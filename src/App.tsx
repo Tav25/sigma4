@@ -1,5 +1,5 @@
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { SceneView } from './scene/SceneView'
 import { generateWallPanel, type WallPanelParams } from './core/wall'
 import { generateWallWithWindow } from './core/window'
@@ -13,6 +13,7 @@ export default function App() {
   const [height, setHeight] = useState(2700)
   const [spacing, setSpacing] = useState(600)
   const [windowEnabled, setWindowEnabled] = useState(false)
+  const [windowX, setWindowX] = useState(900)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
 
@@ -21,16 +22,17 @@ export default function App() {
   const lastElementsRef = useRef(defaultAssembly.elements)
   const assembly = useMemo(() => {
     try {
-      const a = windowEnabled ? generateWallWithWindow(params) : generateWallPanel(params)
+      const a = windowEnabled ? generateWallWithWindow(params, { x: windowX, y: 900, width: 1200, height: 1200 }) : generateWallPanel(params)
       lastElementsRef.current = a.elements
       return a
     } catch (e) {
       console.error('Wall generation error:', e)
       return null
     }
-  }, [length, height, spacing, windowEnabled])
+  }, [length, height, spacing, windowEnabled, windowX])
   const elements = assembly ? assembly.elements : lastElementsRef.current
   const selected = elements.find((e) => e.id === selectedId) ?? null
+  useEffect(() => { if (selectedId && !elements.find((e) => e.id === selectedId)) setSelectedId(null) }, [elements, selectedId])
 
   const dirText = (el: TimberElement) => {
     const m = el.orientation.mode
@@ -44,7 +46,7 @@ export default function App() {
     <div className="app">
       <header className="top-bar">
         <span className="app-title">Конструктор каркасных строений</span>
-        <span className="app-version">0.0.7.1</span>
+        <span className="app-version">0.0.8</span>
       </header>
       <div className="main">
         <aside className="left-panel">
@@ -58,6 +60,9 @@ export default function App() {
               Оконный проём
             </label>
           </div>
+          {windowEnabled && (
+            <SafeNumberInput label="Положение окна X (мм)" value={windowX} onChange={setWindowX} validate={(r) => validateInt(r, 135, 1665, 'положение окна')} />
+          )}
           <div className="param-group">
             <label className="param-label">Сечение</label>
             <input type="text" className="param-input" value="45x145" readOnly />

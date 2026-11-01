@@ -185,3 +185,55 @@ describe('Stage 0.0.7.1 extra cripples', () => {
     expect(br.max.x).toBeCloseTo(2.1, 6)
   })
 })
+
+
+describe('Stage6 window movement', () => {
+  it('X=1100 valid', () => {
+    const w = generateWallWithWindow(params, { x: 1100, y: 900, width: 1200, height: 1200 })
+    expect(w.elements.length).toBeGreaterThan(0)
+    // header at 1055-2345
+    const h = w.elements.find((e) => e.id === 'header-1')!
+    expect(h.position.x).toBe(1055)
+  })
+
+  it('X=600 valid', () => {
+    const w = generateWallWithWindow(params, { x: 600, y: 900, width: 1200, height: 1200 })
+    expect(w.elements.length).toBeGreaterThan(0)
+  })
+
+  it('X=1500 valid', () => {
+    const w = generateWallWithWindow(params, { x: 1500, y: 900, width: 1200, height: 1200 })
+    expect(w.elements.length).toBeGreaterThan(0)
+  })
+
+  it('X=135 valid (min boundary)', () => {
+    const w = generateWallWithWindow(params, { x: 135, y: 900, width: 1200, height: 1200 })
+    expect(w.elements.length).toBeGreaterThan(0)
+  })
+
+  it('X=1665 valid (max boundary)', () => {
+    const w = generateWallWithWindow(params, { x: 1665, y: 900, width: 1200, height: 1200 })
+    expect(w.elements.length).toBeGreaterThan(0)
+  })
+
+  it('X=0 throws', () => {
+    expect(() => generateWallWithWindow(params, { x: 0, y: 900, width: 1200, height: 1200 })).toThrow()
+  })
+
+  it('X=1700 throws', () => {
+    expect(() => generateWallWithWindow(params, { x: 1700, y: 900, width: 1200, height: 1200 })).toThrow()
+  })
+
+  it('sequential restore', () => {
+    const a = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
+    generateWallWithWindow(params, { x: 1100, y: 900, width: 1200, height: 1200 })
+    generateWallWithWindow(params, { x: 600, y: 900, width: 1200, height: 1200 })
+    generateWallWithWindow(params, { x: 1500, y: 900, width: 1200, height: 1200 })
+    const b = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
+    expect(a.elements.length).toBe(b.elements.length)
+    expect(a.elements.map((e) => e.id)).toEqual(b.elements.map((e) => e.id))
+  })
+
+})
+
+
