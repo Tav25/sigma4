@@ -1,8 +1,11 @@
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { SceneView } from './scene/SceneView'
 import { generateWallPanel, type WallPanelParams } from './core/wall'
 import { timberVolumeM3, type TimberElement } from './core/timber'
+import { SafeNumberInput } from './components/SafeNumberInput'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { validateWallLength, validateInt } from './core/validation'
 
 export default function App() {
   const [length, setLength] = useState(3000)
@@ -12,8 +15,19 @@ export default function App() {
   const [showEdges, setShowEdges] = useState(true)
 
   const params: WallPanelParams = { length, height, sectionWidth: 45, sectionHeight: 145, spacing, topLayers: 2 }
-  const assembly = useMemo(() => generateWallPanel(params), [length, height, spacing])
-  const elements = assembly.elements
+  const defaultAssembly = useMemo(() => generateWallPanel({ length: 3000, height: 2700, sectionWidth: 45, sectionHeight: 145, spacing: 600, topLayers: 2 }), [])
+  const lastElementsRef = useRef(defaultAssembly.elements)
+  const assembly = useMemo(() => {
+    try {
+      const a = generateWallPanel(params)
+      lastElementsRef.current = a.elements
+      return a
+    } catch (e) {
+      console.error('Wall generation error:', e)
+      return null
+    }
+  }, [length, height, spacing])
+  const elements = assembly ? assembly.elements : lastElementsRef.current
   const selected = elements.find((e) => e.id === selectedId) ?? null
 
   const dirText = (el: TimberElement) => {
@@ -28,23 +42,14 @@ export default function App() {
     <div className="app">
       <header className="top-bar">
         <span className="app-title">Конструктор каркасных строений</span>
-        <span className="app-version">0.0.6.2</span>
+        <span className="app-version">0.0.6.3</span>
       </header>
       <div className="main">
         <aside className="left-panel">
           <h2 className="panel-title">Стена</h2>
-          <div className="param-group">
-            <label className="param-label">Длина (мм)</label>
-            <input type="number" className="param-input" value={length} onChange={(e) => setLength(Number(e.target.value))} />
-          </div>
-          <div className="param-group">
-            <label className="param-label">Высота (мм)</label>
-            <input type="number" className="param-input" value={height} onChange={(e) => setHeight(Number(e.target.value))} />
-          </div>
-          <div className="param-group">
-            <label className="param-label">Шаг стоек (мм)</label>
-            <input type="number" className="param-input" value={spacing} onChange={(e) => setSpacing(Number(e.target.value))} />
-          </div>
+          <SafeNumberInput label="Длина (мм)" value={length} onChange={setLength} validate={validateWallLength} />
+          <SafeNumberInput label="Высота (мм)" value={height} onChange={setHeight} validate={(r) => validateInt(r, 300, 10000, 'высоту')} />
+          <SafeNumberInput label="Шаг стоек (мм)" value={spacing} onChange={setSpacing} validate={(r) => validateInt(r, 100, 5000, 'шаг')} />
           <div className="param-group">
             <label className="param-label">Сечение</label>
             <input type="text" className="param-input" value="45x145" readOnly />
@@ -93,7 +98,9 @@ export default function App() {
           )}
         </aside>
         <main className="viewport-wrap">
-          <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges} onSelect={setSelectedId} />
+          <ErrorBoundary>
+            <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges} onSelect={setSelectedId} />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
