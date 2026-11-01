@@ -105,6 +105,18 @@ export function applyWindowOpening(elements: TimberElement[], win: WindowOpening
     }))
   }
 
+  // cripple bottom left/right under sill ends
+  result.push(createTimberElement({
+    id: 'cripple-bottom-left', role: 'cripple-bottom', length: oy - 2 * sw, width: sw, height: sh,
+    position: { x: ox + sw / 2, y: sw, z: -sh / 2 },
+    orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
+  }))
+  result.push(createTimberElement({
+    id: 'cripple-bottom-right', role: 'cripple-bottom', length: oy - 2 * sw, width: sw, height: sh,
+    position: { x: openingRight - sw / 2, y: sw, z: -sh / 2 },
+    orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
+  }))
+
   // cripple top x2
   for (const sx of [1200, 1800]) {
     const idx = sx === 1200 ? '1' : '2'

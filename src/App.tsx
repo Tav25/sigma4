@@ -44,7 +44,7 @@ export default function App() {
     <div className="app">
       <header className="top-bar">
         <span className="app-title">Конструктор каркасных строений</span>
-        <span className="app-version">0.0.7</span>
+        <span className="app-version">0.0.7.1</span>
       </header>
       <div className="main">
         <aside className="left-panel">

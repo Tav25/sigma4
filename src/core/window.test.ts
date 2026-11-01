@@ -26,7 +26,7 @@ const params = { length: 3000, height: 2700, sectionWidth: 45, sectionHeight: 14
 describe('Stage5 window opening', () => {
   it('Test A - 18 elements when window on', () => {
     const w = generateWallWithWindow(params)
-    expect(w.elements.length).toBe(18)
+    expect(w.elements.length).toBe(20)
   })
 
   it('Test B - 9 elements when window off', () => {
@@ -37,7 +37,7 @@ describe('Stage5 window opening', () => {
   it('applyWindowOpening toggles count', () => {
     const base = generateWallPanel(params)
     const withWin = applyWindowOpening(base.elements)
-    expect(withWin.length).toBe(18)
+    expect(withWin.length).toBe(20)
   })
 
   it('no element intersects opening (X 900-2100, Y 900-2100)', () => {
@@ -146,10 +146,10 @@ describe('Stage5 window opening', () => {
     expect(size.z).toBeCloseTo(0.145, 6)
   })
 
-  it('volume total 0.22596075', () => {
+  it('volume total 0.23653125', () => {
     const w = generateWallWithWindow(params)
     const total = w.elements.reduce((s, e) => s + timberVolumeM3(e), 0)
-    expect(total).toBeCloseTo(0.22596075, 6)
+    expect(total).toBeCloseTo(0.23653125, 6)
   })
 
   it('no duplicate ids on toggle', () => {
@@ -164,5 +164,24 @@ describe('Stage5 window opening', () => {
     expect(rows.length).toBe(4)
     const xs = rows.map((e) => e.position.x - 22.5).sort((a,b) => a-b)
     expect(xs).toEqual([0, 600, 2400, 2955])
+  })
+})
+
+
+describe('Stage 0.0.7.1 extra cripples', () => {
+  it('count 20', () => {
+    const w = generateWallWithWindow(params)
+    expect(w.elements.length).toBe(20)
+  })
+  it('left/right cripple positions', () => {
+    const w = generateWallWithWindow(params)
+    const cl = w.elements.find((e) => e.id === 'cripple-bottom-left')!
+    const cr = w.elements.find((e) => e.id === 'cripple-bottom-right')!
+    const bl = new THREE.Box3().setFromObject(makeBox(cl))
+    const br = new THREE.Box3().setFromObject(makeBox(cr))
+    expect(bl.min.x).toBeCloseTo(0.9, 6)
+    expect(bl.max.x).toBeCloseTo(0.945, 6)
+    expect(br.min.x).toBeCloseTo(2.055, 6)
+    expect(br.max.x).toBeCloseTo(2.1, 6)
   })
 })
