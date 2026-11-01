@@ -9,6 +9,7 @@ export default function App() {
   const [height, setHeight] = useState(2700)
   const [spacing, setSpacing] = useState(600)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [showEdges, setShowEdges] = useState(true)
 
   const params: WallPanelParams = { length, height, sectionWidth: 45, sectionHeight: 145, spacing, topLayers: 2 }
   const assembly = useMemo(() => generateWallPanel(params), [length, height, spacing])
@@ -27,7 +28,7 @@ export default function App() {
     <div className="app">
       <header className="top-bar">
         <span className="app-title">Конструктор каркасных строений</span>
-        <span className="app-version">0.0.6</span>
+        <span className="app-version">0.0.6.2</span>
       </header>
       <div className="main">
         <aside className="left-panel">
@@ -50,6 +51,12 @@ export default function App() {
           </div>
           <div className="param-group">
             <div>Количество элементов: {elements.length}</div>
+          </div>
+          <div className="param-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={showEdges} onChange={(e) => setShowEdges(e.target.checked)} />
+              Показывать рёбра
+            </label>
           </div>
           <div className="param-group">
             <div style={{ fontWeight: 600, marginBottom: 4 }}>Количество элементов:</div>
@@ -86,7 +93,7 @@ export default function App() {
           )}
         </aside>
         <main className="viewport-wrap">
-          <SceneView elements={elements} selectedId={selectedId} onSelect={setSelectedId} />
+          <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges} onSelect={setSelectedId} />
         </main>
       </div>
     </div>

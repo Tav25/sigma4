@@ -137,3 +137,70 @@ describe('Stage4 wall panel', () => {
     expect(starts).toEqual([0, 600, 1200, 1800, 2400, 2955])
   })
 })
+
+
+describe('Stage4.2 stud placement', () => {
+  it('L=2000: 5 studs at expected positions', () => {
+    const w = generateWallPanel({ length: 2000, height: 2700, sectionWidth: 45, sectionHeight: 145, spacing: 600, topLayers: 2 })
+    expect(w.elements.length).toBe(8)
+    const studs = w.elements.filter((e) => e.role === 'stud').sort((a,b) => a.position.x - b.position.x)
+    expect(studs.length).toBe(5)
+    const starts = studs.map((st) => st.position.x - 22.5)
+    expect(starts).toEqual([0, 600, 1200, 1577.5, 1955])
+    // all within bounds
+    for (const st of studs) {
+      const box = new THREE.Box3().setFromObject(makeBox(st))
+      expect(box.min.x).toBeGreaterThanOrEqual(-1e-9)
+      expect(box.max.x).toBeLessThanOrEqual(2 + 1e-9)
+    }
+  })
+
+  it('L=1500: 4 studs at expected positions', () => {
+    const w = generateWallPanel({ length: 1500, height: 2700, sectionWidth: 45, sectionHeight: 145, spacing: 600, topLayers: 2 })
+    expect(w.elements.length).toBe(7)
+    const studs = w.elements.filter((e) => e.role === 'stud').sort((a,b) => a.position.x - b.position.x)
+    expect(studs.length).toBe(4)
+    const starts = studs.map((st) => st.position.x - 22.5)
+    expect(starts).toEqual([0, 600, 1027.5, 1455])
+  })
+
+  it('L=3000: 6 studs expected', () => {
+    const w = generateWallPanel(params)
+    const studs = w.elements.filter((e) => e.role === 'stud').sort((a,b) => a.position.x - b.position.x)
+    const starts = studs.map((st) => st.position.x - 22.5)
+    expect(starts).toEqual([0, 600, 1200, 1800, 2400, 2955])
+  })
+
+  it('sequential 3000->2000->1500->3000 restores', () => {
+    const w1 = generateWallPanel({ ...params, length: 3000 })
+    const w2 = generateWallPanel({ ...params, length: 2000 })
+    const w3 = generateWallPanel({ ...params, length: 1500 })
+    const w4 = generateWallPanel({ ...params, length: 3000 })
+    expect(w2.elements.length).toBe(8)
+    expect(w3.elements.length).toBe(7)
+    expect(w1.elements.length).toBe(w4.elements.length)
+    expect(w1.elements.map((e) => e.id)).toEqual(w4.elements.map((e) => e.id))
+  })
+
+  it('volumes table', () => {
+    const v3000 = generateWallPanel({ ...params, length: 3000 }).elements.reduce((s,e) => s + timberVolumeM3(e), 0)
+    const v2000 = generateWallPanel({ ...params, length: 2000 }).elements.reduce((s,e) => s + timberVolumeM3(e), 0)
+    const v1500 = generateWallPanel({ ...params, length: 1500 }).elements.reduce((s,e) => s + timberVolumeM3(e), 0)
+    expect(v3000).toBeCloseTo(0.15914475, 6)
+    expect(v2000).toBeCloseTo(0.122833125, 6)
+    expect(v1500).toBeCloseTo(0.096309, 6)
+  })
+
+  it('throws on too short wall', () => {
+    expect(() => generateWallPanel({ ...params, length: 45 })).toThrow()
+  })
+
+  it('Y/Z invariants on length change', () => {
+    const w = generateWallPanel({ ...params, length: 2000 })
+    const stud = w.elements.find((e) => e.role === 'stud')!
+    expect(stud.length).toBe(2565)
+    const box = new THREE.Box3().setFromObject(makeBox(stud))
+    expect(box.max.y - box.min.y).toBeCloseTo(2.565, 6)
+    expect(box.max.z - box.min.z).toBeCloseTo(0.145, 6)
+  })
+})

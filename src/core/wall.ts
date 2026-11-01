@@ -13,15 +13,32 @@ export interface WallPanelParams {
 }
 
 function studStarts(length: number, spacing: number, sectionWidth: number): number[] {
+  if (length < 2 * sectionWidth) {
+    throw new Error('Wall length too short for two studs')
+  }
+  const minInterval = 300
+  const right = length - sectionWidth
   const starts: number[] = [0]
   let x = spacing
-  while (x + sectionWidth < length) {
+  while (x <= right - minInterval) {
     starts.push(x)
     x += spacing
   }
-  const last = length - sectionWidth
-  if (!starts.includes(last)) starts.push(last)
-  return [...new Set(starts)].sort((a, b) => a - b)
+  // last pushed is the largest multiple <= right - minInterval
+  const lastPushed = starts[starts.length - 1]
+  const remaining = right - lastPushed
+  if (remaining <= spacing) {
+    if (!starts.includes(right)) starts.push(right)
+  } else {
+    const n = Math.ceil(remaining / spacing)
+    const step = remaining / n
+    for (let i = 1; i < n; i++) {
+      const pos = lastPushed + step * i
+      if (!starts.includes(Math.round(pos * 1000) / 1000)) starts.push(pos)
+    }
+    if (!starts.includes(right)) starts.push(right)
+  }
+  return [...new Set(starts.map((v) => Math.round(v * 1000) / 1000))].sort((a, b) => a - b)
 }
 
 export function generateWallPanel(params: WallPanelParams): FrameAssembly {
