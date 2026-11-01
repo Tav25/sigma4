@@ -2,6 +2,7 @@
 import { useState, useMemo, useRef } from 'react'
 import { SceneView } from './scene/SceneView'
 import { generateWallPanel, type WallPanelParams } from './core/wall'
+import { generateWallWithWindow } from './core/window'
 import { timberVolumeM3, type TimberElement } from './core/timber'
 import { SafeNumberInput } from './components/SafeNumberInput'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -11,6 +12,7 @@ export default function App() {
   const [length, setLength] = useState(3000)
   const [height, setHeight] = useState(2700)
   const [spacing, setSpacing] = useState(600)
+  const [windowEnabled, setWindowEnabled] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
 
@@ -19,14 +21,14 @@ export default function App() {
   const lastElementsRef = useRef(defaultAssembly.elements)
   const assembly = useMemo(() => {
     try {
-      const a = generateWallPanel(params)
+      const a = windowEnabled ? generateWallWithWindow(params) : generateWallPanel(params)
       lastElementsRef.current = a.elements
       return a
     } catch (e) {
       console.error('Wall generation error:', e)
       return null
     }
-  }, [length, height, spacing])
+  }, [length, height, spacing, windowEnabled])
   const elements = assembly ? assembly.elements : lastElementsRef.current
   const selected = elements.find((e) => e.id === selectedId) ?? null
 
@@ -42,7 +44,7 @@ export default function App() {
     <div className="app">
       <header className="top-bar">
         <span className="app-title">Конструктор каркасных строений</span>
-        <span className="app-version">0.0.6.3</span>
+        <span className="app-version">0.0.7</span>
       </header>
       <div className="main">
         <aside className="left-panel">
@@ -50,6 +52,12 @@ export default function App() {
           <SafeNumberInput label="Длина (мм)" value={length} onChange={setLength} validate={validateWallLength} />
           <SafeNumberInput label="Высота (мм)" value={height} onChange={setHeight} validate={(r) => validateInt(r, 300, 10000, 'высоту')} />
           <SafeNumberInput label="Шаг стоек (мм)" value={spacing} onChange={setSpacing} validate={(r) => validateInt(r, 100, 5000, 'шаг')} />
+          <div className="param-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={windowEnabled} onChange={(e) => setWindowEnabled(e.target.checked)} />
+              Оконный проём
+            </label>
+          </div>
           <div className="param-group">
             <label className="param-label">Сечение</label>
             <input type="text" className="param-input" value="45x145" readOnly />
