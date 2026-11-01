@@ -1,9 +1,0 @@
-{
-  "name": "Параметрический конструктор каркасных строений",
-  "short_name": "Каркас",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#8B5A2B",
-  "icons": []
-}
