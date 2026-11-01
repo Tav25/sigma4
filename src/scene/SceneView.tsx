@@ -55,6 +55,7 @@ export function SceneView({
   const rafRef = useRef<number | null>(null)
   const pendingXRef = useRef<{ id: string; x: number } | null>(null)
   const hoveredWindowRef = useRef<string | null>(null)
+  const lastDraggedRef = useRef<string | null>(null)
   const [cursor, setCursor] = useState('default')
 
   useEffect(() => { elementsRef.current = elements }, [elements])
@@ -151,6 +152,7 @@ export function SceneView({
             const px = getWallIntersection(event)
             if (px !== null) draggingRef.current.startPointer = px
             windowSelectedRef.current = hitId
+            lastDraggedRef.current = hitId
             if (onWindowSelect) onWindowSelect(hitId)
             if (controlsRef.current) controlsRef.current.enabled = false
             setCursor('grabbing')
@@ -557,7 +559,8 @@ export function SceneView({
     windowEntriesRef.current.forEach((w, id) => {
       const sel = id === selectedWindowId
       const hov = id === hoveredWindowRef.current
-      w.outline.visible = sel || hov
+      const dragged = id === lastDraggedRef.current
+      w.outline.visible = sel || hov || dragged
     })
   }, [selectedWindowId])
 

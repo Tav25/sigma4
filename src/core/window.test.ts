@@ -25,7 +25,7 @@ const params = { length: 3000, height: 2700, sectionWidth: 45, sectionHeight: 14
 
 describe('Stage5 window opening', () => {
   it('Test A - 18 elements when window on', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     expect(w.elements.length).toBe(20)
   })
 
@@ -41,7 +41,7 @@ describe('Stage5 window opening', () => {
   })
 
   it('no element intersects opening (X 900-2100, Y 900-2100)', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const ox = 900, oy = 900, ow = 1200, oh = 1200
     for (const el of w.elements) {
       const mesh = makeBox(el)
@@ -60,7 +60,7 @@ describe('Stage5 window opening', () => {
   })
 
   it('king studs positions', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const kl = w.elements.find((e) => e.id === 'king-left')!
     const kr = w.elements.find((e) => e.id === 'king-right')!
     const klBox = new THREE.Box3().setFromObject(makeBox(kl))
@@ -74,7 +74,7 @@ describe('Stage5 window opening', () => {
   })
 
   it('jack studs positions', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const jl = w.elements.find((e) => e.id === 'jack-left')!
     const jr = w.elements.find((e) => e.id === 'jack-right')!
     const jlBox = new THREE.Box3().setFromObject(makeBox(jl))
@@ -88,7 +88,7 @@ describe('Stage5 window opening', () => {
   })
 
   it('header two boards Z split', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const h1 = w.elements.find((e) => e.id === 'header-1')!
     const h2 = w.elements.find((e) => e.id === 'header-2')!
     const b1 = new THREE.Box3().setFromObject(makeBox(h1))
@@ -104,7 +104,7 @@ describe('Stage5 window opening', () => {
   })
 
   it('sill position', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const sill = w.elements.find((e) => e.id === 'sill')!
     const box = new THREE.Box3().setFromObject(makeBox(sill))
     expect(box.min.x).toBeCloseTo(0.9, 6)
@@ -114,7 +114,7 @@ describe('Stage5 window opening', () => {
   })
 
   it('cripple bottom', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const c = w.elements.find((e) => e.id === 'cripple-bottom-1')!
     const box = new THREE.Box3().setFromObject(makeBox(c))
     expect(box.min.x).toBeCloseTo(1.2, 6)
@@ -125,7 +125,7 @@ describe('Stage5 window opening', () => {
   })
 
   it('cripple top', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const c = w.elements.find((e) => e.id === 'cripple-top-1')!
     const box = new THREE.Box3().setFromObject(makeBox(c))
     expect(box.min.x).toBeCloseTo(1.2, 6)
@@ -136,7 +136,7 @@ describe('Stage5 window opening', () => {
   })
 
   it('overall bbox 3000x2700x145', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const full = new THREE.Box3()
     for (const el of w.elements) full.union(new THREE.Box3().setFromObject(makeBox(el)))
     const size = new THREE.Vector3()
@@ -147,19 +147,19 @@ describe('Stage5 window opening', () => {
   })
 
   it('volume total 0.23653125', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const total = w.elements.reduce((s, e) => s + timberVolumeM3(e), 0)
     expect(total).toBeCloseTo(0.23653125, 6)
   })
 
   it('no duplicate ids on toggle', () => {
-    const w1 = generateWallWithWindow(params)
-    const w2 = generateWallWithWindow(params)
+    const w1 = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
+    const w2 = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     expect(w1.elements.map((e) => e.id)).toEqual(w2.elements.map((e) => e.id))
   })
 
   it('remaining row studs are 4', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const rows = w.elements.filter((e) => e.role === 'stud')
     expect(rows.length).toBe(4)
     const xs = rows.map((e) => e.position.x - 22.5).sort((a,b) => a-b)
@@ -170,11 +170,11 @@ describe('Stage5 window opening', () => {
 
 describe('Stage 0.0.7.1 extra cripples', () => {
   it('count 20', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     expect(w.elements.length).toBe(20)
   })
   it('left/right cripple positions', () => {
-    const w = generateWallWithWindow(params)
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
     const cl = w.elements.find((e) => e.id === 'cripple-bottom-left')!
     const cr = w.elements.find((e) => e.id === 'cripple-bottom-right')!
     const bl = new THREE.Box3().setFromObject(makeBox(cl))

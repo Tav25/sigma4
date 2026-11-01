@@ -35,6 +35,8 @@ export default function App() {
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
+  const [doorEnabled, setDoorEnabled] = useState(false)
+  const [doorParams, setDoorParams] = useState({ positionXmm: 3000, widthMm: 900, heightMm: 2100 })
   const idCounterRef = useRef(2)
 
   const selectedWindow = openings.find((o) => o.id === selectedWindowId) ?? null
@@ -42,16 +44,18 @@ export default function App() {
   const params = { length, height, sectionWidth: 45, sectionHeight: 145, spacing, topLayers: 2 }
   const defaultAssembly = useMemo(() => generateWallPanel({ length: 3000, height: 2700, sectionWidth: 45, sectionHeight: 145, spacing: 600, topLayers: 2 }), [])
   const lastElementsRef = useRef(defaultAssembly.elements)
+  const allOpenings = doorEnabled ? [...openings, { id: 'D01', positionXmm: doorParams.positionXmm, widthMm: doorParams.widthMm, heightMm: doorParams.heightMm, sillHeightMm: 0, type: 'door' } as WindowOpening] : openings
+  const doorOpening = allOpenings.find((o) => o.type === 'door') ?? null
   const assembly = useMemo(() => {
     try {
-      const a = openings.length > 0 ? generateWallWithOpenings(params, openings) : generateWallPanel(params)
+      const a = allOpenings.length > 0 ? generateWallWithOpenings(params, allOpenings) : generateWallPanel(params)
       lastElementsRef.current = a.elements
       return a
     } catch (e) {
       console.error('Wall generation error:', e)
       return null
     }
-  }, [length, height, spacing, openings])
+  }, [length, height, spacing, openings, doorEnabled, doorParams])
   const elements = assembly ? assembly.elements : lastElementsRef.current
   const selected = elements.find((e) => e.id === selectedId) ?? null
   useEffect(() => { if (selectedId && !elements.find((e) => e.id === selectedId)) setSelectedId(null) }, [elements, selectedId])
@@ -59,6 +63,11 @@ export default function App() {
 
   const updateWindow = (id: string, patch: Partial<WindowOpening>) => {
     setOpenings((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
+  }
+  const updateDoor = (patch: Partial<WindowOpening>) => {
+    // door is stored separately via doorEnabled; update a synthetic door opening in allOpenings by regenerating
+    // We track door params in a state variable
+    setDoorParams((prev) => ({ ...prev, ...patch }))
   }
 
   const addWindow = () => {
@@ -91,7 +100,7 @@ export default function App() {
     <div className="app">
       <header className="top-bar">
         <span className="app-title">Конструктор каркасных строений</span>
-        <span className="app-version">0.0.11.1</span>
+        <span className="app-version">0.0.14</span>
       </header>
       <div className="main">
         <aside className="left-panel">
@@ -157,6 +166,22 @@ export default function App() {
             </div>
           )}
 
+          <h2 className="panel-title" style={{ marginTop: 16 }}>Дверной проём</h2>
+          <div className="param-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={doorEnabled} onChange={(e) => setDoorEnabled(e.target.checked)} />
+              Добавить дверь
+            </label>
+          </div>
+          {doorEnabled && doorOpening && (
+            <div className="props">
+              <div>ID: {doorOpening.id}</div>
+              <SafeNumberInput label="Положение X (мм)" value={doorOpening.positionXmm} onChange={(v) => updateDoor({ positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
+              <SafeNumberInput label="Ширина (мм)" value={doorOpening.widthMm} onChange={(v) => updateDoor({ widthMm: v })} validate={(r) => validateInt(r, 600, 5000, 'ширина')} />
+              <SafeNumberInput label="Высота (мм)" value={doorOpening.heightMm} onChange={(v) => updateDoor({ heightMm: v })} validate={(r) => validateInt(r, 1600, 5000, 'высота')} />
+            </div>
+          )}
+
           {selected && (
             <div className="props">
               <h3 className="props-title">Свойства детали</h3>
@@ -174,8 +199,11 @@ export default function App() {
         <main className="viewport-wrap">
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
-              openings={openings} selectedWindowId={selectedWindowId} wallLength={length}
-              onWindowXChange={(id, x) => updateWindow(id, { positionXmm: x })}
+              openings={allOpenings} selectedWindowId={selectedWindowId} wallLength={length}
+              onWindowXChange={(id, x) => {
+                if (id.startsWith('D')) setDoorParams((prev) => ({ ...prev, positionXmm: x }))
+                else updateWindow(id, { positionXmm: x })
+              }}
               onWindowSelect={setSelectedWindowId}
               onSelect={setSelectedId} />
           </ErrorBoundary>
