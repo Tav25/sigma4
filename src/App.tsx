@@ -91,7 +91,7 @@ export default function App() {
     <div className="app">
       <header className="top-bar">
         <span className="app-title">Конструктор каркасных строений</span>
-        <span className="app-version">0.0.11</span>
+        <span className="app-version">0.0.11.1</span>
       </header>
       <div className="main">
         <aside className="left-panel">
@@ -115,7 +115,7 @@ export default function App() {
           <div className="param-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
               <input type="checkbox" checked={showEdges} onChange={(e) => setShowEdges(e.target.checked)} />
-              \u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u0440\u0451\u0431\u0440\u0430
+              Показывать рёбра
             </label>
           </div>
 
@@ -174,7 +174,7 @@ export default function App() {
         <main className="viewport-wrap">
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
-              openings={openings} selectedWindowId={selectedWindowId}
+              openings={openings} selectedWindowId={selectedWindowId} wallLength={length}
               onWindowXChange={(id, x) => updateWindow(id, { positionXmm: x })}
               onWindowSelect={setSelectedWindowId}
               onSelect={setSelectedId} />

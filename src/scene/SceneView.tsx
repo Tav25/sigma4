@@ -4,12 +4,14 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { generateTimberGeometry, boxCenterWorld, mmToMeters, type TimberElement } from '../core/timber'
 import type { WindowOpening } from '../core/window'
+import { getWindowPositionBounds } from '../core/window'
 
 interface SceneViewProps {
   elements: TimberElement[]
   selectedId: string | null
   showEdges?: boolean
   openings: WindowOpening[]
+  wallLength?: number
   selectedWindowId: string | null
   onWindowSelect?: (id: string | null) => void
   onWindowXChange?: (id: string, x: number) => void
@@ -31,7 +33,7 @@ interface WindowEntry {
 
 export function SceneView({
   elements, selectedId, showEdges = true,
-  openings, selectedWindowId, onWindowSelect, onWindowXChange, onSelect,
+  openings, wallLength = 3000, selectedWindowId, onWindowSelect, onWindowXChange, onSelect,
 }: SceneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
@@ -47,6 +49,7 @@ export function SceneView({
   const openingsRef = useRef<WindowOpening[]>(openings)
   const windowSelectedRef = useRef<string | null>(selectedWindowId)
   const hasCenteredRef = useRef<boolean>(false)
+  const wallLengthRef = useRef<number>(wallLength)
 
   const draggingRef = useRef<{ id: string; startX: number; startPointer: number } | null>(null)
   const rafRef = useRef<number | null>(null)
@@ -58,6 +61,7 @@ export function SceneView({
   useEffect(() => { selectedRef.current = selectedId }, [selectedId])
   useEffect(() => { showEdgesRef.current = showEdges }, [showEdges])
   useEffect(() => { openingsRef.current = openings }, [openings])
+  useEffect(() => { wallLengthRef.current = wallLength }, [wallLength])
   useEffect(() => { windowSelectedRef.current = selectedWindowId }, [selectedWindowId])
 
   // mount
@@ -111,15 +115,12 @@ export function SceneView({
     }
 
     const clampX = (id: string, x: number, w: number) => {
+      const win = openingsRef.current.find((o) => o.id === id)
+      if (!win) return x
       const others = openingsRef.current.filter((o) => o.id !== id)
-      let minX = 135
-      let maxX = 3000 - w - 135
-      for (const o of others) {
-        const frameMax = o.positionXmm + o.widthMm + 90
-        const frameMin = o.positionXmm - 90
-        if (o.positionXmm < x) minX = Math.max(minX, frameMax + 90)
-        else maxX = Math.min(maxX, frameMin - w - 90)
-      }
+      const bounds2 = getWindowPositionBounds(wallLengthRef.current, { positionXmm: x, widthMm: w }, others)
+      const minX = bounds2.minX
+      const maxX = bounds2.maxX
       return Math.max(minX, Math.min(maxX, x))
     }
 

@@ -1,7 +1,7 @@
 
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { generateWallWithWindow, applyWindowOpening } from './window'
+import { generateWallWithWindow, applyWindowOpening, getWindowPositionBounds } from './window'
 import { generateWallPanel } from './wall'
 import {
   generateTimberGeometry,
@@ -264,5 +264,18 @@ describe('Stage7 window size params', () => {
 
   it('invalid sill height throws', () => {
     expect(() => generateWallWithWindow(params, { x: 900, y: 100, width: 1200, height: 1200 })).toThrow()
+  })
+})
+
+
+describe('getWindowPositionBounds', () => {
+  it('single window in 6000 wall: max 5565 for 300 width', () => {
+    const b = getWindowPositionBounds(6000, { positionXmm: 900, widthMm: 300 }, [])
+    expect(b.minX).toBe(135)
+    expect(b.maxX).toBe(5565)
+  })
+  it('single window in 3000 wall: max 2565 for 300 width', () => {
+    const b = getWindowPositionBounds(3000, { positionXmm: 900, widthMm: 300 }, [])
+    expect(b.maxX).toBe(2565)
   })
 })

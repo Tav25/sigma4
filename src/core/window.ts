@@ -235,3 +235,35 @@ export function generateWallWithWindow(params: WallPanelParams, win: WindowOpeni
   const elements = applyWindowOpening(base.elements, win)
   return { id: 'wall-with-window', elements }
 }
+
+
+export interface WindowBounds {
+  minX: number
+  maxX: number
+}
+
+export function getWindowPositionBounds(
+  wallLength: number,
+  selectedWindow: { positionXmm: number; widthMm: number },
+  otherOpenings: { positionXmm: number; widthMm: number }[],
+): WindowBounds {
+  const w = selectedWindow.widthMm
+  let minX = 135
+  let maxX = wallLength - w - 135
+  for (const o of otherOpenings) {
+    const otherFrameMax = o.positionXmm + o.widthMm + 90
+    const otherFrameMin = o.positionXmm - 90
+    if (o.positionXmm < selectedWindow.positionXmm) {
+      // other is to the left: selected minX must be >= otherFrameMax + 90
+      minX = Math.max(minX, otherFrameMax + 90)
+    } else {
+      // other is to the right: selected maxX must be <= otherFrameMin - w - 90
+      maxX = Math.min(maxX, otherFrameMin - w - 90)
+    }
+  }
+  if (minX > maxX) {
+    // no valid range; collapse
+    minX = maxX
+  }
+  return { minX, maxX }
+}
