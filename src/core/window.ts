@@ -4,6 +4,15 @@ import type { TimberElement } from './timber'
 import { generateWallPanel } from './wall'
 import type { WallPanelParams } from './wall'
 
+export interface WindowOpening {
+  id: string
+  positionXmm: number
+  widthMm: number
+  heightMm: number
+  sillHeightMm: number
+  type: string
+}
+
 export interface WindowOpeningParams {
   x: number
   y: number
@@ -25,9 +34,9 @@ function xOverlap(a1: number, a2: number, b1: number, b2: number): boolean {
   return a1 < b2 - 1e-9 && b1 < a2 - 1e-9
 }
 
-export function applyWindowOpening(elements: TimberElement[], win: WindowOpeningParams = DEFAULT_WINDOW): TimberElement[] {
+export function applyWindowOpening(elements: TimberElement[], win: WindowOpeningParams = DEFAULT_WINDOW, idPrefix: string = ''): TimberElement[] {
   const ox = win.x
-  const oy = win.y
+  const oy = win.y  // sill height (bottom of opening)
   const ow = win.width
   const oh = win.height
   const openingRight = ox + ow
@@ -39,18 +48,16 @@ export function applyWindowOpening(elements: TimberElement[], win: WindowOpening
   const top2 = elements.find((e) => e.id === 'plate-top-2')
   const wallHeight = top2 ? top2.position.y + SW / 2 : 2700
 
-  if (ox < 135 || ox > 1665) {
-    throw new Error('Window position out of range')
-  }
-  if (ox < 0 || oy < 0 || openingRight > wallLength || openingTop > wallHeight) {
-    throw new Error('Window does not fit in wall')
-  }
-  if (openingRight + SW * 2 > wallLength) {
-    throw new Error('Window framing exceeds wall length')
-  }
-  if (ox - SW * 2 < 0) {
-    throw new Error('Window framing exceeds wall length')
-  }
+  // constraints
+  if (ox < 135) throw new Error('Window position out of range')
+  if (ox + ow > wallLength - 135) throw new Error('Window position out of range')
+  if (ow < 300) throw new Error('Window width too small')
+  if (oh < 300) throw new Error('Window height too small')
+  if (oy < 300) throw new Error('Sill height too small')
+  if (openingRight + SW * 2 > wallLength) throw new Error('Window framing exceeds wall length')
+  if (ox - SW * 2 < 0) throw new Error('Window framing exceeds wall length')
+  if (oy + oh + SH > wallHeight - SW * 2) throw new Error('Window too tall for wall height')
+  if (oy + oh + SH + (wallHeight - SW * 2 - (oy + oh + SH)) < 0) throw new Error('No space for top cripples')
 
   const openingRange = [ox, openingRight]
   const framingRanges = [
@@ -60,7 +67,6 @@ export function applyWindowOpening(elements: TimberElement[], win: WindowOpening
     [openingRight + SW, openingRight + 2 * SW],
   ]
 
-  // remove row studs that overlap opening or framing in X
   const removedOpeningStuds: number[] = []
   const result: TimberElement[] = []
   for (const e of elements) {
@@ -71,7 +77,7 @@ export function applyWindowOpening(elements: TimberElement[], win: WindowOpening
       const overlapsFraming = framingRanges.some(([a, b]) => xOverlap(minX, maxX, a, b))
       if (overlapsOpening || overlapsFraming) {
         if (overlapsOpening && !overlapsFraming) {
-          removedOpeningStuds.push(minX) // start X
+          removedOpeningStuds.push(minX)
         }
         continue
       }
@@ -79,7 +85,6 @@ export function applyWindowOpening(elements: TimberElement[], win: WindowOpening
     result.push(e)
   }
 
-  // helper: check X+Y conflict with existing
   function canAdd(minX: number, maxX: number, minY: number, maxY: number): boolean {
     for (const e of result) {
       let eMinX: number, eMaxX: number, eMinY: number, eMaxY: number
@@ -110,42 +115,42 @@ export function applyWindowOpening(elements: TimberElement[], win: WindowOpening
 
   const kingLen = wallHeight - SW * 3
   result.push(createTimberElement({
-    id: 'king-left', role: 'king-stud', length: kingLen, width: SW, height: SH,
+    id: idPrefix + 'king-left', role: 'king-stud', length: kingLen, width: SW, height: SH,
     position: { x: ox - SW - SW / 2, y: SW, z: -SH / 2 },
     orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
   }))
   result.push(createTimberElement({
-    id: 'king-right', role: 'king-stud', length: kingLen, width: SW, height: SH,
+    id: idPrefix + 'king-right', role: 'king-stud', length: kingLen, width: SW, height: SH,
     position: { x: openingRight + SW + SW / 2, y: SW, z: -SH / 2 },
     orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
   }))
 
   const jackLen = openingTop - SW
   result.push(createTimberElement({
-    id: 'jack-left', role: 'jack-stud', length: jackLen, width: SW, height: SH,
+    id: idPrefix + 'jack-left', role: 'jack-stud', length: jackLen, width: SW, height: SH,
     position: { x: ox - SW / 2, y: SW, z: -SH / 2 },
     orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
   }))
   result.push(createTimberElement({
-    id: 'jack-right', role: 'jack-stud', length: jackLen, width: SW, height: SH,
+    id: idPrefix + 'jack-right', role: 'jack-stud', length: jackLen, width: SW, height: SH,
     position: { x: openingRight + SW / 2, y: SW, z: -SH / 2 },
     orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
   }))
 
   const headerLen = (openingRight + SW) - (ox - SW)
   result.push(createTimberElement({
-    id: 'header-1', role: 'header', length: headerLen, width: SW, height: SH,
+    id: idPrefix + 'header-1', role: 'header', length: headerLen, width: SW, height: SH,
     position: { x: ox - SW, y: openingTop, z: -50 },
     orientation: { mode: 'x', angle: 0, roll: 0 }, material: 'wood',
   }))
   result.push(createTimberElement({
-    id: 'header-2', role: 'header', length: headerLen, width: SW, height: SH,
+    id: idPrefix + 'header-2', role: 'header', length: headerLen, width: SW, height: SH,
     position: { x: ox - SW, y: openingTop, z: 50 },
     orientation: { mode: 'x', angle: 0, roll: 0 }, material: 'wood',
   }))
 
   result.push(createTimberElement({
-    id: 'sill', role: 'sill', length: ow, width: SW, height: SH,
+    id: idPrefix + 'sill', role: 'sill', length: ow, width: SW, height: SH,
     position: { x: ox, y: oy - SW + SW / 2, z: -SH / 2 },
     orientation: { mode: 'x', angle: 0, roll: 90 }, material: 'wood',
   }))
@@ -159,25 +164,28 @@ export function applyWindowOpening(elements: TimberElement[], win: WindowOpening
     const cMaxY = oy - SW
     if (!canAdd(cMinX, cMaxX, cMinY, cMaxY)) continue
     result.push(createTimberElement({
-      id: `cripple-bottom-${idx}`, role: 'cripple-bottom', length: oy - 2 * SW, width: SW, height: SH,
+      id: idPrefix + `cripple-bottom-${idx}`, role: 'cripple-bottom', length: oy - 2 * SW, width: SW, height: SH,
       position: { x: sx + SW / 2, y: SW, z: -SH / 2 },
       orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
     }))
   }
 
   // cripple top from removed opening studs
-  for (const sx of removedOpeningStuds) {
-    const idx = removedOpeningStuds.indexOf(sx) + 1
-    const cMinX = sx
-    const cMaxX = sx + SW
-    const cMinY = openingTop + SH
-    const cMaxY = wallHeight - SW * 2
-    if (!canAdd(cMinX, cMaxX, cMinY, cMaxY)) continue
-    result.push(createTimberElement({
-      id: `cripple-top-${idx}`, role: 'cripple-top', length: (wallHeight - SW * 2) - (openingTop + SH), width: SW, height: SH,
-      position: { x: sx + SW / 2, y: openingTop + SH, z: -SH / 2 },
-      orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
-    }))
+  const crippleTopLen = (wallHeight - SW * 2) - (openingTop + SH)
+  if (crippleTopLen > 0) {
+    for (const sx of removedOpeningStuds) {
+      const idx = removedOpeningStuds.indexOf(sx) + 1
+      const cMinX = sx
+      const cMaxX = sx + SW
+      const cMinY = openingTop + SH
+      const cMaxY = wallHeight - SW * 2
+      if (!canAdd(cMinX, cMaxX, cMinY, cMaxY)) continue
+      result.push(createTimberElement({
+        id: idPrefix + `cripple-top-${idx}`, role: 'cripple-top', length: crippleTopLen, width: SW, height: SH,
+        position: { x: sx + SW / 2, y: openingTop + SH, z: -SH / 2 },
+        orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
+      }))
+    }
   }
 
   // sill-end cripples
@@ -190,13 +198,36 @@ export function applyWindowOpening(elements: TimberElement[], win: WindowOpening
     const cMaxY = oy - SW
     if (!canAdd(cMinX, cMaxX, cMinY, cMaxY)) continue
     result.push(createTimberElement({
-      id: `cripple-bottom-${suffix}`, role: 'cripple-bottom', length: oy - 2 * SW, width: SW, height: SH,
+      id: idPrefix + `cripple-bottom-${suffix}`, role: 'cripple-bottom', length: oy - 2 * SW, width: SW, height: SH,
       position: { x: sx + SW / 2, y: SW, z: -SH / 2 },
       orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
     }))
   }
 
   return result
+}
+
+export function generateWallWithOpenings(params: WallPanelParams, openings: WindowOpening[]): { id: string; elements: TimberElement[] } {
+  // validate each
+  const sorted = [...openings].sort((a, b) => a.positionXmm - b.positionXmm)
+  // pairwise framing overlap check
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      const a = sorted[i]
+      const b = sorted[j]
+      const aFrameMax = a.positionXmm + a.widthMm + 90
+      const bFrameMin = b.positionXmm - 90
+      if (aFrameMax > bFrameMin) {
+        throw new Error('Not enough space between windows for side studs')
+      }
+    }
+  }
+  const base = generateWallPanel(params)
+  let elements = base.elements
+  for (const o of sorted) {
+    elements = applyWindowOpening(elements.map((e) => ({ ...e })), { x: o.positionXmm, y: o.sillHeightMm, width: o.widthMm, height: o.heightMm }, o.id + '-')
+  }
+  return { id: 'wall-with-openings', elements }
 }
 
 export function generateWallWithWindow(params: WallPanelParams, win: WindowOpeningParams = DEFAULT_WINDOW): { id: string; elements: TimberElement[] } {

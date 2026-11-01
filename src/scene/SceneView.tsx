@@ -1,14 +1,19 @@
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { generateTimberGeometry, boxCenterWorld, mmToMeters, type TimberElement } from '../core/timber'
+import type { WindowOpening } from '../core/window'
 
 interface SceneViewProps {
   elements: TimberElement[]
   selectedId: string | null
   showEdges?: boolean
-  onSelect?: (id: string) => void
+  openings: WindowOpening[]
+  selectedWindowId: string | null
+  onWindowSelect?: (id: string | null) => void
+  onWindowXChange?: (id: string, x: number) => void
+  onSelect?: (id: string | null) => void
 }
 
 interface MeshEntry {
@@ -19,23 +24,43 @@ interface MeshEntry {
   edgesMat: THREE.LineBasicMaterial
 }
 
-export function SceneView({ elements, selectedId, showEdges = true, onSelect }: SceneViewProps) {
+interface WindowEntry {
+  hitPlane: THREE.Mesh
+  outline: THREE.Line
+}
+
+export function SceneView({
+  elements, selectedId, showEdges = true,
+  openings, selectedWindowId, onWindowSelect, onWindowXChange, onSelect,
+}: SceneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
   const entriesRef = useRef<Map<string, MeshEntry>>(new Map())
+  const windowEntriesRef = useRef<Map<string, WindowEntry>>(new Map())
   const resetRef = useRef<(() => void) | null>(null)
   const elementsRef = useRef<TimberElement[]>(elements)
   const selectedRef = useRef<string | null>(selectedId)
   const showEdgesRef = useRef<boolean>(showEdges)
+  const openingsRef = useRef<WindowOpening[]>(openings)
+  const windowSelectedRef = useRef<string | null>(selectedWindowId)
+  const hasCenteredRef = useRef<boolean>(false)
+
+  const draggingRef = useRef<{ id: string; startX: number; startPointer: number } | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const pendingXRef = useRef<{ id: string; x: number } | null>(null)
+  const hoveredWindowRef = useRef<string | null>(null)
+  const [cursor, setCursor] = useState('default')
 
   useEffect(() => { elementsRef.current = elements }, [elements])
   useEffect(() => { selectedRef.current = selectedId }, [selectedId])
   useEffect(() => { showEdgesRef.current = showEdges }, [showEdges])
+  useEffect(() => { openingsRef.current = openings }, [openings])
+  useEffect(() => { windowSelectedRef.current = selectedWindowId }, [selectedWindowId])
 
-  // mount scene once
+  // mount
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -69,7 +94,37 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
 
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
-    const onClick = (event: MouseEvent) => {
+
+    const getWallIntersection = (event: PointerEvent | MouseEvent): number | null => {
+      const cam = cameraRef.current
+      const ren = rendererRef.current
+      if (!cam || !ren) return null
+      const rect = ren.domElement.getBoundingClientRect()
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+      raycaster.setFromCamera(pointer, cam)
+      const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)
+      const target = new THREE.Vector3()
+      const hit = raycaster.ray.intersectPlane(plane, target)
+      if (!hit) return null
+      return target.x
+    }
+
+    const clampX = (id: string, x: number, w: number) => {
+      const others = openingsRef.current.filter((o) => o.id !== id)
+      let minX = 135
+      let maxX = 3000 - w - 135
+      for (const o of others) {
+        const frameMax = o.positionXmm + o.widthMm + 90
+        const frameMin = o.positionXmm - 90
+        if (o.positionXmm < x) minX = Math.max(minX, frameMax + 90)
+        else maxX = Math.min(maxX, frameMin - w - 90)
+      }
+      return Math.max(minX, Math.min(maxX, x))
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return
       const cam = cameraRef.current
       const ren = rendererRef.current
       if (!cam || !ren) return
@@ -77,19 +132,168 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(pointer, cam)
-      const meshes = Array.from(entriesRef.current.values()).map((e) => e.mesh)
-      const hits = raycaster.intersectObjects(meshes)
-      if (hits.length > 0) {
-        const hitMesh = hits[0].object as THREE.Mesh
-        for (const [id, e] of entriesRef.current) {
-          if (e.mesh === hitMesh) {
-            onSelect?.(id)
-            break
+
+      // check window hit planes
+      const windowHits = raycaster.intersectObjects(
+        Array.from(windowEntriesRef.current.values()).map((w) => w.hitPlane), false
+      )
+      if (windowHits.length > 0) {
+        const hitPlane = windowHits[0].object as THREE.Mesh
+        let hitId: string | null = null
+        for (const [id, w] of windowEntriesRef.current) {
+          if (w.hitPlane === hitPlane) { hitId = id; break }
+        }
+        if (hitId) {
+          const win = openingsRef.current.find((o) => o.id === hitId)
+          if (win) {
+            draggingRef.current = { id: hitId, startX: win.positionXmm, startPointer: 0 }
+            const px = getWallIntersection(event)
+            if (px !== null) draggingRef.current.startPointer = px
+            windowSelectedRef.current = hitId
+            if (onWindowSelect) onWindowSelect(hitId)
+            if (controlsRef.current) controlsRef.current.enabled = false
+            setCursor('grabbing')
+            ren.domElement.setPointerCapture(event.pointerId)
+            event.preventDefault()
+            return
           }
         }
       }
+
+      // wood selection
+      const meshes = Array.from(entriesRef.current.values()).map((e) => e.mesh)
+      const woodHits = raycaster.intersectObjects(meshes)
+      if (woodHits.length > 0) {
+        const hitMesh = woodHits[0].object as THREE.Mesh
+        for (const [id, e] of entriesRef.current) {
+          if (e.mesh === hitMesh) { onSelect?.(id); break }
+        }
+      }
     }
-    renderer.domElement.addEventListener('click', onClick)
+
+    const onPointerMove = (event: PointerEvent) => {
+      const cam = cameraRef.current
+      const ren = rendererRef.current
+      if (!cam || !ren) return
+      const rect = ren.domElement.getBoundingClientRect()
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+      if (draggingRef.current) {
+        const px = getWallIntersection(event)
+        if (px === null) return
+        const drag = draggingRef.current
+        const win = openingsRef.current.find((o) => o.id === drag.id)
+        if (!win) return
+        const deltaMm = (px - drag.startPointer) * 1000
+        let snapped = deltaMm
+        if (!event.shiftKey) snapped = Math.round(deltaMm / 50) * 50
+        let newX = drag.startX + snapped
+        newX = clampX(drag.id, newX, win.widthMm)
+        pendingXRef.current = { id: drag.id, x: newX }
+        if (rafRef.current === null) {
+          rafRef.current = requestAnimationFrame(() => {
+            rafRef.current = null
+            const p = pendingXRef.current
+            if (p && onWindowXChange) onWindowXChange(p.id, p.x)
+          })
+        }
+        return
+      }
+
+      // hover
+      raycaster.setFromCamera(pointer, cam)
+      const hits = raycaster.intersectObjects(Array.from(windowEntriesRef.current.values()).map((w) => w.hitPlane), false)
+      let newHovered: string | null = null
+      if (hits.length > 0) {
+        const hp = hits[0].object as THREE.Mesh
+        for (const [id, w] of windowEntriesRef.current) {
+          if (w.hitPlane === hp) { newHovered = id; break }
+        }
+      }
+      if (newHovered !== hoveredWindowRef.current) {
+        hoveredWindowRef.current = newHovered
+        setCursor(newHovered ? 'move' : 'default')
+        // update outline visibility
+        windowEntriesRef.current.forEach((w, id) => {
+          const sel = id === windowSelectedRef.current
+          const hov = id === newHovered
+          w.outline.visible = sel || hov || draggingRef.current?.id === id
+        })
+      }
+    }
+
+    const endDrag = () => {
+      if (!draggingRef.current) return
+      draggingRef.current = null
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+      const p = pendingXRef.current
+      if (p && onWindowXChange) onWindowXChange(p.id, p.x)
+      pendingXRef.current = null
+      if (controlsRef.current) controlsRef.current.enabled = true
+      setCursor(hoveredWindowRef.current ? 'move' : 'default')
+    }
+
+    const onPointerUp = (event: PointerEvent) => {
+      const ren = rendererRef.current
+      if (ren) try { ren.domElement.releasePointerCapture(event.pointerId) } catch {}
+      endDrag()
+    }
+
+    const onPointerCancel = () => {
+      if (draggingRef.current) {
+        const drag = draggingRef.current
+        if (onWindowXChange) onWindowXChange(drag.id, drag.startX)
+      }
+      draggingRef.current = null
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+      pendingXRef.current = null
+      if (controlsRef.current) controlsRef.current.enabled = true
+      setCursor('default')
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && draggingRef.current) {
+        const drag = draggingRef.current
+        if (onWindowXChange) onWindowXChange(drag.id, drag.startX)
+        draggingRef.current = null
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current)
+          rafRef.current = null
+        }
+        pendingXRef.current = null
+        if (controlsRef.current) controlsRef.current.enabled = true
+        setCursor('default')
+      }
+    }
+
+    const onBlur = () => {
+      if (draggingRef.current) {
+        const drag = draggingRef.current
+        if (onWindowXChange) onWindowXChange(drag.id, drag.startX)
+        draggingRef.current = null
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current)
+          rafRef.current = null
+        }
+        pendingXRef.current = null
+        if (controlsRef.current) controlsRef.current.enabled = true
+        setCursor('default')
+      }
+    }
+
+    renderer.domElement.addEventListener('pointerdown', onPointerDown)
+    renderer.domElement.addEventListener('pointermove', onPointerMove)
+    renderer.domElement.addEventListener('pointerup', onPointerUp)
+    renderer.domElement.addEventListener('pointercancel', onPointerCancel)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('blur', onBlur)
 
     let frameId = 0
     const animate = () => {
@@ -137,9 +341,13 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
     return () => {
       cancelAnimationFrame(frameId)
       resizeObserver.disconnect()
-      renderer.domElement.removeEventListener('click', onClick)
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown)
+      renderer.domElement.removeEventListener('pointermove', onPointerMove)
+      renderer.domElement.removeEventListener('pointerup', onPointerUp)
+      renderer.domElement.removeEventListener('pointercancel', onPointerCancel)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('blur', onBlur)
       controls.dispose()
-      // dispose all entries
       entriesRef.current.forEach((e) => {
         e.mesh.geometry.dispose()
         e.material.dispose()
@@ -149,6 +357,13 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
         e.edgesMat.dispose()
       })
       entriesRef.current.clear()
+      windowEntriesRef.current.forEach((w) => {
+        w.hitPlane.geometry.dispose()
+        ;(w.hitPlane.material as THREE.Material).dispose()
+        w.outline.geometry.dispose()
+        ;(w.outline.material as THREE.Material).dispose()
+      })
+      windowEntriesRef.current.clear()
       renderer.dispose()
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement)
@@ -161,13 +376,11 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
     }
   }, [])
 
-  // reconcile meshes with elements
+  // reconcile wood meshes
   useEffect(() => {
     const scene = sceneRef.current
     if (!scene) return
     const entries = entriesRef.current
-
-    // remove stale
     for (const [id, entry] of Array.from(entries.entries())) {
       if (!elements.find((e) => e.id === id)) {
         scene.remove(entry.mesh)
@@ -181,8 +394,6 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
         entries.delete(id)
       }
     }
-
-    // add/update
     for (const el of elements) {
       let entry = entries.get(el.id)
       if (!entry) {
@@ -194,24 +405,20 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
         mesh.position.set(mmToMeters(center.x), mmToMeters(center.y), mmToMeters(center.z))
         mesh.quaternion.set(spec.quaternion.x, spec.quaternion.y, spec.quaternion.z, spec.quaternion.w)
         scene.add(mesh)
-
         const edgesGeo = new THREE.EdgesGeometry(geo)
         const edgesMat = new THREE.LineBasicMaterial({ color: 0x2a1a0a })
         const edges = new THREE.LineSegments(edgesGeo, edgesMat)
         edges.visible = showEdgesRef.current
         mesh.add(edges)
-
         const markerGeo = new THREE.SphereGeometry(0.03, 16, 16)
         const markerMat = new THREE.MeshStandardMaterial({ color: 0xff3333 })
         const marker = new THREE.Mesh(markerGeo, markerMat)
         marker.position.set(mmToMeters(el.position.x), mmToMeters(el.position.y), mmToMeters(el.position.z))
         marker.visible = selectedRef.current === el.id
         scene.add(marker)
-
         entry = { mesh, material: mat, marker, edges, edgesMat }
         entries.set(el.id, entry)
       }
-      // update geometry
       const spec = generateTimberGeometry(el)
       const oldGeo = entry.mesh.geometry
       const newGeo = new THREE.BoxGeometry(mmToMeters(spec.size.x), mmToMeters(spec.size.y), mmToMeters(spec.size.z))
@@ -220,15 +427,11 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
       const center = boxCenterWorld(el)
       entry.mesh.position.set(mmToMeters(center.x), mmToMeters(center.y), mmToMeters(center.z))
       entry.mesh.quaternion.set(spec.quaternion.x, spec.quaternion.y, spec.quaternion.z, spec.quaternion.w)
-
       const oldEdges = entry.edges.geometry
       entry.edges.geometry = new THREE.EdgesGeometry(newGeo)
       oldEdges.dispose()
-
       entry.marker.position.set(mmToMeters(el.position.x), mmToMeters(el.position.y), mmToMeters(el.position.z))
     }
-
-    // highlight + edges visibility
     entries.forEach((e, key) => {
       e.edges.visible = showEdgesRef.current
       if (key === selectedRef.current) {
@@ -243,44 +446,93 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
         e.edgesMat.color = new THREE.Color(0x2a1a0a)
       }
     })
-
-    // camera only on first load (when no entries existed before). We'll center on first reconcile only.
-    // To avoid camera jump on param change, only center if not yet centered.
-    // We track via a flag on entriesRef? Use a simple module-level-ish ref via containerRef? Use a ref.
-  }, [elements])
-
   // camera centering on first load
-  const centeredRef = useRef(false)
-  useEffect(() => {
-    if (centeredRef.current) return
+  if (!hasCenteredRef.current) {
     const camera = cameraRef.current
     const controls = controlsRef.current
-    if (!camera || !controls) return
-    const els = elementsRef.current
-    const fb = new THREE.Box3()
-    for (const el of els) {
-      const spec = generateTimberGeometry(el)
-      const c = boxCenterWorld(el)
-      const center2 = new THREE.Vector3(mmToMeters(c.x), mmToMeters(c.y), mmToMeters(c.z))
-      const hx = mmToMeters(spec.size.x) / 2
-      const hy = mmToMeters(spec.size.y) / 2
-      const hz = mmToMeters(spec.size.z) / 2
-      fb.expandByPoint(new THREE.Vector3(center2.x - hx, center2.y - hy, center2.z - hz))
-      fb.expandByPoint(new THREE.Vector3(center2.x + hx, center2.y + hy, center2.z + hz))
+    if (camera && controls) {
+      const els = elementsRef.current
+      const fb = new THREE.Box3()
+      for (const el of els) {
+        const spec = generateTimberGeometry(el)
+        const c = boxCenterWorld(el)
+        const center2 = new THREE.Vector3(mmToMeters(c.x), mmToMeters(c.y), mmToMeters(c.z))
+        const hx = mmToMeters(spec.size.x) / 2
+        const hy = mmToMeters(spec.size.y) / 2
+        const hz = mmToMeters(spec.size.z) / 2
+        fb.expandByPoint(new THREE.Vector3(center2.x - hx, center2.y - hy, center2.z - hz))
+        fb.expandByPoint(new THREE.Vector3(center2.x + hx, center2.y + hy, center2.z + hz))
+      }
+      const ctr = new THREE.Vector3()
+      fb.getCenter(ctr)
+      const sz = new THREE.Vector3()
+      fb.getSize(sz)
+      const md = Math.max(sz.x, sz.y, sz.z)
+      const cd = md * 1.5 + 2
+      camera.position.copy(ctr.clone().add(new THREE.Vector3(cd * 0.6, cd * 0.5, cd * 0.6)))
+      controls.target.copy(ctr)
+      controls.update()
+      hasCenteredRef.current = true
     }
-    const ctr = new THREE.Vector3()
-    fb.getCenter(ctr)
-    const sz = new THREE.Vector3()
-    fb.getSize(sz)
-    const md = Math.max(sz.x, sz.y, sz.z)
-    const cd = md * 1.5 + 2
-    camera.position.copy(ctr.clone().add(new THREE.Vector3(cd * 0.6, cd * 0.5, cd * 0.6)))
-    controls.target.copy(ctr)
-    controls.update()
-    centeredRef.current = true
+  }
+
   }, [elements])
 
-  // highlight + edges visibility updates
+  // reconcile window hit planes/outlines
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    const wEntries = windowEntriesRef.current
+    // remove stale
+    for (const [id, w] of Array.from(wEntries.entries())) {
+      if (!openings.find((o) => o.id === id)) {
+        scene.remove(w.hitPlane)
+        scene.remove(w.outline)
+        w.hitPlane.geometry.dispose()
+        ;(w.hitPlane.material as THREE.Material).dispose()
+        w.outline.geometry.dispose()
+        ;(w.outline.material as THREE.Material).dispose()
+        wEntries.delete(id)
+      }
+    }
+    // add/update
+    for (const o of openings) {
+      let w = wEntries.get(o.id)
+      if (!w) {
+        const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+        const hitPlane = new THREE.Mesh(new THREE.PlaneGeometry(o.widthMm / 1000, o.heightMm / 1000), hitMat)
+        const outlineGeo = new THREE.BufferGeometry()
+        const outlineMat = new THREE.LineBasicMaterial({ color: 0x00bfff })
+        const outline = new THREE.Line(outlineGeo, outlineMat)
+        outline.visible = o.id === windowSelectedRef.current || hoveredWindowRef.current === o.id
+        scene.add(hitPlane)
+        scene.add(outline)
+        w = { hitPlane, outline }
+        wEntries.set(o.id, w)
+      }
+      const x0 = o.positionXmm / 1000
+      const y0 = o.sillHeightMm / 1000
+      const x1 = (o.positionXmm + o.widthMm) / 1000
+      const y1 = (o.sillHeightMm + o.heightMm) / 1000
+      w.hitPlane.geometry.dispose()
+      w.hitPlane.geometry = new THREE.PlaneGeometry(o.widthMm / 1000, o.heightMm / 1000)
+      w.hitPlane.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0)
+      const pts = [
+        new THREE.Vector3(x0, y0, 0),
+        new THREE.Vector3(x1, y0, 0),
+        new THREE.Vector3(x1, y1, 0),
+        new THREE.Vector3(x0, y1, 0),
+        new THREE.Vector3(x0, y0, 0),
+      ]
+      w.outline.geometry.dispose()
+      w.outline.geometry = new THREE.BufferGeometry().setFromPoints(pts)
+      const sel = o.id === windowSelectedRef.current
+      const hov = hoveredWindowRef.current === o.id
+      w.outline.visible = sel || hov
+    }
+  }, [openings])
+
+  // highlight wood + edges on selectedId change
   useEffect(() => {
     const entries = entriesRef.current
     entries.forEach((e, key) => {
@@ -298,6 +550,21 @@ export function SceneView({ elements, selectedId, showEdges = true, onSelect }: 
       }
     })
   }, [selectedId, showEdges])
+
+  // update outline visibility on selectedWindow change
+  useEffect(() => {
+    windowEntriesRef.current.forEach((w, id) => {
+      const sel = id === selectedWindowId
+      const hov = id === hoveredWindowRef.current
+      w.outline.visible = sel || hov
+    })
+  }, [selectedWindowId])
+
+  // cursor style
+  useEffect(() => {
+    const container = containerRef.current
+    if (container) container.style.cursor = cursor
+  }, [cursor])
 
   return (
     <div className="viewport" ref={containerRef}>

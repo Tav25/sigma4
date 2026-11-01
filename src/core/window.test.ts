@@ -237,3 +237,32 @@ describe('Stage6 window movement', () => {
 })
 
 
+
+
+describe('Stage7 window size params', () => {
+  it('header length = w + 90', () => {
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 900, height: 1000 })
+    const h = w.elements.find((e) => e.id === 'header-1')!
+    expect(h.length).toBe(990)
+  })
+
+  it('sill length = w', () => {
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 900, height: 1000 })
+    const sill = w.elements.find((e) => e.id === 'sill')!
+    expect(sill.length).toBe(900)
+  })
+
+  it('control model 20 elements', () => {
+    const w = generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 1200 })
+    expect(w.elements.length).toBe(20)
+  })
+
+
+  it('invalid height throws', () => {
+    expect(() => generateWallWithWindow(params, { x: 900, y: 900, width: 1200, height: 2500 })).toThrow()
+  })
+
+  it('invalid sill height throws', () => {
+    expect(() => generateWallWithWindow(params, { x: 900, y: 100, width: 1200, height: 1200 })).toThrow()
+  })
+})
