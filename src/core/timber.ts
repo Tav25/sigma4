@@ -105,8 +105,8 @@ export function rotateVectorByQuaternion(v: Vec3, q: { x: number; y: number; z: 
 
 export function generateTimberGeometry(element: TimberElement): GeometrySpec {
   const local = orientationQuaternion(element.orientation)
-  // A second wall along +Z rotates its local +X direction by -90° around Y.
-  const yaw = element.wallTransform?.orientation === 'z' ? -Math.PI / 2 : 0
+  // A right-hand wall goes into the room along -Z: local +X rotates +90° around Y.
+  const yaw = element.wallTransform?.orientation === 'z' ? Math.PI / 2 : 0
   const rotation = { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }
   const q = {
     x: rotation.w * local.x + rotation.x * local.w + rotation.y * local.z - rotation.z * local.y,

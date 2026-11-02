@@ -56,6 +56,8 @@ export function SceneView({
   const openingsRef = useRef<WindowOpening[]>(openings)
   const windowSelectedRef = useRef<string | null>(selectedWindowId)
   const hasCenteredRef = useRef<boolean>(false)
+  const wallCountRef = useRef(wallCount)
+  wallCountRef.current = wallCount
   const wallLengthRef = useRef<number>(wallLength)
 
   const draggingRef = useRef<{ id: string; startX: number; startPointer: number; previewedX: number } | null>(null)
@@ -327,7 +329,12 @@ export function SceneView({
       fb.getSize(sz)
       const md = Math.max(sz.x, sz.y, sz.z)
       const cd = md * 1.5 + 2
-      camera.position.copy(ctr.clone().add(new THREE.Vector3(cd * 0.6, cd * 0.5, cd * 0.6)))
+      const interiorView = wallCountRef.current > 1
+      camera.position.copy(ctr.clone().add(new THREE.Vector3(
+        interiorView ? -cd * 0.6 : cd * 0.6,
+        cd * 0.5,
+        interiorView ? -cd * 0.6 : cd * 0.6,
+      )))
       controls.target.copy(ctr)
       controls.update()
       hasCenteredRef.current = true

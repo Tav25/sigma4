@@ -63,7 +63,7 @@ export interface Marker {
 export interface TimberElement {
   elementId: string
   wallId: string
-  role: 'stud' | 'king-stud' | 'jack-stud' | 'cripple-stud' | 'cripple-bottom' | 'cripple-top' | 'bottom-plate' | 'top-plate' | 'header' | 'sill'
+  role: 'stud' | 'king-stud' | 'jack-stud' | 'cripple-stud' | 'cripple-bottom' | 'cripple-top' | 'bottom-plate' | 'top-plate' | 'header' | 'sill' | 'corner-backing'
   sectionMm: { width: number; height: number }
   lengthMm: number
   orientation: Orientation

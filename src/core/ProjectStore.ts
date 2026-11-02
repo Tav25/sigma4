@@ -5,6 +5,7 @@ import type {
 } from './project'
 import { validateProject, validateProjectSnapshot, validateSourceParameters } from './frame-validator'
 import { buildProjectSnapshot, serializeProject } from './project-store'
+import { rightCornerOrigin } from './corner'
 
 export type ProjectCommand =
   | { type: 'SET_PROJECT_NAME'; payload: { projectName: string } }
@@ -255,6 +256,11 @@ export class ProjectStore {
           if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: `Стена ${wallId} не найдена` }
           if (lengthMm <= 0) return { success: false, errorCode: 'INVALID_LENGTH', messageRu: 'Длина стены должна быть положительной' }
           wall.lengthMm = lengthMm
+          if (candidate.building.walls.length === 2 && wallId === candidate.building.walls[0].wallId) {
+            const right = candidate.building.walls[1]
+            right.origin = rightCornerOrigin(wall, right)
+            changedIds.push(`building.walls[${right.wallId}].origin`)
+          }
           changedIds.push(`building.walls[${wallId}].lengthMm`)
           break
         }
@@ -263,8 +269,11 @@ export class ProjectStore {
           const wall = candidate.building.walls.find(w => w.wallId === wallId)
           if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: `Стена ${wallId} не найдена` }
           if (heightMm <= 0) return { success: false, errorCode: 'INVALID_HEIGHT', messageRu: 'Высота стены должна быть положительной' }
-          wall.heightMm = heightMm
-          changedIds.push(`building.walls[${wallId}].heightMm`)
+          // Joined walls share the same height so the upper plates still meet.
+          for (const connected of candidate.building.walls) {
+            connected.heightMm = heightMm
+            changedIds.push(`building.walls[${connected.wallId}].heightMm`)
+          }
           break
         }
         case 'SET_STUD_SPACING': {
@@ -337,8 +346,14 @@ export class ProjectStore {
           if (candidate.building.walls.some(w => w.wallId === wall.wallId)) {
             return { success: false, errorCode: 'DUPLICATE_WALL_ID', messageRu: 'Такой номер стены уже существует' }
           }
-          if (wall.orientation !== 'z' || wall.openings.length > 0) {
-            return { success: false, errorCode: 'UNSUPPORTED_WALL', messageRu: 'Пока можно добавить только пустую стену вдоль Z' }
+          const front = candidate.building.walls[0]
+          const expectedOrigin = rightCornerOrigin(front, wall)
+          if (front.orientation !== 'x' || wall.orientation !== 'z' || wall.openings.length > 0 ||
+            wall.heightMm !== front.heightMm ||
+            wall.sectionMm.width !== front.sectionMm.width ||
+            wall.sectionMm.height !== front.sectionMm.height ||
+            (['x', 'y', 'z'] as const).some(k => Math.abs(wall.origin[k] - expectedOrigin[k]) > 0.01)) {
+            return { success: false, errorCode: 'INVALID_CORNER', messageRu: 'Вторая стена должна примыкать к правому внутреннему углу первой' }
           }
           candidate.building.walls.push(this.deepClone(wall))
           changedIds.push(`building.walls[${wall.wallId}]`)

@@ -8,6 +8,7 @@ import type { WindowOpening } from './core/window'
 import { projectToScene } from './scene/project-to-scene'
 import { createProjectFromCurrentState } from './core/project-store'
 import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
+import { rightCornerOrigin } from './core/corner'
 
 function findFreePosition(openings: WindowOpening[], wallLength: number, newW: number): number | null {
   for (let x = 135; x + newW + 90 <= wallLength; x += 50) {
@@ -155,11 +156,7 @@ export default function App() {
       ...mainWall,
       wallId: 'wall-002',
       lengthMm: 3000,
-      origin: {
-        x: mainWall.origin.x + mainWall.lengthMm + mainWall.sectionMm.height / 2,
-        y: mainWall.origin.y,
-        z: mainWall.origin.z,
-      },
+      origin: rightCornerOrigin(mainWall, mainWall),
       orientation: 'z' as const,
       sectionMm: { ...mainWall.sectionMm },
       openings: [],
@@ -260,7 +257,7 @@ export default function App() {
                   onClick={removeSecondWall}>Удалить вторую стену</button>}
           </div>
           {hasSecondWall && <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
-            Стены пока независимы: соединение угла сделаем следующим шагом.
+            Стены соединены тёплым углом. Высота общая, длины регулируются отдельно.
           </div>}
           <h2 className="panel-title" style={{ marginTop: 14 }}>Стена {wall.wallId === mainWall.wallId ? '1' : '2'} — параметры</h2>
           <div className="param-group">

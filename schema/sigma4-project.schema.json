@@ -130,7 +130,7 @@
             "properties": {
               "elementId": { "type": "string", "minLength": 1 },
               "wallId": { "type": "string", "minLength": 1 },
-              "role": { "enum": ["stud", "king-stud", "jack-stud", "cripple-stud", "bottom-plate", "top-plate", "header", "sill"] },
+              "role": { "enum": ["stud", "king-stud", "jack-stud", "cripple-stud", "cripple-bottom", "cripple-top", "bottom-plate", "top-plate", "header", "sill", "corner-backing"] },
               "sectionMm": {
                 "type": "object",
                 "required": ["width", "height"],

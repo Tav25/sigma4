@@ -19,6 +19,7 @@ import type {
   Orientation,
 } from './project'
 import { validateProject } from './frame-validator'
+import { CORNER_CLEAT_MM } from './corner'
 
 const SW = 45
 const SH = 145
@@ -80,6 +81,39 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
       assembly = generateWallPanel(params)
     }
 
+    // Warm right-angle junction: the lower top plates meet at the faces.
+    // The uppermost plates lap: front stops one stud-depth before the end,
+    // side crosses over it by that depth, at the same Y level.
+    const inCorner = building.walls.length === 2
+    const front = inCorner && wallIndex === 0
+    const right = inCorner && wallIndex === 1
+    if (front) {
+      const top = assembly.elements.find(el => el.id === 'plate-top-2')
+      if (top) top.length -= wall.sectionMm.height
+      // A slim inner fixing cleat provides drywall backing, leaving a cavity
+      // between it and the existing end stud for corner insulation.
+      assembly.elements.push({
+        id: 'warm-corner-cleat',
+        role: 'corner-backing',
+        length: wall.heightMm - wall.sectionMm.width * 3,
+        width: CORNER_CLEAT_MM,
+        height: wall.sectionMm.height,
+        position: {
+          x: wall.lengthMm - wall.sectionMm.height + CORNER_CLEAT_MM / 2,
+          y: wall.sectionMm.width,
+          z: -wall.sectionMm.height / 2,
+        },
+        orientation: { mode: 'y', angle: 0, roll: 0 },
+      })
+    }
+    if (right) {
+      const top = assembly.elements.find(el => el.id === 'plate-top-2')
+      if (top) {
+        top.position = { ...top.position, x: -wall.sectionMm.height }
+        top.length += wall.sectionMm.height
+      }
+    }
+
     assembly.elements.forEach((el: any) => {
       const timberEl = createTimberElement({
         elementId: wallIndex === 0 ? el.id : `${wall.wallId}:${el.id}`,
@@ -96,6 +130,26 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
     })
   })
 
+  if (building.walls.length === 2) {
+    const front = building.walls[0]
+    const right = building.walls[1]
+    const firstEnd = allElements
+      .filter(e => e.wallId === front.wallId && e.role === 'stud')
+      .sort((a, b) => b.position.x - a.position.x)[0]
+    const rightStart = allElements
+      .filter(e => e.wallId === right.wallId && e.role === 'stud')
+      .sort((a, b) => a.position.x - b.position.x)[0]
+    if (firstEnd && rightStart) {
+      firstEnd.connectionIds = [rightStart.elementId]
+      rightStart.connectionIds = [firstEnd.elementId]
+    }
+    const frontUpper = allElements.find(e => e.wallId === front.wallId && e.elementId === 'plate-top-2')
+    const rightUpper = allElements.find(e => e.wallId === right.wallId && e.elementId === `${right.wallId}:plate-top-2`)
+    if (frontUpper && rightUpper) {
+      frontUpper.connectionIds = [rightUpper.elementId]
+      rightUpper.connectionIds = [frontUpper.elementId]
+    }
+  }
   return { elements: allElements }
 }
 

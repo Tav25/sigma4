@@ -4,12 +4,13 @@ import type {
   ValidationIssue,
   Opening,
 } from './project'
+import { canFitCornerBacking, rightCornerOrigin } from './corner'
 
 const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
 const SUPPORTED_GENERATOR_VERSIONS = ['1.0.0']
 
-const REQUIRED_ROLES = ['stud', 'king-stud', 'jack-stud', 'cripple-stud', 'cripple-bottom', 'cripple-top', 'bottom-plate', 'top-plate', 'header', 'sill'] as const
+const REQUIRED_ROLES = ['stud', 'king-stud', 'jack-stud', 'cripple-stud', 'cripple-bottom', 'cripple-top', 'bottom-plate', 'top-plate', 'header', 'sill', 'corner-backing'] as const
 
 function createIssue(
   code: string,
@@ -228,6 +229,25 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
   if (!doc || !doc.building || !doc.assembly) return issues
 
   const { building, assembly } = doc
+  if (building.walls.length === 2) {
+    const [front, right] = building.walls
+    const expected = rightCornerOrigin(front, right)
+    const aligned = (['x', 'y', 'z'] as const).every(k => Math.abs(right.origin[k] - expected[k]) < 0.01)
+    if (front.orientation !== 'x' || right.orientation !== 'z' || !aligned ||
+        front.heightMm !== right.heightMm ||
+        front.sectionMm.width !== right.sectionMm.width ||
+        front.sectionMm.height !== right.sectionMm.height) {
+      issues.push(createIssue('INVALID_CORNER_GEOMETRY', 'error', 'building.walls[1]',
+        'Вторая стена должна быть справа, внутри дома и на одном уровне с первой',
+        [front.wallId, right.wallId]))
+    }
+    for (const opening of building.openings.filter(o => o.wallId === front.wallId)) {
+      if (!canFitCornerBacking(front, opening.positionUmm + opening.widthMm + 90)) {
+        issues.push(createIssue('CORNER_BACKING_OVERLAP', 'error', `building.openings[id=${opening.id}]`,
+          'Окно или дверь слишком близко к тёплому углу', [front.wallId, opening.id]))
+      }
+    }
+  }
   const wallsById = new Map(building.walls.map(w => [w.wallId, w]))
   const openingsByWall = new Map<string, Opening[]>()
   building.openings.forEach(o => {
@@ -300,7 +320,13 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
         maxY = el.position.y + halfH
       }
 
-      if (minX < 0 || maxX > wall.lengthMm) {
+      // The right wall's second top plate intentionally overhangs its
+      // local origin by the wall depth to tie into the first wall.
+      const rightLap = building.walls.length === 2 &&
+        el.wallId === building.walls[1].wallId &&
+        el.elementId === `${el.wallId}:plate-top-2`
+      const minAllowed = rightLap ? -wall.sectionMm.height : 0
+      if (minX < minAllowed - 0.001 || maxX > wall.lengthMm + 0.001) {
         issues.push(createIssue('ELEMENT_OUT_OF_WALL_BOUNDS', 'error', `assembly.elements[id=${el.elementId}]`, 'Элемент выходит за границы стены по X', [el.elementId, el.wallId]))
       }
       if (minY < 0 || maxY > wall.heightMm) {
