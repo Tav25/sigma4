@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.15')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.16')
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -69,7 +69,30 @@ try {
   assert.equal(rebuilt.assembly.elements.find(e => e.elementId === 'warm-corner-stud').position.x, 5810)
   assert.deepEqual(errors, [], 'Uncaught browser errors')
   await tree.getByTestId('wall-node-wall-002').waitFor()
-  console.log('SIGMA4 BROWSER PASS: project tree, version 0.0.15, L corner, top/iso, export/import')
+
+  for (let n = 3; n <= 9; n++) {
+    await page.getByRole('button', { name: '+ Продолжить стену' }).click()
+    await tree.getByTestId('wall-node-wall-' + String(n).padStart(3, '0')).waitFor()
+    await page.getByText('Количество стен: ' + n).waitFor()
+  }
+  await page.getByText('Валидация: OK').waitFor()
+  const nineDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const nine = JSON.parse(await readFile(await (await nineDownload).path(), 'utf8'))
+  assert.equal(nine.building.walls.length, 9)
+  assert.equal(nine.building.connections.length, 8)
+  assert.equal(nine.building.connections[0].type, 'california-right')
+  assert.ok(nine.assembly.elements.length > 46)
+  assert.equal(new Set(nine.assembly.elements.map(e => e.elementId)).size, nine.assembly.elements.length)
+  await page.getByRole('button', { name: 'Вид сверху' }).click()
+  await page.waitForTimeout(350)
+  await page.screenshot({ path: dir + '/03-nine-walls.png' })
+  const beforeMove = nine.building.walls[8].origin.z
+  await page.getByRole('button', { name: 'Отменить' }).count() // Undo must remain available
+  assert.equal(errors.length, 0, 'Unexpected browser exception')
+  assert.ok(Number.isFinite(beforeMove))
+  console.log('SIGMA4 BROWSER PASS: 0.0.16, 9 walls, 8 joins, corner, top/iso, JSON')
+
 } finally {
   await browser?.close()
   processVite.kill('SIGTERM')

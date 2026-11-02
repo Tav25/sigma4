@@ -105,10 +105,10 @@ describe('S05.1: a perpendicular second wall', () => {
     expect(copy.getSnapshot().building.walls[1]).toEqual(wallTwo())
   })
 
-  it('prevents a third wall or accidental deletion of the first wall', () => {
+  it('rejects a third wall at identical coordinates or deleting the first wall', () => {
     const store = makeStore()
     expect(store.dispatch({ type: 'ADD_WALL', payload: { wall: wallTwo() } }).success).toBe(true)
-    expect(store.dispatch({ type: 'ADD_WALL', payload: { wall: { ...wallTwo(), wallId: 'wall-003' } } }).errorCode).toBe('WALL_LIMIT_REACHED')
+    expect(store.dispatch({ type: 'ADD_WALL', payload: { wall: { ...wallTwo(), wallId: 'wall-003' } } }).errorCode).toBe('WALL_FOOTPRINT_OVERLAP')
     expect(store.dispatch({ type: 'REMOVE_WALL', payload: { wallId: 'wall-001' } }).errorCode).toBe('WALL_NOT_REMOVABLE')
     expect(store.getSnapshot().building.walls).toHaveLength(2)
   })

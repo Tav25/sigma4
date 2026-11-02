@@ -1,4 +1,5 @@
 import type { ProjectDocument, Wall, Opening, TimberElement, Marker } from './project'
+import { effectiveConnections } from './wall-topology'
 
 /** Read-only projection. Records are REFERENCES to the canonical JSON. */
 export interface WallTreeNode {
@@ -27,9 +28,11 @@ export function buildProjectTree(doc: ProjectDocument): ProjectTreeModel {
       markers: doc.building.markers.filter(marker => openingIds.has(marker.openingId)),
     }
   })
-  const connections: ProjectTreeModel['connections'] = []
-  if (walls.length === 2 && doc.assembly.elements.some(e => e.role === 'corner-backing')) {
-    connections.push({ from: walls[0].wall.wallId, to: walls[1].wall.wallId, type: 'Калифорнийский угол' })
-  }
+  const connections: ProjectTreeModel['connections'] = effectiveConnections(doc)
+    .map(link => ({
+      from: link.fromWallId,
+      to: link.toWallId,
+      type: link.type === 'california-right' ? 'Калифорнийский угол' : 'Прямой стык',
+    }))
   return { name: doc.project.projectName, walls, connections }
 }

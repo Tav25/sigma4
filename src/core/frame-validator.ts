@@ -5,6 +5,7 @@ import type {
   Opening,
 } from './project'
 import { canFitCornerFraming, rightCornerOrigin } from './corner'
+import { effectiveConnections, validateWallTopology } from './wall-topology'
 
 const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
@@ -229,8 +230,14 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
   if (!doc || !doc.building || !doc.assembly) return issues
 
   const { building, assembly } = doc
-  if (building.walls.length === 2) {
-    const [front, right] = building.walls
+  const links = effectiveConnections(doc)
+  issues.push(...validateWallTopology(building.walls, links))
+  const california = links.find(link => link && link.type === 'california-right' &&
+    building.walls.some(w => w.wallId === link.fromWallId) &&
+    building.walls.some(w => w.wallId === link.toWallId))
+  if (california) {
+    const front = building.walls.find(w => w.wallId === california.fromWallId)!
+    const right = building.walls.find(w => w.wallId === california.toWallId)!
     const expected = rightCornerOrigin(front, right)
     const aligned = (['x', 'y', 'z'] as const).every(k => Math.abs(right.origin[k] - expected[k]) < 0.01)
     if (front.orientation !== 'x' || right.orientation !== 'z' || !aligned ||
@@ -375,8 +382,7 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
 
       // The right wall's second top plate intentionally overhangs its
       // local origin by the wall depth to tie into the first wall.
-      const rightLap = building.walls.length === 2 &&
-        el.wallId === building.walls[1].wallId &&
+      const rightLap = california?.toWallId === el.wallId &&
         el.elementId === `${el.wallId}:plate-top-2`
       const minAllowed = rightLap ? -wall.sectionMm.height : 0
       if (minX < minAllowed - 0.001 || maxX > wall.lengthMm + 0.001) {
@@ -636,6 +642,21 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
         if (!m.color || !/^#[0-9a-fA-F]{6}$/.test(m.color)) issues.push(createIssue('INVALID_MARKER_COLOR', 'error', `${path}.color`, 'Цвет должен быть в формате #RRGGBB', m.openingId ? [m.openingId] : []))
       })
     }
+  }
+
+  if (doc.building && Array.isArray(doc.building.walls)) {
+    const links = Array.isArray(doc.building.connections)
+      ? doc.building.connections
+      : (doc.building.walls.length === 2
+        ? [{ fromWallId: doc.building.walls[0].wallId,
+             toWallId: doc.building.walls[1].wallId,
+             type: 'california-right' as const }]
+        : [])
+    issues.push(...validateWallTopology(doc.building.walls, links))
+  }
+  if (doc.building?.connections !== undefined && !Array.isArray(doc.building.connections)) {
+    issues.push(createIssue('INVALID_CONNECTIONS_ARRAY', 'error', 'building.connections',
+      'Соединения должны быть массивом', []))
   }
 
   return issues

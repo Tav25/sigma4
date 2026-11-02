@@ -9,6 +9,8 @@ import { projectToScene } from './scene/project-to-scene'
 import { createProjectFromCurrentState } from './core/project-store'
 import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 import { rightCornerOrigin } from './core/corner'
+import { wallEnd, effectiveConnections } from './core/wall-topology'
+import type { Wall } from './core/project'
 import { ProjectTree } from './components/ProjectTree'
 import packageInfo from '../package.json'
 
@@ -70,6 +72,8 @@ export default function App() {
   const wall = snapshot.building.walls.find(w => w.wallId === selectedWallId) ?? snapshot.building.walls[0]
   const mainWall = snapshot.building.walls[0]
   const hasSecondWall = snapshot.building.walls.length > 1
+  const wallLinks = effectiveConnections(snapshot)
+  const wallHasParent = wallLinks.some(link => link.toWallId === wall.wallId)
   // Three.js reads a projection of ProjectDocument; it does not own geometry.
   const { openings: allOpenings, elements, markers } = projectToScene(snapshot)
   const selectedOpening = allOpenings.find((o) => o.id === selectedOpeningId) ?? null
@@ -160,30 +164,59 @@ export default function App() {
     }
   }
 
-  const addSecondWall = () => {
-    if (hasSecondWall) return
-    const newWall = {
-      ...mainWall,
-      wallId: 'wall-002',
-      lengthMm: 3000,
-      origin: rightCornerOrigin(mainWall, mainWall),
-      orientation: 'z' as const,
-      sectionMm: { ...mainWall.sectionMm },
-      openings: [],
+  const addWall = (attached = true) => {
+    const all = snapshot.building.walls
+    const parent = all[all.length - 1]
+    const nextNumber = Math.max(0, ...all.map(w => Number(w.wallId.match(/^wall-(\d+)$/)?.[1] ?? 0))) + 1
+    const wallId = 'wall-' + String(nextNumber).padStart(3, '0')
+    let wall: Wall
+    let connection: { fromWallId: string; toWallId: string; type: 'california-right' | 'end-to-end' } | undefined
+    if (all.length === 1 && attached) {
+      wall = {
+        ...parent, wallId, lengthMm: 3000,
+        origin: rightCornerOrigin(parent, parent),
+        orientation: 'z', sectionMm: { ...parent.sectionMm }, openings: [],
+      }
+      connection = { fromWallId: parent.wallId, toWallId: wallId, type: 'california-right' }
+    } else {
+      // A chain of straight end-to-end joints can be extended to any number
+      // of walls. Isolated walls are positioned with a clearance from the
+      // existing model and can subsequently be moved by coordinates.
+      const start = attached ? wallEnd(parent) : {
+        x: Math.max(...all.map(item => item.origin.x + item.lengthMm)) + 1000,
+        y: parent.origin.y,
+        z: parent.origin.z,
+      }
+      wall = {
+        ...parent, wallId, lengthMm: 3000, origin: start,
+        sectionMm: { ...parent.sectionMm }, openings: [],
+      }
+      if (attached) {
+        connection = { fromWallId: parent.wallId, toWallId: wallId, type: 'end-to-end' }
+      }
     }
-    if (dispatch({ type: 'ADD_WALL', payload: { wall: newWall } }).success) {
-      setSelectedWallId('wall-002')
+    if (dispatch({ type: 'ADD_WALL', payload: { wall, connection } }).success) {
+      setSelectedWallId(wallId)
       setSelectedOpeningId(null)
       setSelectedId(null)
     }
   }
 
-  const removeSecondWall = () => {
-    if (dispatch({ type: 'REMOVE_WALL', payload: { wallId: 'wall-002' } }).success) {
-      setSelectedWallId(mainWall.wallId)
+  const removeLastWall = () => {
+    const all = snapshot.building.walls
+    if (all.length <= 1) return
+    const last = all[all.length - 1]
+    if (dispatch({ type: 'REMOVE_WALL', payload: { wallId: last.wallId } }).success) {
+      setSelectedWallId(all[all.length - 2].wallId)
       setSelectedOpeningId(null)
       setSelectedId(null)
     }
+  }
+
+  const moveWall = (axis: 'x' | 'z', value: number) => {
+    dispatch({ type: 'SET_WALL_ORIGIN', payload: {
+      wallId: wall.wallId, origin: { ...wall.origin, [axis]: value },
+    } })
   }
 
   const deleteOpening = (id: string) => {
@@ -270,16 +303,26 @@ export default function App() {
           />
           <h2 className="panel-title" style={{ marginTop: 16 }}>Стены</h2>
           <div className="param-group">
-            {!hasSecondWall
-              ? <button type="button" className="param-input" style={{ cursor: 'pointer' }}
-                  onClick={addSecondWall}>+ Добавить вторую стену</button>
-              : <button type="button" className="param-input" style={{ cursor: 'pointer' }}
-                  onClick={removeSecondWall}>Удалить вторую стену</button>}
+            <button type="button" className="param-input" style={{ cursor: 'pointer' }}
+              onClick={() => addWall(true)}>
+              {hasSecondWall ? '+ Продолжить стену' : '+ Добавить вторую стену'}
+            </button>
+            <button type="button" className="param-input"
+              style={{ cursor: 'pointer', marginTop: 5 }}
+              onClick={() => addWall(false)}>+ Свободная стена</button>
+            {hasSecondWall && (
+              <button type="button" className="param-input" style={{ cursor: 'pointer', marginTop: 5 }}
+                onClick={removeLastWall}>
+                Удалить {snapshot.building.walls.length === 2 ? 'вторую стену' : 'последнюю стену'}
+              </button>
+            )}
           </div>
           {hasSecondWall && <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
-            Калифорнийский угол: третья стойка повёрнута на 90°, есть место под утепление.
+            Калифорнийский угол первой пары стен сохранён. Остальные связи — прямой стык.
           </div>}
-          <h2 className="panel-title" style={{ marginTop: 14 }}>Стена {wall.wallId === mainWall.wallId ? '1' : '2'} — параметры</h2>
+          <h2 className="panel-title" style={{ marginTop: 14 }}>
+            Стена {snapshot.building.walls.findIndex(w => w.wallId === wall.wallId) + 1} — параметры
+          </h2>
           <div className="param-group">
             <SafeNumberInput label="Длина (мм)" value={wall.lengthMm} onChange={updateLength} validate={(r) => validateWallLength(r)} />
           </div>
@@ -290,11 +333,40 @@ export default function App() {
             <SafeNumberInput label="Шаг стоек (мм)" value={wall.studSpacingMm} onChange={updateSpacing} validate={(r) => validateInt(r, 100, 5000, 'шаг')} />
           </div>
           <div className="param-group">
+            <div>Направление: {wall.orientation === 'z' ? '−Z' : '+X'}</div>
+            <label className="param-label" htmlFor="wall-axis">Ось стены</label>
+            <select id="wall-axis" className="param-input" value={wall.orientation}
+              disabled={wallLinks.some(link => link.fromWallId === wall.wallId ||
+                link.toWallId === wall.wallId)}
+              onChange={event => dispatch({ type: 'SET_WALL_AXIS', payload: {
+                wallId: wall.wallId, orientation: event.target.value as 'x' | 'z',
+              } })}>
+              <option value="x">Вдоль +X</option>
+              <option value="z">Вдоль −Z</option>
+            </select>
+            <div>Координаты начала: X={wall.origin.x}, Y={wall.origin.y}, Z={wall.origin.z} мм</div>
+            {wallHasParent
+              ? <div style={{ color: '#666', fontSize: 12, marginTop: 5 }}>
+                  Положение закреплено соединением с предыдущей стеной
+                </div>
+              : <>
+                  <SafeNumberInput label="Начало X (мм)" value={wall.origin.x}
+                    onChange={v => moveWall('x', v)}
+                    validate={r => validateInt(r, -100000, 100000, 'координату X')} />
+                  <SafeNumberInput label="Начало Z (мм)" value={wall.origin.z}
+                    onChange={v => moveWall('z', v)}
+                    validate={r => validateInt(r, -100000, 100000, 'координату Z')} />
+                </>
+            }
+          </div>
+          <div className="param-group">
             <label className="param-label">Сечение</label>
             <input type="text" className="param-input" value="45x145" readOnly />
           </div>
           <div className="param-group">
             <div>Количество элементов: {elements.length}</div>
+            <div>Количество стен: {snapshot.building.walls.length}</div>
+            <div>Соединения: {wallLinks.length}</div>
           </div>
           <div className="param-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>

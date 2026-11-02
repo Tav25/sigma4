@@ -1,11 +1,14 @@
 import type {
   ProjectDocument,
   Wall,
+  WallConnection,
+  Vector3,
   ValidationResult,
 } from './project'
 import { validateProjectSnapshot, validateSourceParameters } from './frame-validator'
 import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
+import { effectiveConnections, reflowConnections } from './wall-topology'
 
 export type ProjectCommand =
   | { type: 'SET_PROJECT_NAME'; payload: { projectName: string } }
@@ -19,7 +22,9 @@ export type ProjectCommand =
   | { type: 'SET_MARKER_SETTINGS'; payload: { openingId: string; anchor?: 'center' | 'left' | 'right'; outsideOffsetMm?: number; elevationMm?: number; visible?: boolean; color?: string } }
   | { type: 'ADD_OPENING'; payload: { wallId: string; opening: { id: string; type: 'window' | 'door'; positionXmm: number; widthMm: number; heightMm: number; sillHeightMm: number } } }
   | { type: 'REMOVE_OPENING'; payload: { openingId: string } }
-  | { type: 'ADD_WALL'; payload: { wall: Wall } }
+  | { type: 'ADD_WALL'; payload: { wall: Wall; connection?: WallConnection } }
+  | { type: 'SET_WALL_ORIGIN'; payload: { wallId: string; origin: Vector3 } }
+  | { type: 'SET_WALL_AXIS'; payload: { wallId: string; orientation: 'x' | 'z' } }
   | { type: 'REMOVE_WALL'; payload: { wallId: string } }
   | { type: 'REPLACE_PROJECT'; payload: { document: ProjectDocument } }
 
@@ -253,15 +258,49 @@ export class ProjectStore {
         case 'SET_WALL_LENGTH': {
           const { wallId, lengthMm } = command.payload
           const wall = candidate.building.walls.find(w => w.wallId === wallId)
-          if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: `Стена ${wallId} не найдена` }
-          if (lengthMm <= 0) return { success: false, errorCode: 'INVALID_LENGTH', messageRu: 'Длина стены должна быть положительной' }
-          wall.lengthMm = lengthMm
-          if (candidate.building.walls.length === 2 && wallId === candidate.building.walls[0].wallId) {
-            const right = candidate.building.walls[1]
-            right.origin = rightCornerOrigin(wall, right)
-            changedIds.push(`building.walls[${right.wallId}].origin`)
+          if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: 'Стена не найдена' }
+          if (!Number.isFinite(lengthMm) || lengthMm <= 0) {
+            return { success: false, errorCode: 'INVALID_LENGTH', messageRu: 'Длина должна быть положительным числом' }
           }
-          changedIds.push(`building.walls[${wallId}].lengthMm`)
+          const links = effectiveConnections(candidate)
+          wall.lengthMm = lengthMm
+          reflowConnections(candidate.building.walls, links)
+          changedIds.push('building.walls[' + wallId + '].lengthMm')
+          for (const link of links) changedIds.push('building.walls[' + link.toWallId + '].origin')
+          break
+        }
+        case 'SET_WALL_AXIS': {
+          const { wallId, orientation } = command.payload
+          const wall = candidate.building.walls.find(w => w.wallId === wallId)
+          if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: 'Стена не найдена' }
+          if (orientation !== 'x' && orientation !== 'z') {
+            return { success: false, errorCode: 'UNSUPPORTED_WALL_AXIS', messageRu: 'Поддерживаются направления X и -Z' }
+          }
+          const links = effectiveConnections(candidate)
+          if (links.some(link => link.fromWallId === wallId || link.toWallId === wallId)) {
+            return { success: false, errorCode: 'WALL_CONNECTED_AXIS_LOCKED',
+              messageRu: 'Поворот соединённой стены требует отдельного расчёта узла' }
+          }
+          wall.orientation = orientation
+          changedIds.push('building.walls[' + wallId + '].orientation')
+          break
+        }
+        case 'SET_WALL_ORIGIN': {
+          const { wallId, origin } = command.payload
+          const wall = candidate.building.walls.find(w => w.wallId === wallId)
+          if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: 'Стена не найдена' }
+          const links = effectiveConnections(candidate)
+          if (links.some(link => link.toWallId === wallId)) {
+            return { success: false, errorCode: 'WALL_CONNECTED_POSITION_LOCKED',
+              messageRu: 'Координаты присоединённой стены определяются её соединением' }
+          }
+          if (!origin || ![origin.x, origin.y, origin.z].every(Number.isFinite)) {
+            return { success: false, errorCode: 'INVALID_WALL_ORIGIN', messageRu: 'Некорректные координаты стены' }
+          }
+          wall.origin = { ...origin }
+          reflowConnections(candidate.building.walls, links)
+          changedIds.push('building.walls[' + wallId + '].origin')
+          for (const link of links) changedIds.push('building.walls[' + link.toWallId + '].origin')
           break
         }
         case 'SET_WALL_HEIGHT': {
@@ -269,8 +308,24 @@ export class ProjectStore {
           const wall = candidate.building.walls.find(w => w.wallId === wallId)
           if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: `Стена ${wallId} не найдена` }
           if (heightMm <= 0) return { success: false, errorCode: 'INVALID_HEIGHT', messageRu: 'Высота стены должна быть положительной' }
-          // Joined walls share the same height so the upper plates still meet.
+          // A connected component shares panel height. Independent walls do
+          // not inherit unrelated changes.
+          const links = effectiveConnections(candidate)
+          const affected = new Set([wallId])
+          let changed = true
+          while (changed) {
+            changed = false
+            for (const link of links) {
+              if (affected.has(link.fromWallId) || affected.has(link.toWallId)) {
+                const prior = affected.size
+                affected.add(link.fromWallId)
+                affected.add(link.toWallId)
+                if (affected.size !== prior) changed = true
+              }
+            }
+          }
           for (const connected of candidate.building.walls) {
+            if (!affected.has(connected.wallId)) continue
             connected.heightMm = heightMm
             changedIds.push(`building.walls[${connected.wallId}].heightMm`)
           }
@@ -340,23 +395,31 @@ export class ProjectStore {
         }
         case 'ADD_WALL': {
           const wall = command.payload.wall
-          if (candidate.building.walls.length !== 1) {
-            return { success: false, errorCode: 'WALL_LIMIT_REACHED', messageRu: 'Пока поддерживаются только две стены' }
-          }
           if (candidate.building.walls.some(w => w.wallId === wall.wallId)) {
-            return { success: false, errorCode: 'DUPLICATE_WALL_ID', messageRu: 'Такой номер стены уже существует' }
+            return { success: false, errorCode: 'DUPLICATE_WALL_ID', messageRu: 'Такой ID стены уже существует' }
           }
-          const front = candidate.building.walls[0]
-          const expectedOrigin = rightCornerOrigin(front, wall)
-          if (front.orientation !== 'x' || wall.orientation !== 'z' || wall.openings.length > 0 ||
-            wall.heightMm !== front.heightMm ||
-            wall.sectionMm.width !== front.sectionMm.width ||
-            wall.sectionMm.height !== front.sectionMm.height ||
-            (['x', 'y', 'z'] as const).some(k => Math.abs(wall.origin[k] - expectedOrigin[k]) > 0.01)) {
-            return { success: false, errorCode: 'INVALID_CORNER', messageRu: 'Вторая стена должна примыкать к правому внутреннему углу первой' }
+          if (wall.openings.length !== 0) {
+            return { success: false, errorCode: 'NEW_WALL_HAS_OPENINGS',
+              messageRu: 'Проёмы добавляются отдельной командой' }
+          }
+          // Materialize the legacy implicit two-wall corner before the third
+          // wall arrives; old saved JSON remains supported without rewriting.
+          const oldLinks = effectiveConnections(candidate)
+          if (!candidate.building.connections) candidate.building.connections = [...oldLinks]
+          const chosen = command.payload.connection
+          let connection = chosen
+          if (!connection && candidate.building.walls.length === 1 &&
+              candidate.building.walls[0].orientation === 'x' && wall.orientation === 'z') {
+            const first = candidate.building.walls[0]
+            const expected = rightCornerOrigin(first, wall)
+            if ((['x', 'y', 'z'] as const).every(k => Math.abs(wall.origin[k] - expected[k]) < 0.01)) {
+              connection = { fromWallId: first.wallId, toWallId: wall.wallId, type: 'california-right' }
+            }
           }
           candidate.building.walls.push(this.deepClone(wall))
-          changedIds.push(`building.walls[${wall.wallId}]`)
+          if (connection) candidate.building.connections.push(this.deepClone(connection))
+          changedIds.push('building.walls[' + wall.wallId + ']')
+          if (connection) changedIds.push('building.connections')
           break
         }
         case 'REMOVE_WALL': {
@@ -365,11 +428,18 @@ export class ProjectStore {
           if (index <= 0) {
             return { success: false, errorCode: 'WALL_NOT_REMOVABLE', messageRu: 'Первую стену удалить нельзя' }
           }
+          const links = effectiveConnections(candidate)
+          if (links.some(link => link.fromWallId === wallId)) {
+            return { success: false, errorCode: 'WALL_HAS_CHILDREN',
+              messageRu: 'Сначала удалите присоединённые к этой стене стены' }
+          }
           if (candidate.building.openings.some(o => o.wallId === wallId)) {
-            return { success: false, errorCode: 'WALL_HAS_OPENINGS', messageRu: 'Сначала удалите проёмы из стены' }
+            return { success: false, errorCode: 'WALL_HAS_OPENINGS',
+              messageRu: 'Сначала удалите проёмы из стены' }
           }
           candidate.building.walls.splice(index, 1)
-          changedIds.push(`building.walls[${wallId}]`)
+          candidate.building.connections = links.filter(link => link.toWallId !== wallId)
+          changedIds.push('building.walls[' + wallId + ']', 'building.connections')
           break
         }
         case 'ADD_OPENING': {

@@ -39,6 +39,12 @@ export interface Wall {
   openings: string[]
 }
 
+export interface WallConnection {
+  fromWallId: string
+  toWallId: string
+  type: 'california-right' | 'end-to-end'
+}
+
 export interface Opening {
   id: string
   wallId: string
@@ -95,6 +101,8 @@ export interface ProjectDocument {
   building: {
     materials: Material[]
     walls: Wall[]
+    /** Optional for backward compatibility with legacy two-wall projects. */
+    connections?: WallConnection[]
     openings: Opening[]
     markers: Marker[]
   }
