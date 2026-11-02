@@ -45,10 +45,21 @@ export interface WallConnection {
   type: 'california-right' | 'end-to-end'
 }
 
+export interface GarageDoorSpec {
+  installationProfile: 'clopay-standard-torsion'
+  minSideRoomMm: number
+  minHeadRoomMm: number
+  minBackRoomExtraMm: number
+  /** Preliminary drawing dimension: structural capacity NOT verified. */
+  lintelPreviewDepthMm: number
+  jackStudsPerSide: number
+}
+
 export interface Opening {
   id: string
   wallId: string
-  type: 'window' | 'door'
+  type: 'window' | 'door' | 'garage-door'
+  garage?: GarageDoorSpec
   positionUmm: number
   widthMm: number
   heightMm: number
@@ -69,7 +80,7 @@ export interface Marker {
 export interface TimberElement {
   elementId: string
   wallId: string
-  role: 'stud' | 'king-stud' | 'jack-stud' | 'cripple-stud' | 'cripple-bottom' | 'cripple-top' | 'bottom-plate' | 'top-plate' | 'header' | 'sill' | 'corner-backing'
+  role: 'stud' | 'king-stud' | 'jack-stud' | 'cripple-stud' | 'cripple-bottom' | 'cripple-top' | 'bottom-plate' | 'top-plate' | 'header' | 'sill' | 'corner-backing' | 'garage-lintel-preview'
   sectionMm: { width: number; height: number }
   lengthMm: number
   orientation: Orientation

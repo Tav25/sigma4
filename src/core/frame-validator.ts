@@ -6,12 +6,13 @@ import type {
 } from './project'
 import { canFitCornerFraming, rightCornerOrigin } from './corner'
 import { effectiveConnections, validateWallTopology } from './wall-topology'
+import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
 
 const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
 const SUPPORTED_GENERATOR_VERSIONS = ['1.0.0']
 
-const REQUIRED_ROLES = ['stud', 'king-stud', 'jack-stud', 'cripple-stud', 'cripple-bottom', 'cripple-top', 'bottom-plate', 'top-plate', 'header', 'sill', 'corner-backing'] as const
+const REQUIRED_ROLES = ['stud', 'king-stud', 'jack-stud', 'cripple-stud', 'cripple-bottom', 'cripple-top', 'bottom-plate', 'top-plate', 'header', 'sill', 'corner-backing', 'garage-lintel-preview'] as const
 
 function createIssue(
   code: string,
@@ -135,9 +136,10 @@ export function validateStructure(doc: any): ValidationIssue[] {
         if (!o.wallId) issues.push(createIssue('MISSING_OPENING_WALL_ID', 'error', path, 'Отсутствует wallId у проёма', o.id ? [o.id] : []))
         else if (!wallIds.has(o.wallId)) issues.push(createIssue('OPENING_REF_INVALID_WALL', 'error', path, `Проём ссылается на несуществующую стену: ${o.wallId}`, o.id ? [o.id] : []))
 
-        if (!['window', 'door'].includes(o.type)) {
-          issues.push(createIssue('INVALID_OPENING_TYPE', 'error', `${path}.type`, 'Тип проёма должен быть window или door', o.id ? [o.id] : []))
+        if (!['window', 'door', 'garage-door'].includes(o.type)) {
+          issues.push(createIssue('INVALID_OPENING_TYPE', 'error', `${path}.type`, 'Тип проёма должен быть window, door или garage-door', o.id ? [o.id] : []))
         }
+        issues.push(...validateGarageOpening(o))
 
         const checkNonNeg = (val: any, field: string, label: string) => {
           if (typeof val !== 'number' || val < 0) {
@@ -230,6 +232,7 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
   if (!doc || !doc.building || !doc.assembly) return issues
 
   const { building, assembly } = doc
+  for (const opening of building.openings) issues.push(...garageEngineeringNotices(opening))
   const links = effectiveConnections(doc)
   issues.push(...validateWallTopology(building.walls, links))
   const california = links.find(link => link && link.type === 'california-right' &&
@@ -577,9 +580,10 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
         if (!o.wallId) issues.push(createIssue('MISSING_OPENING_WALL_ID', 'error', path, 'Отсутствует wallId у проёма', o.id ? [o.id] : []))
         else if (!wallIds.has(o.wallId)) issues.push(createIssue('OPENING_REF_INVALID_WALL', 'error', path, `Проём ссылается на несуществующую стену: ${o.wallId}`, o.id ? [o.id] : []))
 
-        if (!['window', 'door'].includes(o.type)) {
-          issues.push(createIssue('INVALID_OPENING_TYPE', 'error', `${path}.type`, 'Тип проёма должен быть window или door', o.id ? [o.id] : []))
+        if (!['window', 'door', 'garage-door'].includes(o.type)) {
+          issues.push(createIssue('INVALID_OPENING_TYPE', 'error', `${path}.type`, 'Тип проёма должен быть window, door или garage-door', o.id ? [o.id] : []))
         }
+        issues.push(...validateGarageOpening(o))
 
         checkNonNeg(o.positionUmm, 'positionUmm', 'Положение проёма', path, issues, o.id ? [o.id] : [])
         checkPositive(o.widthMm, 'widthMm', 'Ширина проёма', 'f', path, issues, o.id ? [o.id] : [])

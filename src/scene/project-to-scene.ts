@@ -51,6 +51,7 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
       heightMm: opening.heightMm,
       sillHeightMm: opening.sillHeightMm,
       type: opening.type,
+      ...(opening.garage ? { garage: { ...opening.garage } } : {}),
     })),
     // The independent 3D projection carries wall identity and transform.
     // The editor's existing 'openings' collection stays backward compatible.
@@ -68,6 +69,7 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
         heightMm: opening.heightMm,
         sillHeightMm: opening.sillHeightMm,
         type: opening.type,
+        ...(opening.garage ? { garage: { ...opening.garage } } : {}),
       }]
     }),
     // Markers depend exclusively on their opening and wall's local frame.

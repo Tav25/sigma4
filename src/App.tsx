@@ -12,6 +12,7 @@ import { rightCornerOrigin } from './core/corner'
 import { wallEnd, effectiveConnections } from './core/wall-topology'
 import type { Wall } from './core/project'
 import { ProjectTree } from './components/ProjectTree'
+import { GARAGE_DOOR_PRESETS, defaultGarageDoorSpec } from './core/garage-door'
 import packageInfo from '../package.json'
 
 function findFreePosition(openings: WindowOpening[], wallLength: number, newW: number): number | null {
@@ -117,7 +118,7 @@ export default function App() {
     }
   }
 
-  const addOpening = (type: 'window' | 'door') => {
+  const addOpening = (type: 'window' | 'door' | 'garage-door') => {
     // Find room only among this wall's openings, in its own local U.
     const onThisWall = snapshot.building.openings
       .filter(opening => opening.wallId === wall.wallId)
@@ -129,21 +130,26 @@ export default function App() {
     const isCornerFacade = wall.wallId === mainWall.wallId &&
       wallLinks.some(link => link.fromWallId === wall.wallId && link.type === 'california-right')
     const availableLength = wall.lengthMm - (isCornerFacade ? wall.sectionMm.height : 0)
-    const pos = findFreePosition(onThisWall, availableLength, type === 'door' ? 900 : 450)
+    const width = type === 'garage-door' ? GARAGE_DOOR_PRESETS[0].widthMm : type === 'door' ? 900 : 450
+    const pos = findFreePosition(onThisWall, availableLength, width)
     if (pos === null) {
       alert('Недостаточно места для нового проёма. Увеличьте длину стены или измените размеры существующих проёмов.')
       return
     }
     // The counter is derived from canonical JSON, not from a session ref:
     // importing a project can never introduce duplicate W/D IDs.
-    const prefix = type === 'door' ? 'D' : 'W'
+    const prefix = type === 'garage-door' ? 'G' : type === 'door' ? 'D' : 'W'
     const existing = new Set(snapshot.building.openings.map(opening => opening.id))
     let number = 1
     while (existing.has(prefix + String(number).padStart(2, '0'))) number++
     const id = prefix + String(number).padStart(2, '0')
-    const newOpening: WindowOpening = type === 'door'
-      ? { id, positionXmm: pos, widthMm: 900, heightMm: 2100, sillHeightMm: 0, type: 'door' }
-      : { id, positionXmm: pos, widthMm: 450, heightMm: 1200, sillHeightMm: 900, type: 'window' }
+    const newOpening: WindowOpening = type === 'garage-door'
+      ? { id, positionXmm: pos, widthMm: GARAGE_DOOR_PRESETS[0].widthMm,
+          heightMm: GARAGE_DOOR_PRESETS[0].heightMm, sillHeightMm: 0,
+          type, garage: defaultGarageDoorSpec() }
+      : type === 'door'
+        ? { id, positionXmm: pos, widthMm: 900, heightMm: 2100, sillHeightMm: 0, type: 'door' }
+        : { id, positionXmm: pos, widthMm: 450, heightMm: 1200, sillHeightMm: 900, type: 'window' }
     
     if (dispatch({
       type: 'ADD_OPENING',
@@ -394,14 +400,49 @@ export default function App() {
           <div className="param-group">
             <button type="button" className="param-input" onClick={() => addOpening('window')} style={{ cursor: 'pointer' }}>Добавить окно</button>
             <button type="button" className="param-input" onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
+            <button type="button" className="param-input" data-testid="add-garage-door"
+              onClick={() => addOpening('garage-door')} style={{ cursor: 'pointer', marginTop: 6 }}>
+              + Гаражные ворота
+            </button>
           </div>
           {selectedOpening && (
             <div className="props">
               <h3 className="props-title">
-                Свойства {selectedOpening.type === 'door' ? 'дверного проёма' : 'оконного проёма'} ({selectedOpening.id})
+                Свойства {selectedOpening.type === 'garage-door' ? 'гаражных ворот' : selectedOpening.type === 'door' ? 'дверного проёма' : 'оконного проёма'} ({selectedOpening.id})
               </h3>
               <div>ID: {selectedOpening.id}</div>
-              <div>Тип: {selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
+              <div>Тип: {selectedOpening.type === 'garage-door' ? 'Гаражные секционные ворота' : selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
+              {selectedOpening.type === 'garage-door' && (
+                <div style={{ margin: '8px 0', fontSize: 12 }}>
+                  <label className="param-label" htmlFor="garage-preset">Североамериканский размер</label>
+                  <select id="garage-preset" className="param-input"
+                    value={GARAGE_DOOR_PRESETS.find(p => p.widthMm === selectedOpening.widthMm &&
+                      p.heightMm === selectedOpening.heightMm)?.label ?? ''}
+                    onChange={event => {
+                      const preset = GARAGE_DOOR_PRESETS.find(p => p.label === event.target.value)
+                      if (preset) {
+                        updateOpening(selectedOpening.id, { widthMm: preset.widthMm })
+                        if (selectedOpening.heightMm !== preset.heightMm)
+                          updateOpening(selectedOpening.id, { heightMm: preset.heightMm })
+                      }
+                    }}>
+                    <option value="">Индивидуальный размер</option>
+                    {GARAGE_DOOR_PRESETS.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
+                  </select>
+                  <div style={{ marginTop: 8 }}>
+                    Профиль: Clopay, стандартные торсионные направляющие (справочный)
+                  </div>
+                  <div>Требуется сбоку: ≥ {selectedOpening.garage?.minSideRoomMm} мм с каждой стороны</div>
+                  <div>Требуется сверху: ≥ {selectedOpening.garage?.minHeadRoomMm} мм</div>
+                  <div>Требуется в глубину: ≥ {selectedOpening.heightMm +
+                    (selectedOpening.garage?.minBackRoomExtraMm ?? 0)} мм</div>
+                  <div style={{ marginTop: 7, color: '#a25a00' }}>
+                    Перемычка {selectedOpening.garage?.lintelPreviewDepthMm} мм и
+                    {selectedOpening.garage?.jackStudsPerSide} опорные стойки на сторону — предварительная компоновка.
+                    Несущая способность, portal frame и реальные зазоры НЕ проверены.
+                  </div>
+                </div>
+              )}
               <SafeNumberInput label="Положение вдоль стены U (мм)" value={selectedOpening.positionXmm} onChange={(v) => updateOpening(selectedOpening.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
               <SafeNumberInput label="Ширина (мм)" value={selectedOpening.widthMm} onChange={(v) => updateOpening(selectedOpening.id, { widthMm: v })} validate={(r) => validateInt(r, 300, 5000, 'ширина')} />
               <SafeNumberInput label="Высота (мм)" value={selectedOpening.heightMm} onChange={(v) => updateOpening(selectedOpening.id, { heightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота')} />
@@ -419,7 +460,7 @@ export default function App() {
                 </label>
               )}
               <div style={{ marginTop: 8 }}>
-                <button type="button" className="param-input" onClick={() => deleteOpening(selectedOpening.id)} style={{ cursor: 'pointer' }}>Удалить {selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
+                <button type="button" className="param-input" onClick={() => deleteOpening(selectedOpening.id)} style={{ cursor: 'pointer' }}>Удалить {selectedOpening.type === 'garage-door' ? 'гаражные ворота' : selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
               </div>
             </div>
           )}

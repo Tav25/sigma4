@@ -28,6 +28,7 @@ export function generateWallModule(
       heightMm: opening.heightMm,
       sillHeightMm: opening.sillHeightMm,
       type: opening.type,
+      ...(opening.garage ? { garage: { ...opening.garage } } : {}),
     }))
     .sort((a, b) => a.positionXmm - b.positionXmm)
 

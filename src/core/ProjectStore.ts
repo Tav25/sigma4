@@ -20,7 +20,7 @@ export type ProjectCommand =
   | { type: 'SET_OPENING_HEIGHT'; payload: { openingId: string; heightMm: number } }
   | { type: 'SET_WINDOW_SILL_HEIGHT'; payload: { openingId: string; sillHeightMm: number } }
   | { type: 'SET_MARKER_SETTINGS'; payload: { openingId: string; anchor?: 'center' | 'left' | 'right'; outsideOffsetMm?: number; elevationMm?: number; visible?: boolean; color?: string } }
-  | { type: 'ADD_OPENING'; payload: { wallId: string; opening: { id: string; type: 'window' | 'door'; positionXmm: number; widthMm: number; heightMm: number; sillHeightMm: number } } }
+  | { type: 'ADD_OPENING'; payload: { wallId: string; opening: { id: string; type: 'window' | 'door' | 'garage-door'; positionXmm: number; widthMm: number; heightMm: number; sillHeightMm: number; garage?: import('./project').GarageDoorSpec } } }
   | { type: 'REMOVE_OPENING'; payload: { openingId: string } }
   | { type: 'ADD_WALL'; payload: { wall: Wall; connection?: WallConnection } }
   | { type: 'SET_WALL_ORIGIN'; payload: { wallId: string; origin: Vector3 } }
@@ -474,6 +474,7 @@ export class ProjectStore {
             id: opening.id, wallId, type: opening.type,
             positionUmm: opening.positionXmm, widthMm: opening.widthMm,
             heightMm: opening.heightMm, sillHeightMm: opening.sillHeightMm,
+            ...(opening.garage ? { garage: this.deepClone(opening.garage) } : {}),
           })
           wall.openings.push(opening.id)
           // Add marker for new opening

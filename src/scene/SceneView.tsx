@@ -418,7 +418,9 @@ export function SceneView({
       if (!entry) {
         const spec = generateTimberGeometry(el)
         const geo = new THREE.BoxGeometry(mmToMeters(spec.size.x), mmToMeters(spec.size.y), mmToMeters(spec.size.z))
-        const mat = new THREE.MeshStandardMaterial({ color: 0xb8864e })
+        const mat = new THREE.MeshStandardMaterial({
+          color: el.role === 'garage-lintel-preview' ? 0xe0ac43 : 0xb8864e,
+        })
         const mesh = new THREE.Mesh(geo, mat)
         const center = boxCenterWorld(el)
         mesh.position.set(mmToMeters(center.x), mmToMeters(center.y), mmToMeters(center.z))

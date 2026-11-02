@@ -61,6 +61,20 @@ export function ProjectTree({
                   ))}
                 </div>
               </details>
+              <details className="tree-group" open={node.garageDoors.length > 0}>
+                <summary>Гаражные ворота ({node.garageDoors.length})</summary>
+                <div className="tree-children">
+                  {node.garageDoors.length === 0 && <span className="tree-empty">Нет ворот</span>}
+                  {node.garageDoors.map(opening => (
+                    <button type="button" key={opening.id}
+                      data-testid={'tree-opening-' + opening.id}
+                      className={'tree-item' + (selectedOpeningId === opening.id ? ' tree-selected' : '')}
+                      onClick={() => onSelectOpening(wallId, opening.id)}>
+                      {opening.id} · {opening.widthMm} × {opening.heightMm} мм
+                    </button>
+                  ))}
+                </div>
+              </details>
               <details className="tree-group" data-testid={'tree-frame-' + wallId}>
                 <summary>Каркас ({node.boards.length})</summary>
                 <div className="tree-children">

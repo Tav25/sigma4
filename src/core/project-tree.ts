@@ -6,6 +6,7 @@ export interface WallTreeNode {
   wall: Wall
   windows: Opening[]
   doors: Opening[]
+  garageDoors: Opening[]
   boards: TimberElement[]
   markers: Marker[]
 }
@@ -24,6 +25,7 @@ export function buildProjectTree(doc: ProjectDocument): ProjectTreeModel {
       wall,
       windows: openings.filter(opening => opening.type === 'window'),
       doors: openings.filter(opening => opening.type === 'door'),
+      garageDoors: openings.filter(opening => opening.type === 'garage-door'),
       boards: doc.assembly.elements.filter(element => element.wallId === wall.wallId),
       markers: doc.building.markers.filter(marker => openingIds.has(marker.openingId)),
     }

@@ -1,5 +1,6 @@
 
 import { createTimberElement } from './timber'
+import type { GarageDoorSpec } from './project'
 import type { TimberElement } from './timber'
 import { generateWallPanel } from './wall'
 import type { WallPanelParams } from './wall'
@@ -10,7 +11,8 @@ export interface WindowOpening {
   widthMm: number
   heightMm: number
   sillHeightMm: number
-  type: 'window' | 'door'
+  type: 'window' | 'door' | 'garage-door'
+  garage?: GarageDoorSpec
 }
 
 export type Opening = WindowOpening
@@ -237,6 +239,10 @@ export function applyDoorOpening(elements: TimberElement[], door: WindowOpening)
   const oh = door.heightMm
   const openingRight = ox + ow
   const openingTop = oy + oh
+  const garage = door.type === 'garage-door' ? door.garage : undefined
+  if (door.type === 'garage-door' && !garage) throw new Error('Garage specification required')
+  const studsPerSide = garage ? garage.jackStudsPerSide : 1
+  const headerDepth = garage ? garage.lintelPreviewDepthMm : SH
 
   const bottom = elements.find((e) => e.role === 'bottom-plate')
   if (!bottom) throw new Error('No base wall')
@@ -248,15 +254,18 @@ export function applyDoorOpening(elements: TimberElement[], door: WindowOpening)
   if (ox + ow > wallLength - 135) throw new Error('Door position out of range')
   if (ow < 300) throw new Error('Door width too small')
   if (oh < 300) throw new Error('Door height too small')
-  if (openingTop + SH > wallHeight - SW * 2) throw new Error('Door too tall for wall height')
+  if (openingTop + headerDepth > wallHeight - SW * 2) throw new Error('Door/lintel too tall for wall height')
+  if (garage && (!Number.isInteger(studsPerSide) || studsPerSide < 1 || studsPerSide > 4)) throw new Error('Invalid garage jack stud count')
 
   const openingRange = [ox, openingRight]
-  const framingRanges = [
-    [ox - 2 * SW, ox - SW],
-    [ox - SW, ox],
-    [openingRight, openingRight + SW],
-    [openingRight + SW, openingRight + 2 * SW],
-  ]
+  const framingRanges: number[][] = []
+  for (let i = 0; i <= studsPerSide; i++) {
+    framingRanges.push([ox - (i + 1) * SW, ox - i * SW])
+    framingRanges.push([openingRight + i * SW, openingRight + (i + 1) * SW])
+  }
+  if (ox < (studsPerSide + 1) * SW || openingRight > wallLength - (studsPerSide + 1) * SW) {
+    throw new Error('Garage support studs outside wall')
+  }
 
   const removedOpeningStuds: number[] = []
   const result: TimberElement[] = []
@@ -281,52 +290,57 @@ export function applyDoorOpening(elements: TimberElement[], door: WindowOpening)
   const kingLen = wallHeight - SW * 3
   result.push(createTimberElement({
     id: door.id + '-king-left', role: 'king-stud', length: kingLen, width: SW, height: SH,
-    position: { x: ox - SW - SW / 2, y: SW, z: -SH / 2 },
+    position: { x: ox - studsPerSide * SW - SW / 2, y: SW, z: -SH / 2 },
     orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
   }))
   result.push(createTimberElement({
     id: door.id + '-king-right', role: 'king-stud', length: kingLen, width: SW, height: SH,
-    position: { x: openingRight + SW + SW / 2, y: SW, z: -SH / 2 },
+    position: { x: openingRight + studsPerSide * SW + SW / 2, y: SW, z: -SH / 2 },
     orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
   }))
 
-  // jack studs (Y 45..2100)
+  // Side supports: a provisional layout, not a calculated capacity.
   const jackLen = openingTop - SW
-  result.push(createTimberElement({
-    id: door.id + '-jack-left', role: 'jack-stud', length: jackLen, width: SW, height: SH,
-    position: { x: ox - SW / 2, y: SW, z: -SH / 2 },
-    orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
-  }))
-  result.push(createTimberElement({
-    id: door.id + '-jack-right', role: 'jack-stud', length: jackLen, width: SW, height: SH,
-    position: { x: openingRight + SW / 2, y: SW, z: -SH / 2 },
-    orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
-  }))
+  for (let i = 0; i < studsPerSide; i++) {
+    result.push(createTimberElement({
+      id: door.id + (i === 0 ? '-jack-left' : '-jack-left-' + (i + 1)),
+      role: 'jack-stud', length: jackLen, width: SW, height: SH,
+      position: { x: ox - SW / 2 - i * SW, y: SW, z: -SH / 2 },
+      orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
+    }))
+    result.push(createTimberElement({
+      id: door.id + (i === 0 ? '-jack-right' : '-jack-right-' + (i + 1)),
+      role: 'jack-stud', length: jackLen, width: SW, height: SH,
+      position: { x: openingRight + SW / 2 + i * SW, y: SW, z: -SH / 2 },
+      orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
+    }))
+  }
 
   // header: two boards, length 990, Y 2100-2245, Z split
-  const headerLen = (openingRight + SW) - (ox - SW)
+  const headerLen = ow + 2 * SW * studsPerSide
+  const headerRole = garage ? 'garage-lintel-preview' : 'header'
   result.push(createTimberElement({
-    id: door.id + '-header-1', role: 'header', length: headerLen, width: SW, height: SH,
-    position: { x: ox - SW, y: openingTop, z: -50 },
+    id: door.id + '-header-1', role: headerRole, length: headerLen, width: SW, height: headerDepth,
+    position: { x: ox - studsPerSide * SW, y: openingTop, z: -50 },
     orientation: { mode: 'x', angle: 0, roll: 0 }, material: 'wood',
   }))
   result.push(createTimberElement({
-    id: door.id + '-header-2', role: 'header', length: headerLen, width: SW, height: SH,
-    position: { x: ox - SW, y: openingTop, z: 50 },
+    id: door.id + '-header-2', role: headerRole, length: headerLen, width: SW, height: headerDepth,
+    position: { x: ox - studsPerSide * SW, y: openingTop, z: 50 },
     orientation: { mode: 'x', angle: 0, roll: 0 }, material: 'wood',
   }))
 
   // cripple-top (two studs at 3300 and 3600 for control model; for general, use removed opening studs)
-    const crippleTopLen = (wallHeight - SW * 2) - (openingTop + SH)
+    const crippleTopLen = (wallHeight - SW * 2) - (openingTop + headerDepth)
   if (crippleTopLen > 0) {
     for (const sx of removedOpeningStuds) {
       const idx = removedOpeningStuds.indexOf(sx) + 1
       const cMinX = sx; const cMaxX = sx + SW
-      const cMinY = openingTop + SH; const cMaxY = wallHeight - SW * 2
+      const cMinY = openingTop + headerDepth; const cMaxY = wallHeight - SW * 2
       if (!canAdd(result, cMinX, cMaxX, cMinY, cMaxY)) continue
       result.push(createTimberElement({
         id: door.id + `-cripple-top-${idx}`, role: 'cripple-top', length: crippleTopLen, width: SW, height: SH,
-        position: { x: sx + SW / 2, y: openingTop + SH, z: -SH / 2 },
+        position: { x: sx + SW / 2, y: openingTop + headerDepth, z: -SH / 2 },
         orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
       }))
     }
@@ -354,7 +368,7 @@ export function generateWallWithOpenings(params: WallPanelParams, openings: Wind
   const base = generateWallPanel(params)
   let elements = base.elements
   for (const o of sorted) {
-    if (o.type === 'door') {
+    if (o.type === 'door' || o.type === 'garage-door') {
       elements = applyDoorOpening(elements.map((e) => ({ ...e })), o)
     } else {
       elements = applyWindowOpening(elements.map((e) => ({ ...e })), o, o.id + '-')
@@ -362,7 +376,7 @@ export function generateWallWithOpenings(params: WallPanelParams, openings: Wind
   }
 
   // if any door, rebuild bottom plates (split around doors)
-  const doors = openings.filter((o) => o.type === 'door')
+  const doors = openings.filter((o) => o.type === 'door' || o.type === 'garage-door')
   if (doors.length > 0) {
     // remove existing bottom-plate elements
     elements = elements.filter((e) => e.role !== 'bottom-plate')
