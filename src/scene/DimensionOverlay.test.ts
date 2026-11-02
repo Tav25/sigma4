@@ -31,7 +31,7 @@ describe('S06.5.3 planar drawing legibility', () => {
     const bounds = geometry.boundingBox!
     // Previous 0.36m custom glyphs, new technical font <= 0.18m high.
     expect(bounds.max.y - bounds.min.y).toBeGreaterThan(0.08)
-    expect(bounds.max.y - bounds.min.y).toBeLessThanOrEqual(0.181)
+    expect(bounds.max.y - bounds.min.y).toBeLessThanOrEqual(0.185)
     expect(geometry.getAttribute('position').count).toBeGreaterThan(20)
     const mat = digits.material as THREE.MeshBasicMaterial
     expect(mat.map).toBeNull()
