@@ -386,7 +386,7 @@ export default function App() {
         <main className="viewport-wrap">
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
-              openings={allOpenings} markers={markers} selectedWindowId={selectedOpeningId} wallLength={wall.lengthMm}
+              openings={allOpenings} markers={markers} wallCount={snapshot.building.walls.length} selectedWindowId={selectedOpeningId} wallLength={mainWall.lengthMm}
               onWindowDragStart={startOpeningDrag}
               onWindowDragPreview={previewOpeningX}
               onWindowDragEnd={finishOpeningDrag}

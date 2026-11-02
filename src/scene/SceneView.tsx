@@ -13,6 +13,7 @@ interface SceneViewProps {
   showEdges?: boolean
   openings: WindowOpening[]
   markers: OpeningMarker[]
+  wallCount: number
   wallLength?: number
   selectedWindowId: string | null
   onWindowSelect?: (id: string | null) => void
@@ -37,7 +38,7 @@ interface WindowEntry {
 
 export function SceneView({
   elements, selectedId, showEdges = true,
-  openings, markers, wallLength = 3000, selectedWindowId, onWindowSelect,
+  openings, markers, wallCount, wallLength = 3000, selectedWindowId, onWindowSelect,
   onWindowDragStart, onWindowDragPreview, onWindowDragEnd, onSelect,
 }: SceneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -454,6 +455,12 @@ export function SceneView({
     }
 
   }, [elements])
+
+  // A newly added/removed wall changes the scene bounds. Refit only when
+  // the wall count changes, never during ordinary dragging or manual orbiting.
+  useEffect(() => {
+    resetRef.current?.()
+  }, [wallCount])
 
   // reconcile window hit planes/outlines
   useEffect(() => {
