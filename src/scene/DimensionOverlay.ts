@@ -1,112 +1,110 @@
 import * as THREE from 'three'
-import type { DimensionLayout, DimensionLine, DimensionPoint } from './dimension-model'
+import { formatDimensionNumber, type DimensionLayout, type DimensionLine, type DimensionPoint } from './dimension-model'
 
-const mm = (number: number) => number / 1000
-const point = (p: DimensionPoint) => new THREE.Vector3(mm(p.x), mm(p.y), mm(p.z))
+/** Everything dimension-related lies on the horizontal XZ drawing plane. */
+const GROUND_Y = 0.025
+const mm = (value: number) => value / 1000
+const planar = (p: DimensionPoint) => new THREE.Vector3(mm(p.x), GROUND_Y, mm(p.z))
 
-function labelSprite(value: string, color = '#182d43'): THREE.Sprite {
+/** Actual typography on a flat plane, not a billboard or a floating label. */
+function numericLabel(valueMm: number, color: string): THREE.Mesh {
+  const digits = formatDimensionNumber(valueMm)
   const canvas = document.createElement('canvas')
-  canvas.width = 768
-  canvas.height = 144
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('2D canvas is unavailable for dimension labels')
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = 'rgba(255,255,255,0.95)'
-  ctx.beginPath()
-  ctx.roundRect(3, 4, 762, 134, 20)
-  ctx.fill()
-  ctx.strokeStyle = color
-  ctx.lineWidth = 3
-  ctx.stroke()
-  ctx.font = 'bold 47px Arial, sans-serif'
-  ctx.fillStyle = color
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(value, 384, 74, 716)
+  canvas.width = 512
+  canvas.height = 128
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('2D canvas unavailable for dimension numbers')
+  context.clearRect(0, 0, canvas.width, canvas.height)
+  context.font = 'bold 85px Arial, sans-serif'
+  context.fillStyle = color
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  context.fillText(digits, 256, 64, 495)
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  const material = new THREE.SpriteMaterial({
-    map: texture, transparent: true, depthTest: false, depthWrite: false,
+  const material = new THREE.MeshBasicMaterial({
+    map: texture, side: THREE.DoubleSide, transparent: true,
+    depthWrite: false, depthTest: false,
   })
-  const sprite = new THREE.Sprite(material)
-  sprite.scale.set(2.1, 0.40, 1)
-  sprite.renderOrder = 110
-  return sprite
+  const length = Math.max(0.54, digits.length * 0.145)
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(length, 0.22), material)
+  // Local XY -> world XZ, facing the top (+Y) view. No camera billboarding.
+  mesh.rotation.x = -Math.PI / 2
+  mesh.renderOrder = 111
+  return mesh
 }
 
-function lineSegments(points: THREE.Vector3[], color: number): THREE.LineSegments {
+function segments(points: THREE.Vector3[], color: number): THREE.LineSegments {
   const geometry = new THREE.BufferGeometry().setFromPoints(points)
-  const material = new THREE.LineBasicMaterial({ color, depthTest: false, depthWrite: false })
-  const line = new THREE.LineSegments(geometry, material)
-  line.renderOrder = 105
-  return line
+  const material = new THREE.LineBasicMaterial({
+    color, depthTest: false, depthWrite: false,
+  })
+  const lines = new THREE.LineSegments(geometry, material)
+  lines.renderOrder = 107
+  return lines
 }
 
-function appendLine(group: THREE.Group, dim: DimensionLine) {
-  const a = point(dim.from), b = point(dim.to)
-  const da = point(dim.dimensionFrom), db = point(dim.dimensionTo)
-  const direction = db.clone().sub(da).normalize()
-  const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x)
-  const ext = 0.14
-  const arrowLength = 0.17
-  const arrowHalf = 0.085
-  const arrow = (at: THREE.Vector3, forward: THREE.Vector3) => {
-    const tipBack = at.clone().addScaledVector(forward, arrowLength)
+function appendDimension(group: THREE.Group, dim: DimensionLine) {
+  const start = planar(dim.from)
+  const end = planar(dim.to)
+  const a = planar(dim.dimensionFrom)
+  const b = planar(dim.dimensionTo)
+  const axis = b.clone().sub(a).normalize()
+  const normal = new THREE.Vector3(-axis.z, 0, axis.x)
+  const arrowLength = 0.13
+  const arrowHalf = 0.055
+  const arrow = (tip: THREE.Vector3, toward: THREE.Vector3) => {
+    const base = tip.clone().addScaledVector(toward, arrowLength)
     return [
-      at.clone(), tipBack.clone().addScaledVector(perpendicular, arrowHalf),
-      at.clone(), tipBack.addScaledVector(perpendicular, -arrowHalf),
+      tip.clone(), base.clone().addScaledVector(normal, arrowHalf),
+      tip.clone(), base.clone().addScaledVector(normal, -arrowHalf),
     ]
   }
-  // Always use world-space endpoints derived from the model. No viewport
-  // offsets or camera-centering corrections are applied to the coordinates.
   const points = [
-    a, da.clone().addScaledVector(da.clone().sub(a).normalize(), ext),
-    b, db.clone().addScaledVector(db.clone().sub(b).normalize(), ext),
-    da, db,
-    ...arrow(da, direction), ...arrow(db, direction.clone().negate()),
+    start, a.clone().addScaledVector(a.clone().sub(start).normalize(), 0.09),
+    end, b.clone().addScaledVector(b.clone().sub(end).normalize(), 0.09),
+    a, b,
+    ...arrow(a, axis), ...arrow(b, axis.clone().negate()),
   ]
-  group.add(lineSegments(points, dim.kind === 'overall' ? 0x1562a8 : 0x274559))
-  const title = dim.label + ': ' + Math.round(dim.valueMm) + ' мм'
-  const sprite = labelSprite(title, dim.kind === 'overall' ? '#1562a8' : '#274559')
-  sprite.name = 'dimension-label-' + dim.id
-  sprite.position.copy(da.clone().add(db).multiplyScalar(0.5))
-  sprite.position.y += 0.32
-  group.add(sprite)
+  group.add(segments(points, dim.kind === 'overall' ? 0x1562a8 : 0x274559))
+  const number = numericLabel(dim.valueMm, dim.kind === 'overall' ? '#1562a8' : '#274559')
+  number.name = 'dimension-number-' + dim.id
+  number.position.copy(a.clone().add(b).multiplyScalar(0.5))
+  // Put digits next to, not across, the dimension stroke on the same plane.
+  number.position.addScaledVector(normal, 0.18)
+  number.position.y = GROUND_Y + 0.004
+  group.add(number)
 }
 
-/** This is a render-only object; JSON never includes dimension geometry. */
+/** Derived visualization only: no canonical JSON mutation. */
 export function makeDimensionGroup(layout: DimensionLayout): THREE.Group {
   const group = new THREE.Group()
-  group.name = 'sigma4-dimensions'
-  for (const line of layout.lines) appendLine(group, line)
+  group.name = 'sigma4-planar-dimensions'
+  for (const dim of layout.lines) appendDimension(group, dim)
   return group
 }
 
-/** The global origin is NOT the centre of the camera or of the wall. */
+/** World-origin geometry is separate from engineering dimensions. */
 export function makeOriginGroup(): THREE.Group {
   const group = new THREE.Group()
   group.name = 'sigma4-world-origin'
-  const axes: { axis: 'X' | 'Y' | 'Z'; end: THREE.Vector3; color: number }[] = [
-    { axis: 'X', end: new THREE.Vector3(0.85, 0, 0), color: 0xdf3030 },
-    { axis: 'Y', end: new THREE.Vector3(0, 0.85, 0), color: 0x279453 },
-    { axis: 'Z', end: new THREE.Vector3(0, 0, 0.85), color: 0x365cc4 },
+  const axes = [
+    { end: new THREE.Vector3(0.7, 0, 0), color: 0xdf3030 },
+    { end: new THREE.Vector3(0, 0.7, 0), color: 0x279453 },
+    { end: new THREE.Vector3(0, 0, 0.7), color: 0x365cc4 },
   ]
   for (const axis of axes) {
-    const arrow = new THREE.ArrowHelper(axis.end.clone().normalize(),
-      new THREE.Vector3(0, 0.03, 0), axis.end.length(), axis.color, 0.16, 0.08)
-    arrow.renderOrder = 102
-    group.add(arrow)
+    group.add(new THREE.ArrowHelper(
+      axis.end.clone().normalize(), new THREE.Vector3(0, 0.025, 0),
+      axis.end.length(), axis.color, 0.11, 0.05,
+    ))
   }
-  const pointMarker = new THREE.Mesh(
-    new THREE.SphereGeometry(0.055, 12, 10),
+  const origin = new THREE.Mesh(
+    new THREE.SphereGeometry(0.03, 10, 10),
     new THREE.MeshBasicMaterial({ color: 0x111111, depthTest: false }),
   )
-  pointMarker.position.set(0, 0.03, 0)
-  group.add(pointMarker)
-  const label = labelSprite('0, 0, 0')
-  label.position.set(-0.48, 0.27, 0.25)
-  label.scale.set(0.96, 0.22, 1)
-  group.add(label)
+  origin.position.set(0, 0.025, 0)
+  group.add(origin)
   return group
 }
 
@@ -115,15 +113,11 @@ export function disposeDimensionGroup(group: THREE.Group): void {
     if (object instanceof THREE.Mesh || object instanceof THREE.Line ||
       object instanceof THREE.LineSegments) {
       object.geometry.dispose()
-    }
-    if (object instanceof THREE.Sprite) {
-      const mat = object.material as THREE.SpriteMaterial
-      mat.map?.dispose()
-      mat.dispose()
-    } else if (object instanceof THREE.Mesh || object instanceof THREE.Line ||
-      object instanceof THREE.LineSegments) {
       const materials = Array.isArray(object.material) ? object.material : [object.material]
-      for (const material of materials) material.dispose()
+      for (const material of materials) {
+        if (material instanceof THREE.MeshBasicMaterial) material.map?.dispose()
+        material.dispose()
+      }
     }
   })
 }

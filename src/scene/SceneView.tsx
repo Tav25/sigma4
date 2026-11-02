@@ -678,20 +678,11 @@ export function SceneView({
   }, [cursor])
 
   return (
-    <div className="viewport" ref={containerRef}>
-      {showDimensions && (
-        <div className="dimension-readout" data-testid="dimension-readout" aria-label="Размеры каркаса">
-          <strong>Размеры каркаса · мм</strong>
-          <span data-testid="dimension-total-x" className="dimension-total">
-            Наружный X: {Math.round(dimensions.overallXmm)} мм
-          </span>
-          <span data-testid="dimension-total-z" className="dimension-total">
-            Наружный Z: {Math.round(dimensions.overallZmm)} мм
-          </span>
-          <span className="dimension-origin">Оси: 0, 0, 0 — глобальное начало</span>
-          <span className="dimension-origin">Размеры отдельных стен указаны на линиях</span>
-        </div>
-      )}
+    <div className="viewport" ref={containerRef}
+      data-dimension-total-x={Math.round(dimensions.overallXmm)}
+      data-dimension-total-z={Math.round(dimensions.overallZmm)}
+      data-dimensions-visible={showDimensions ? 'true' : 'false'}
+      data-dimensions-plane="XZ">
       <button type="button" className="reset-view" onClick={() => resetRef.current?.()}>
         Сбросить вид
       </button>

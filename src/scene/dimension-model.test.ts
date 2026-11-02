@@ -2,13 +2,35 @@ import { describe, it, expect } from 'vitest'
 import { createProjectFromCurrentState, buildProjectSnapshot } from '../core/project-store'
 import { rightCornerOrigin } from '../core/corner'
 import { projectToScene } from './project-to-scene'
-import { buildDimensionLayout } from './dimension-model'
+import { buildDimensionLayout, formatDimensionNumber } from './dimension-model'
 
 const create = (length = 4000) => createProjectFromCurrentState({
   projectId: 's06-5-coordinates', length, height: 2700, spacing: 600, openings: [],
 })
 
 describe('S06.5 coordinates and real dimensions', () => {
+  it('renders numerical millimetres only, without labels or units', () => {
+    expect(formatDimensionNumber(4000)).toBe('4000')
+    expect(formatDimensionNumber(3145.2)).toBe('3145')
+    expect(formatDimensionNumber(12500)).toMatch(/^\d+$/)
+    expect(() => formatDimensionNumber(Number.NaN)).toThrow()
+    expect(() => formatDimensionNumber(-100)).toThrow()
+  })
+
+  it('projects every measurement and extension endpoint to the horizontal XZ plane', () => {
+    const doc = create()
+    const walls = doc.building.walls
+    const dimensions = buildDimensionLayout(walls, projectToScene(doc).elements)
+    for (const dimension of dimensions.lines) {
+      for (const endpoint of [dimension.from, dimension.to,
+        dimension.dimensionFrom, dimension.dimensionTo]) {
+        expect(endpoint.y).toBe(0)
+      }
+      expect(formatDimensionNumber(dimension.valueMm)).toMatch(/^\d+$/)
+    }
+    expect(dimensions.lines.some(dim => 'label' in dim)).toBe(false)
+  })
+
   it('anchors the first wall at x=0 and extends exactly to x=4000', () => {
     const doc = create()
     const layout = buildDimensionLayout(doc.building.walls, projectToScene(doc).elements)

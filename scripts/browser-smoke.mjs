@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.20')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.21')
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -40,18 +40,21 @@ try {
   await page.getByText('Количество элементов: 46').waitFor()
   await page.getByText('Валидация: OK').waitFor()
   await page.locator('.viewport canvas').waitFor({ state: 'visible' })
-  // S06.5: all dimensions are derived from actual timber world bounds.
-  const readout = page.getByTestId('dimension-readout')
-  await readout.waitFor()
-  assert.match(await page.getByTestId('dimension-total-x').textContent(), /6000 мм/)
-  assert.match(await page.getByTestId('dimension-total-z').textContent(), /\d+ мм/)
-  assert.match(await readout.textContent(), /0, 0, 0/)
+  // S06.5.1: measurements exist only on the XZ ground plane.
+  // Only numerals appear in the viewport; no floating information panel.
+  const viewport = page.locator('.viewport')
+  await viewport.waitFor()
+  assert.equal(await viewport.getAttribute('data-dimensions-plane'), 'XZ')
+  assert.equal(await viewport.getAttribute('data-dimension-total-x'), '6000')
+  assert.match(await viewport.getAttribute('data-dimension-total-z'), /^\d+$/)
+  assert.equal(await page.getByTestId('dimension-readout').count(), 0)
   const dimensionsControl = page.getByTestId('show-wall-dimensions')
   assert.equal(await dimensionsControl.isChecked(), true)
+  assert.equal(await viewport.getAttribute('data-dimensions-visible'), 'true')
   await dimensionsControl.uncheck()
-  await readout.waitFor({ state: 'hidden' })
+  assert.equal(await viewport.getAttribute('data-dimensions-visible'), 'false')
   await dimensionsControl.check()
-  await readout.waitFor()
+  assert.equal(await viewport.getAttribute('data-dimensions-visible'), 'true')
   await page.getByRole('button', { name: 'Вид сверху' }).click()
   await page.waitForTimeout(400)
   await page.screenshot({ path: dir + '/01-top.png' })
@@ -245,8 +248,8 @@ try {
     name: 's06-5-four-metre-wall.sigma4.json', mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(single)),
   }])
-  await page.getByTestId('dimension-total-x').getByText('4000 мм', { exact: false }).waitFor()
-  assert.match(await page.getByTestId('dimension-total-z').textContent(), /145 мм/)
+  await page.locator('.viewport[data-dimension-total-x="4000"]').waitFor()
+  assert.equal(await page.locator('.viewport').getAttribute('data-dimension-total-z'), '145')
   const fourDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const four = JSON.parse(await readFile(await (await fourDownload).path(), 'utf8'))
@@ -259,9 +262,9 @@ try {
   const wallLengthInput = page.getByText('Длина (мм)', { exact: true }).locator('..').locator('input')
   await wallLengthInput.fill('5000')
   await wallLengthInput.press('Tab')
-  await page.getByTestId('dimension-total-x').getByText('5000 мм', { exact: false }).waitFor()
+  await page.locator('.viewport[data-dimension-total-x="5000"]').waitFor()
   assert.equal(errors.length, 0, 'Unexpected browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.0.20 origin 0,0,0; 4m and 5m dimensions; corner externals; garage+door; JSON')
+  console.log('SIGMA4 BROWSER PASS: v0.0.21 ground-plane dimension numerals only; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()
