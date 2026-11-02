@@ -9,7 +9,7 @@ const make = (length = 6000) => createProjectStore(createProjectFromCurrentState
   projectId: 'garage-na-ca', length, height: 2700, spacing: 600, openings: [],
 }))
 function addGarage(store: ReturnType<typeof make>, wallId: string,
-  widthMm = GARAGE_DOOR_PRESETS[0].widthMm, positionXmm = 135) {
+  widthMm: number = GARAGE_DOOR_PRESETS[0].widthMm, positionXmm = 135) {
   return store.dispatch({ type: 'ADD_OPENING', payload: { wallId,
     opening: { id: 'G01', type: 'garage-door', positionXmm,
       widthMm, heightMm: 2134, sillHeightMm: 0,
