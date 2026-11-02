@@ -67,30 +67,55 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(d.isEmpty() || Math.min(extents.x, extents.y, extents.z) < 1e-6).toBe(true)
   })
 
-  it('forms a two-stud L corner with standard 45x145 mm boards', () => {
+  it('has the missing 45x145 inner stud and an open pocket for insulation', () => {
     const store = storeWithCorner()
     const doc = store.getSnapshot()
-    expect(doc.assembly.elements.some(e => e.role === 'corner-backing')).toBe(false)
-    const frontEnd = bbox(store, 'stud-11')
-    const sideStart = bbox(store, 'wall-002:stud-01')
-    // A 45 mm stud face joins a 145 mm deep edge at right angles.
-    expect(frontEnd.min.x).toBeCloseTo(5.955, 6)
-    expect(frontEnd.max.x).toBeCloseTo(6, 6)
-    expect(frontEnd.min.z).toBeCloseTo(-0.0725, 6)
-    expect(frontEnd.max.z).toBeCloseTo(0.0725, 6)
-    expect(sideStart.min.x).toBeCloseTo(5.855, 6)
-    expect(sideStart.max.x).toBeCloseTo(6, 6)
-    expect(sideStart.min.z).toBeCloseTo(-0.1175, 6)
-    expect(sideStart.max.z).toBeCloseTo(-0.0725, 6)
-    // They touch on the inside plane of the facade, without overlapping.
-    const overlap = frontEnd.clone().intersect(sideStart)
-    const size = overlap.getSize(new THREE.Vector3())
-    expect(Math.min(size.x, size.y, size.z)).toBeCloseTo(0, 6)
+    const stud = doc.assembly.elements.find(e => e.elementId === 'warm-corner-stud')
+    expect(stud).toBeDefined()
+    expect(stud?.role).toBe('corner-backing')
+    expect(stud?.sectionMm).toEqual({ width: 45, height: 145 })
     expect(doc.building.walls.map(w => w.thicknessMm)).toEqual([145, 145])
-    for (const id of ['stud-11', 'wall-002:stud-01']) {
-      const element = doc.assembly.elements.find(e => e.elementId === id)!
-      expect(element.sectionMm).toEqual({ width: 45, height: 145 })
+
+    const inside = bbox(store, 'warm-corner-stud')
+    const outside = bbox(store, 'stud-11')
+    const side = bbox(store, 'wall-002:stud-01')
+
+    // Actual world-space footprint in metres for the 6000mm facade.
+    expect(inside.min.x).toBeCloseTo(5.855, 6)
+    expect(inside.max.x).toBeCloseTo(5.900, 6)
+    expect(outside.min.x).toBeCloseTo(5.955, 6)
+    expect(outside.max.x).toBeCloseTo(6, 6)
+    expect(inside.min.z).toBeCloseTo(-0.0725, 6)
+    expect(inside.max.z).toBeCloseTo(0.0725, 6)
+    expect(side.min.z).toBeCloseTo(-0.1175, 6)
+    expect(side.max.z).toBeCloseTo(-0.0725, 6)
+    expect(inside.min.y).toBeCloseTo(0.045, 6)
+    expect(inside.max.y).toBeCloseTo(2.610, 6)
+
+    // 55mm open cavity between facade studs; no volumes intersect.
+    expect(outside.min.x - inside.max.x).toBeCloseTo(0.055, 6)
+    for (const [a, b] of [[inside, outside], [inside, side], [outside, side]]) {
+      const extents = a.clone().intersect(b).getSize(new THREE.Vector3())
+      expect(Math.min(extents.x, extents.y, extents.z)).toBeCloseTo(0, 6)
     }
+
+    expect(stud?.connectionIds).toContain('wall-002:stud-01')
+    const sideStud = doc.assembly.elements.find(e => e.elementId === 'wall-002:stud-01')
+    expect(sideStud?.connectionIds).toContain('warm-corner-stud')
+  })
+
+  it('moves the inner corner stud with facade length and changes its height', () => {
+    const store = storeWithCorner()
+    expect(store.dispatch({
+      type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 6500 },
+    }).success).toBe(true)
+    expect(bbox(store, 'warm-corner-stud').min.x).toBeCloseTo(6.355, 6)
+    expect(store.dispatch({
+      type: 'SET_WALL_HEIGHT', payload: { wallId: 'wall-001', heightMm: 3000 },
+    }).success).toBe(true)
+    expect(bbox(store, 'warm-corner-stud').max.y).toBeCloseTo(2.910, 6)
+    expect(store.undo().success).toBe(true)
+    expect(bbox(store, 'warm-corner-stud').max.y).toBeCloseTo(2.610, 6)
   })
 
   it('first wall length changes move the side wall and preserve a single undo', () => {

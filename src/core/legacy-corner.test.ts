@@ -28,7 +28,7 @@ describe('S05.3: two-stud 45x145 corner and legacy JSON compatibility', () => {
     expect(JSON.stringify(rebuilt.assembly.elements)).toBe(oldAssembly)
   })
 
-  it('imports legacy two-wall JSON with 45 mm metadata and rebuilds without a third corner stud', () => {
+  it('imports legacy two-wall JSON and replaces the old 20mm strip with a 45x145 stud', () => {
     const source = createProjectStore(original())
     const front = source.getSnapshot().building.walls[0]
     const wall = {
@@ -53,6 +53,9 @@ describe('S05.3: two-stud 45x145 corner and legacy JSON compatibility', () => {
     expect(updated.building.walls.map(w => w.thicknessMm)).toEqual([145, 145])
     expect(updated.assembly.elements.some(e => e.elementId === 'warm-corner-cleat')).toBe(false)
     expect(updated.assembly.elements.some(e => e.sectionMm.width === 20)).toBe(false)
+    const inside = updated.assembly.elements.find(e => e.elementId === 'warm-corner-stud')
+    expect(inside?.sectionMm).toEqual({ width: 45, height: 145 })
+    expect(inside?.position.x).toBe(5877.5)
     expect(updated.assembly.elements.find(e => e.elementId === 'stud-11')?.sectionMm).toEqual({
       width: 45, height: 145,
     })
@@ -73,6 +76,6 @@ describe('S05.3: two-stud 45x145 corner and legacy JSON compatibility', () => {
     expect(store.getSnapshot().building.walls[1].origin.x).toBeCloseTo(6427.5)
     expect(store.undo().success).toBe(true)
     expect(store.getSnapshot().building.walls[1].origin.x).toBeCloseTo(5927.5)
-    expect(store.getSnapshot().assembly.elements.some(e => e.role === 'corner-backing')).toBe(false)
+    expect(store.getSnapshot().assembly.elements.find(e => e.elementId === 'warm-corner-stud')?.position.x).toBe(5877.5)
   })
 })

@@ -257,7 +257,7 @@ export default function App() {
                   onClick={removeSecondWall}>Удалить вторую стену</button>}
           </div>
           {hasSecondWall && <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
-            Тёплый угол: две стойки 45×145 мм, место под утеплитель. Высота стен общая.
+            Тёплый угол: три стойки 45×145 мм, между ними место под утеплитель.
           </div>}
           <h2 className="panel-title" style={{ marginTop: 14 }}>Стена {wall.wallId === mainWall.wallId ? '1' : '2'} — параметры</h2>
           <div className="param-group">

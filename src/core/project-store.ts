@@ -89,9 +89,23 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
     if (front) {
       const top = assembly.elements.find(el => el.id === 'plate-top-2')
       if (top) top.length -= wall.sectionMm.height
-      // The two existing 45x145 end studs already form a two-stud L corner.
-      // Do not add a third full-height wooden piece: leave the cavity open
-      // for insulation. Interior sheathing uses separate drywall clips.
+      // The Canadian warm corner needs an inner nailer/support stud as well:
+      // two 45-mm facade uprights separated by an insulated cavity, joined
+      // along their back faces by the perpendicular wall's start stud.
+      // Unlike the old 20-mm cleat, this is a real 45x145 framing member.
+      assembly.elements.push({
+        id: 'warm-corner-stud',
+        role: 'corner-backing',
+        length: wall.heightMm - wall.sectionMm.width * 3,
+        width: wall.sectionMm.width,
+        height: wall.sectionMm.height,
+        position: {
+          x: wall.lengthMm - wall.sectionMm.height + wall.sectionMm.width / 2,
+          y: wall.sectionMm.width,
+          z: -wall.sectionMm.height / 2,
+        },
+        orientation: { mode: 'y', angle: 0, roll: 0 },
+      })
     }
     if (right) {
       const top = assembly.elements.find(el => el.id === 'plate-top-2')
@@ -129,6 +143,11 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
     if (firstEnd && rightStart) {
       firstEnd.connectionIds = [rightStart.elementId]
       rightStart.connectionIds = [firstEnd.elementId]
+    }
+    const insideStud = allElements.find(e => e.wallId === front.wallId && e.elementId === 'warm-corner-stud')
+    if (insideStud && rightStart) {
+      insideStud.connectionIds = [rightStart.elementId]
+      rightStart.connectionIds.push(insideStud.elementId)
     }
     const frontUpper = allElements.find(e => e.wallId === front.wallId && e.elementId === 'plate-top-2')
     const rightUpper = allElements.find(e => e.wallId === right.wallId && e.elementId === `${right.wallId}:plate-top-2`)
