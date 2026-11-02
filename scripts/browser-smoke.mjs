@@ -84,6 +84,16 @@ try {
   assert.equal(nine.building.connections[0].type, 'california-right')
   assert.ok(nine.assembly.elements.length > 46)
   assert.equal(new Set(nine.assembly.elements.map(e => e.elementId)).size, nine.assembly.elements.length)
+  // Only one wall branch is expanded; verify selection and switching even
+  // after adding nine real walls to the 3D scene.
+  const selectedNinth = tree.getByTestId('wall-node-wall-009')
+  assert.notEqual(await selectedNinth.getAttribute('open'), null)
+  assert.equal(await tree.getByTestId('wall-node-wall-001').getAttribute('open'), null)
+  await tree.locator('[data-testid="wall-node-wall-003"] > summary').click()
+  assert.notEqual(await tree.getByTestId('wall-node-wall-003').getAttribute('open'), null)
+  assert.equal(await selectedNinth.getAttribute('open'), null)
+  await tree.locator('[data-testid="wall-node-wall-009"] > summary').click()
+  assert.notEqual(await selectedNinth.getAttribute('open'), null)
   await page.getByRole('button', { name: 'Вид сверху' }).click()
   await page.waitForTimeout(350)
   await page.screenshot({ path: dir + '/03-nine-walls.png' })

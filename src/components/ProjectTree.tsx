@@ -22,8 +22,13 @@ export function ProjectTree({
       {tree.walls.map((node, index) => {
         const wallId = node.wall.wallId
         return (
-          <details key={wallId} data-testid={'wall-node-' + wallId} className="project-tree-wall" open>
-            <summary className={selectedWallId === wallId ? 'tree-selected' : ''} onClick={() => onSelectWall(wallId)}>
+          <details key={wallId} data-testid={'wall-node-' + wallId}
+            className="project-tree-wall" open={selectedWallId === wallId}>
+            <summary className={selectedWallId === wallId ? 'tree-selected' : ''}
+              onClick={(event) => {
+                event.preventDefault()
+                onSelectWall(wallId)
+              }}>
               Стена {index + 1} · {node.wall.lengthMm} мм
             </summary>
             <div className="tree-branches">
