@@ -64,7 +64,7 @@ describe('S06.5.3 planar drawing legibility', () => {
     const b = group.getObjectByName('dimension-number-wall-dim-wall-002') as THREE.Mesh
     const camera = new THREE.PerspectiveCamera()
     for (const position of [[-8, 8, -8], [8, 8, 8], [-8, 8, 8]] as const) {
-      camera.position.set(...position)
+      camera.position.set(position[0], position[1], position[2])
       orientDimensionNumbers(group, camera)
       const directionA = new THREE.Vector3(1, 0, 0).applyQuaternion(a.quaternion)
       const directionB = new THREE.Vector3(1, 0, 0).applyQuaternion(b.quaternion)
