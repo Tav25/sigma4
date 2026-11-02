@@ -32,6 +32,8 @@ try {
   await page.getByText('Свойства оконного проёма (W01)').waitFor()
   await page.getByRole('button', { name: '+ Добавить вторую стену' }).click()
   await tree.getByTestId('wall-node-wall-002').waitFor()
+  // The selected wall is the only expanded branch in S06.2.
+  await tree.locator('[data-testid="wall-node-wall-001"] > summary').click()
   await tree.locator('[data-testid="tree-frame-wall-001"] > summary').click()
   await tree.getByTestId('tree-board-warm-corner-stud').click()
   await page.getByText('Свойства детали').waitFor()
