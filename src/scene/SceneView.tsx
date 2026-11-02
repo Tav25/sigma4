@@ -75,6 +75,9 @@ export function SceneView({
     const container = containerRef.current
     if (!container) return
 
+    // React StrictMode remounts the scene in development. Its new camera must be fitted again.
+    hasCenteredRef.current = false
+
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0xf2f2f2)
     sceneRef.current = scene
@@ -292,12 +295,17 @@ export function SceneView({
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
+      // Retry initial centering after the viewport has a measured size.
+      if (!hasCenteredRef.current && elementsRef.current.length > 0) {
+        resetRef.current?.()
+      }
     }
     const resizeObserver = new ResizeObserver(handleResize)
     resizeObserver.observe(container)
 
     resetRef.current = () => {
       const els = elementsRef.current
+      if (els.length === 0 || container.clientWidth <= 0 || container.clientHeight <= 0) return
       const fb = new THREE.Box3()
       for (const el of els) {
         const spec = generateTimberGeometry(el)
@@ -318,6 +326,7 @@ export function SceneView({
       camera.position.copy(ctr.clone().add(new THREE.Vector3(cd * 0.6, cd * 0.5, cd * 0.6)))
       controls.target.copy(ctr)
       controls.update()
+      hasCenteredRef.current = true
     }
 
     return () => {
@@ -429,35 +438,11 @@ export function SceneView({
         e.edgesMat.color = new THREE.Color(0x2a1a0a)
       }
     })
-  // camera centering on first load
-  if (!hasCenteredRef.current) {
-    const camera = cameraRef.current
-    const controls = controlsRef.current
-    if (camera && controls) {
-      const els = elementsRef.current
-      const fb = new THREE.Box3()
-      for (const el of els) {
-        const spec = generateTimberGeometry(el)
-        const c = boxCenterWorld(el)
-        const center2 = new THREE.Vector3(mmToMeters(c.x), mmToMeters(c.y), mmToMeters(c.z))
-        const hx = mmToMeters(spec.size.x) / 2
-        const hy = mmToMeters(spec.size.y) / 2
-        const hz = mmToMeters(spec.size.z) / 2
-        fb.expandByPoint(new THREE.Vector3(center2.x - hx, center2.y - hy, center2.z - hz))
-        fb.expandByPoint(new THREE.Vector3(center2.x + hx, center2.y + hy, center2.z + hz))
-      }
-      const ctr = new THREE.Vector3()
-      fb.getCenter(ctr)
-      const sz = new THREE.Vector3()
-      fb.getSize(sz)
-      const md = Math.max(sz.x, sz.y, sz.z)
-      const cd = md * 1.5 + 2
-      camera.position.copy(ctr.clone().add(new THREE.Vector3(cd * 0.6, cd * 0.5, cd * 0.6)))
-      controls.target.copy(ctr)
-      controls.update()
-      hasCenteredRef.current = true
+    // Use the same framing as "Сбросить вид" only on initial load.
+    // If the viewport has no size yet, ResizeObserver handles it later.
+    if (!hasCenteredRef.current && elements.length > 0) {
+      resetRef.current?.()
     }
-  }
 
   }, [elements])
 
