@@ -390,14 +390,11 @@ export function generateWallWithOpenings(params: WallPanelParams, openings: Wind
       const [ds, de] = doorRanges[di]
       if (ds > prevEnd) {
         const len = ds - prevEnd
-        // determine id
-        let segId = `plate-bottom-mid-${di}`
-        if (doorRanges.length === 1) {
-          segId = 'plate-bottom-left'
-        }
-        if (di === 0) segId = 'plate-bottom-left'
-        if (di === doorRanges.length - 1 && prevEnd > 0) segId = 'plate-bottom-right'
-        // for single door, right segment is plate-bottom-right (already set above for last)
+        // The gap BEFORE the first door is 'left'. Every gap between
+        // two doors is 'mid-N'. Only the gap AFTER the final door may
+        // be 'right'. Never label an interior gap as 'right' or the
+        // tail segment will reuse its elementId.
+        const segId = di === 0 ? 'plate-bottom-left' : `plate-bottom-mid-${di}`
         elements.push(createTimberElement({
           id: segId, role: 'bottom-plate', length: len, width: SW, height: SH,
           position: { x: prevEnd, y: SW / 2, z: -SH / 2 },

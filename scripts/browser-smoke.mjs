@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.18')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.19')
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -172,7 +172,53 @@ try {
   await page.waitForTimeout(400)
   await page.screenshot({ path: dir + '/06-focused-second-wall-garage.png' })
   assert.equal(errors.length, 0)
-  console.log('SIGMA4 BROWSER PASS: 0.0.18, focused garage on wall 2, garage on wall 3, warnings, 9 walls, JSON')
+  // Regression from an actual 12-m wall with G01 3500@2230, W03 @6435,
+  // then D01 on the SAME wall. The old generator duplicated
+  // wall-002:plate-bottom-right, and rejected this valid operation.
+  const lengthInput = page.getByText('Длина (мм)', { exact: true }).locator('..').locator('input')
+  await lengthInput.fill('12000')
+  await lengthInput.press('Tab')
+  const props = page.locator('.props').filter({ hasText: 'Свойства гаражных ворот (G01)' })
+  const garageWidth = props.getByText('Ширина (мм)', { exact: true }).locator('..').locator('input')
+  await garageWidth.fill('3500')
+  await garageWidth.press('Tab')
+  const garagePosition = props.getByText('Положение вдоль стены U (мм)', { exact: true }).locator('..').locator('input')
+  await garagePosition.fill('2230')
+  await garagePosition.press('Tab')
+  const garageHeight = props.getByText('Высота (мм)', { exact: true }).locator('..').locator('input')
+  await garageHeight.fill('2000')
+  await garageHeight.press('Tab')
+  await page.getByRole('button', { name: 'Добавить окно' }).click()
+  await tree.getByTestId('tree-opening-W03').waitFor()
+  const windowProps = page.locator('.props').filter({ hasText: 'Свойства оконного проёма (W03)' })
+  const windowPosition = windowProps.getByText('Положение вдоль стены U (мм)', { exact: true }).locator('..').locator('input')
+  await windowPosition.fill('6435')
+  await windowPosition.press('Tab')
+  await page.getByRole('button', { name: 'Добавить дверь' }).click()
+  await tree.getByTestId('tree-opening-D01').waitFor()
+  await page.getByText('Свойства дверного проёма (D01)').waitFor()
+  const mixedDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const mixed = JSON.parse(await readFile(await (await mixedDownload).path(), 'utf8'))
+  const sideOpenings = mixed.building.openings.filter(o => o.wallId === 'wall-002')
+  assert.deepEqual(sideOpenings.map(o => [o.id, o.positionUmm, o.widthMm]), [
+    ['G01', 2230, 3500], ['W03', 6435, 450], ['D01', 135, 900],
+  ])
+  const plates = mixed.assembly.elements.filter(e => e.wallId === 'wall-002' && e.role === 'bottom-plate')
+    .sort((a, b) => a.position.x - b.position.x)
+    .map(e => [e.elementId, e.position.x, e.lengthMm])
+  assert.deepEqual(plates, [
+    ['wall-002:plate-bottom-left', 0, 135],
+    ['wall-002:plate-bottom-mid-1', 1035, 1195],
+    ['wall-002:plate-bottom-right', 5730, 6270],
+  ])
+  assert.equal(new Set(mixed.assembly.elements.map(e => e.elementId)).size, mixed.assembly.elements.length)
+  await page.getByText('Валидация: OK').waitFor()
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
+  await page.waitForTimeout(450)
+  await page.screenshot({ path: dir + '/07-garage-window-and-door-fixed.png' })
+  assert.equal(errors.length, 0)
+  console.log('SIGMA4 BROWSER PASS: v0.0.19 garage + window + pedestrian door, unique bottom plates, 9 walls, JSON')
 
 } finally {
   await browser?.close()
