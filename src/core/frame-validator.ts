@@ -307,9 +307,11 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
       // its 145-mm dimension is now along the wall's local X axis.
       const isRolledStud = el.orientation.mode === 'y' &&
         Math.abs(Math.abs(el.orientation.roll % 180) - 90) < 0.001
-      const halfX = isRolledStud ? halfH : halfW
-      let minX = el.position.x - halfX
-      let maxX = el.position.x + halfX
+      // For a Y-axis stud rolled ±90°, local section height projects along
+      // X from the saved reference point, not from a centred X coordinate.
+      const positiveRoll = Math.sin(el.orientation.roll * Math.PI / 180) > 0
+      let minX = isRolledStud ? el.position.x - (positiveRoll ? 0 : el.sectionMm.height) : el.position.x - halfW
+      let maxX = isRolledStud ? el.position.x + (positiveRoll ? el.sectionMm.height : 0) : el.position.x + halfW
       let minY = el.position.y
       let maxY = el.position.y + el.lengthMm
 
@@ -352,9 +354,9 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
       const halfH = el.sectionMm.height / 2
       const isRolledStud = el.orientation.mode === 'y' &&
         Math.abs(Math.abs(el.orientation.roll % 180) - 90) < 0.001
-      const halfX = isRolledStud ? halfH : halfW
-      let elMinX = el.position.x - halfX
-      let elMaxX = el.position.x + halfX
+      const positiveRoll = Math.sin(el.orientation.roll * Math.PI / 180) > 0
+      let elMinX = isRolledStud ? el.position.x - (positiveRoll ? 0 : el.sectionMm.height) : el.position.x - halfW
+      let elMaxX = isRolledStud ? el.position.x + (positiveRoll ? el.sectionMm.height : 0) : el.position.x + halfW
       let elMinY = el.position.y
       let elMaxY = el.position.y + el.lengthMm
 

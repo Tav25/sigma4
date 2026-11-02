@@ -3,7 +3,7 @@ import type {
   Wall,
   ValidationResult,
 } from './project'
-import { validateProject, validateProjectSnapshot, validateSourceParameters } from './frame-validator'
+import { validateProjectSnapshot, validateSourceParameters } from './frame-validator'
 import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
 
@@ -500,10 +500,13 @@ export class ProjectStore {
   importJson(json: string): CommandResult {
     try {
       const parsed = JSON.parse(json)
-      const validation = validateProject(parsed)
-      if (!validation.valid) {
-        const errors = validation.issues.filter(i => i.severity === 'error')
-        return { success: false, revision: this.revision, errorCode: errors[0]?.code || 'VALIDATION_FAILED', messageRu: errors[0]?.messageRu || 'Ошибка валидации', validation }
+      // A saved generated assembly may be stale (including old California
+      // corner coordinates). Validate author-controlled source first; then
+      // regenerate and validate the actual resulting assembly.
+      const sourceIssues = validateSourceParameters(parsed)
+      if (sourceIssues.some(i => i.severity === 'error')) {
+        const errors = sourceIssues.filter(i => i.severity === 'error')
+        return { success: false, revision: this.revision, errorCode: errors[0]?.code || 'VALIDATION_FAILED', messageRu: errors[0]?.messageRu || 'Ошибка валидации', validation: { valid: false, issues: sourceIssues, engineeringStatus: 'not_evaluated' } }
       }
       let rebuilt: ProjectDocument
       try {

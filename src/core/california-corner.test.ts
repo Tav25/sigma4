@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { createProjectFromCurrentState } from './project-store'
 import { createProjectStore } from './ProjectStore'
 import { rightCornerOrigin } from './corner'
+import { validateProject } from './frame-validator'
 import { boxCenterWorld, generateTimberGeometry, mmToMeters } from './timber'
 import { projectToScene } from '../scene/project-to-scene'
 
@@ -69,6 +70,15 @@ describe('S05.6 California insulated three-stud corner: true top section', () =>
     const pocket = new THREE.Vector3(5.890, 1.2, 0.020)
     for (const b of [inside,facade,side]) expect(b.containsPoint(pocket)).toBe(false)
     expect(facade.max.z - inside.max.z).toBeCloseTo(0.1, 6)
+  })
+
+  it('rejects the old protruding nailer geometry instead of trusting saved valid:true', () => {
+    const snapshot = createCornerStore().getSnapshot()
+    const old = JSON.parse(JSON.stringify(snapshot))
+    const nailer = old.assembly.elements.find((e: { elementId: string }) => e.elementId === 'warm-corner-stud')
+    nailer.position.x = 5882.5
+    expect(validateProject(old).issues.map(i => i.code)).toContain('ELEMENT_OUT_OF_WALL_BOUNDS')
+    expect(validateProject(snapshot).valid).toBe(true)
   })
 
   it('rebuilds an old saved JSON containing a wrongly oriented nailer', () => {

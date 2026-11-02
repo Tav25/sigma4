@@ -75,7 +75,7 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(stud?.role).toBe('corner-backing')
     expect(stud?.sectionMm).toEqual({ width: 45, height: 145 })
     expect(stud?.orientation).toEqual({ mode: 'y', angle: 0, roll: 90 })
-    expect(stud?.position.x).toBe(5882.5)
+    expect(stud?.position.x).toBe(5810)
     expect(stud?.position.z).toBe(-50)
     expect(doc.building.walls.map(w => w.thicknessMm)).toEqual([145, 145])
 

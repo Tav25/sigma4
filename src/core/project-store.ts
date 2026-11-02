@@ -103,7 +103,8 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
         width: wall.sectionMm.width,
         height: wall.sectionMm.height,
         position: {
-          x: wall.lengthMm - wall.sectionMm.width - wall.sectionMm.height / 2,
+          // Position is the near X edge after a +90° roll (not the centre).
+          x: wall.lengthMm - wall.sectionMm.width - wall.sectionMm.height,
           y: wall.sectionMm.width,
           z: -wall.sectionMm.height / 2 + wall.sectionMm.width / 2,
         },
