@@ -51,14 +51,12 @@ export function exteriorExtensionFoot(
   const isAlongX = Math.abs(line.dimensionTo.x - line.dimensionFrom.x) >
     Math.abs(line.dimensionTo.z - line.dimensionFrom.z)
   const exteriorOffsetMm = 100
-  if (isAlongX) {
-    const outsideZ = line.dimensionFrom.z >= bounds.maxZ
-      ? bounds.maxZ + exteriorOffsetMm : bounds.minZ - exteriorOffsetMm
-    return asPoint(source.x, outsideZ)
-  }
-  const outsideX = line.dimensionFrom.x >= bounds.maxX
-    ? bounds.maxX + exteriorOffsetMm : bounds.minX - exteriorOffsetMm
-  return asPoint(outsideX, source.z)
+  // Extension lines must never cross the overall plan footprint.
+  // The common camera in isometric mode looks from -X/-Z, so choose
+  // the NEAR (negative) exterior sides to prevent foreground overlays
+  // appearing across the studs and door/window openings.
+  if (isAlongX) return asPoint(source.x, bounds.minZ - exteriorOffsetMm)
+  return asPoint(bounds.minX - exteriorOffsetMm, source.z)
 }
 
 /**
@@ -87,11 +85,11 @@ export function buildDimensionLayout(walls: readonly Wall[], elements: TimberEle
       alongX ? wall.origin.z : wall.origin.z - wall.lengthMm)
     const level = offset + index * step
     const dimensionFrom = alongX
-      ? asPoint(from.x, bounds.maxZ + level)
-      : asPoint(bounds.maxX + level, from.z)
+      ? asPoint(from.x, bounds.minZ - level)
+      : asPoint(bounds.minX - level, from.z)
     const dimensionTo = alongX
-      ? asPoint(to.x, bounds.maxZ + level)
-      : asPoint(bounds.maxX + level, to.z)
+      ? asPoint(to.x, bounds.minZ - level)
+      : asPoint(bounds.minX - level, to.z)
     return {
       id: 'wall-dim-' + wall.wallId,
       kind: 'wall' as const,
@@ -106,16 +104,16 @@ export function buildDimensionLayout(walls: readonly Wall[], elements: TimberEle
     valueMm: overallXmm,
     from: asPoint(bounds.minX, bounds.maxZ),
     to: asPoint(bounds.maxX, bounds.maxZ),
-    dimensionFrom: asPoint(bounds.minX, bounds.maxZ + totalOffset),
-    dimensionTo: asPoint(bounds.maxX, bounds.maxZ + totalOffset),
+    dimensionFrom: asPoint(bounds.minX, bounds.minZ - totalOffset),
+    dimensionTo: asPoint(bounds.maxX, bounds.minZ - totalOffset),
   })
   lines.push({
     id: 'overall-dimension-z', kind: 'overall',
     valueMm: overallZmm,
     from: asPoint(bounds.maxX, bounds.maxZ),
     to: asPoint(bounds.maxX, bounds.minZ),
-    dimensionFrom: asPoint(bounds.maxX + totalOffset, bounds.maxZ),
-    dimensionTo: asPoint(bounds.maxX + totalOffset, bounds.minZ),
+    dimensionFrom: asPoint(bounds.minX - totalOffset, bounds.maxZ),
+    dimensionTo: asPoint(bounds.minX - totalOffset, bounds.minZ),
   })
   return { lines, bounds, overallXmm, overallZmm }
 }

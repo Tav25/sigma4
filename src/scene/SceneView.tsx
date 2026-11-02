@@ -8,7 +8,7 @@ import type { SceneOpening3D } from './project-to-scene'
 import { openingLocalToWorld, openingWorldToLocalU, openingYaw } from './opening-geometry'
 import { calculateWorldBounds, topViewDistance } from './view-bounds'
 import type { DimensionLayout } from './dimension-model'
-import { makeDimensionGroup, makeOriginGroup, disposeDimensionGroup } from './DimensionOverlay'
+import { makeDimensionGroup, makeOriginGroup, disposeDimensionGroup, orientDimensionNumbers } from './DimensionOverlay'
 import type { OpeningMarker } from './project-to-scene'
 
 interface SceneViewProps {
@@ -315,6 +315,9 @@ export function SceneView({
     const animate = () => {
       frameId = requestAnimationFrame(animate)
       controls.update()
+      if (dimensionGroupRef.current) {
+        orientDimensionNumbers(dimensionGroupRef.current, camera)
+      }
       renderer.render(scene, camera)
     }
     animate()

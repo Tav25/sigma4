@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.22')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.23')
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -67,6 +67,14 @@ try {
   assert.equal(await viewport.getAttribute('data-dimension-total-x'), '6000')
   assert.equal(await viewport.getAttribute('data-dimension-total-z'), '3145')
   await page.screenshot({ path: dir + '/09-vector-dimensions-iso.png' })
+  // S06.5.3: isometric and top screenshots for 50%-size vector type,
+  // in-plane CAD arrowheads and exterior-only extension lines.
+  await page.screenshot({ path: dir + '/10-fixed-dimensions-isometric.png' })
+  await page.getByRole('button', { name: 'Вид сверху' }).click()
+  await page.waitForTimeout(350)
+  await page.screenshot({ path: dir + '/11-fixed-dimensions-top.png' })
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
+  await page.waitForTimeout(200)
 
   const firstDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
@@ -270,7 +278,7 @@ try {
   await wallLengthInput.press('Tab')
   await page.locator('.viewport[data-dimension-total-x="5000"]').waitFor()
   assert.equal(errors.length, 0, 'Unexpected browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.0.22 vector numerals; aligned axes; exterior arrows; 4m and 5m; corner; garage+door; JSON')
+  console.log('SIGMA4 BROWSER PASS: v0.0.23 half-size Helvetiker vector type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()

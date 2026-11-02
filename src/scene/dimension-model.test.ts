@@ -44,10 +44,10 @@ describe('S06.5 coordinates and real dimensions', () => {
         const alongX = Math.abs(line.dimensionTo.x - line.dimensionFrom.x) >
           Math.abs(line.dimensionTo.z - line.dimensionFrom.z)
         if (alongX) {
-          expect(foot.z).toBeGreaterThan(layout.bounds.maxZ)
+          expect(foot.z).toBeLessThan(layout.bounds.minZ)
           expect(foot.x).toBe(side === 'from' ? line.from.x : line.to.x)
         } else {
-          expect(foot.x).toBeGreaterThan(layout.bounds.maxX)
+          expect(foot.x).toBeLessThan(layout.bounds.minX)
           expect(foot.z).toBe(side === 'from' ? line.from.z : line.to.z)
         }
       }
@@ -61,7 +61,7 @@ describe('S06.5 coordinates and real dimensions', () => {
     const yaw = dimensionLabelYaw(layout.lines[0])
     const feet = exteriorExtensionFoot(layout.lines[0], layout.bounds, 'from')
     expect(yaw).toBe(0)
-    expect(feet.z).toBeGreaterThan(layout.bounds.maxZ)
+    expect(feet.z).toBeLessThan(layout.bounds.minZ)
     expect(JSON.stringify(doc)).toBe(before)
   })
 
