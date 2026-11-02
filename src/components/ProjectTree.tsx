@@ -22,13 +22,13 @@ export function ProjectTree({
       {tree.walls.map((node, index) => {
         const wallId = node.wall.wallId
         return (
-          <details key={wallId} data-testid={'wall-node-' + wallId} className="project-tree-wall" defaultOpen>
+          <details key={wallId} data-testid={'wall-node-' + wallId} className="project-tree-wall" open>
             <summary className={selectedWallId === wallId ? 'tree-selected' : ''} onClick={() => onSelectWall(wallId)}>
               Стена {index + 1} · {node.wall.lengthMm} мм
             </summary>
             <div className="tree-branches">
               <div className="tree-parameters">Параметры · {node.wall.sectionMm.width}×{node.wall.sectionMm.height} мм</div>
-              <details className="tree-group" defaultOpen={node.windows.length > 0}>
+              <details className="tree-group" open={node.windows.length > 0}>
                 <summary>Окна ({node.windows.length})</summary>
                 <div className="tree-children">
                   {node.windows.length === 0 && <span className="tree-empty">Нет окон</span>}
@@ -42,7 +42,7 @@ export function ProjectTree({
                   ))}
                 </div>
               </details>
-              <details className="tree-group" defaultOpen={node.doors.length > 0}>
+              <details className="tree-group" open={node.doors.length > 0}>
                 <summary>Двери ({node.doors.length})</summary>
                 <div className="tree-children">
                   {node.doors.length === 0 && <span className="tree-empty">Нет дверей</span>}
