@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sigma4.org/schema/project.schema.json",
+  "title": "SIGMA4 Project Document",
+  "type": "object",
+  "required": ["project", "building", "assembly", "validation"],
+  "additionalProperties": false,
+  "properties": {
+    "project": {
+      "type": "object",
+      "required": ["schemaVersion", "projectId", "projectName", "units", "rulesetId", "rulesetVersion", "generatorVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "projectId": { "type": "string", "minLength": 1 },
+        "projectName": { "type": "string", "minLength": 1 },
+        "units": { "const": "mm" },
+        "rulesetId": { "type": "string", "minLength": 1 },
+        "rulesetVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "generatorVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" }
+      }
+    },
+    "building": {
+      "type": "object",
+      "required": ["materials", "walls", "openings", "markers"],
+      "additionalProperties": false,
+      "properties": {
+        "materials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "densityKgM3"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "densityKgM3": { "type": "number", "minimum": 1 },
+              "strengthClass": { "type": "string" }
+            }
+          },
+          "uniqueItems": true
+        },
+        "walls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["wallId", "lengthMm", "heightMm", "thicknessMm", "studSpacingMm", "sectionMm", "orientation", "origin", "openings"],
+            "additionalProperties": false,
+            "properties": {
+              "wallId": { "type": "string", "minLength": 1 },
+              "lengthMm": { "type": "number", "minimum": 1 },
+              "heightMm": { "type": "number", "minimum": 1 },
+              "thicknessMm": { "type": "number", "minimum": 1 },
+              "studSpacingMm": { "type": "number", "minimum": 1 },
+              "sectionMm": {
+                "type": "object",
+                "required": ["width", "height"],
+                "additionalProperties": false,
+                "properties": {
+                  "width": { "type": "number", "minimum": 1 },
+                  "height": { "type": "number", "minimum": 1 }
+                }
+              },
+              "orientation": { "enum": ["x", "y", "z"] },
+              "origin": {
+                "type": "object",
+                "required": ["x", "y", "z"],
+                "additionalProperties": false,
+                "properties": {
+                  "x": { "type": "number" },
+                  "y": { "type": "number" },
+                  "z": { "type": "number" }
+                }
+              },
+              "openings": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "uniqueItems": true
+        },
+        "openings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "wallId", "type", "positionUmm", "widthMm", "heightMm", "sillHeightMm"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "wallId": { "type": "string", "minLength": 1 },
+              "type": { "enum": ["window", "door"] },
+              "positionUmm": { "type": "number", "minimum": 0 },
+              "widthMm": { "type": "number", "minimum": 1 },
+              "heightMm": { "type": "number", "minimum": 1 },
+              "sillHeightMm": { "type": "number", "minimum": 0 }
+            }
+          },
+          "uniqueItems": true
+        },
+        "markers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["openingId", "anchor", "outsideOffsetMm", "elevationMm", "visible", "color"],
+            "additionalProperties": false,
+            "properties": {
+              "openingId": { "type": "string", "minLength": 1 },
+              "anchor": { "enum": ["center", "left", "right"] },
+              "outsideOffsetMm": { "type": "number" },
+              "elevationMm": { "type": "number" },
+              "visible": { "type": "boolean" },
+              "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+            }
+          }
+        }
+      }
+    },
+    "assembly": {
+      "type": "object",
+      "required": ["elements"],
+      "additionalProperties": false,
+      "properties": {
+        "elements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["elementId", "wallId", "role", "sectionMm", "lengthMm", "orientation", "position", "connectionIds", "generated"],
+            "additionalProperties": false,
+            "properties": {
+              "elementId": { "type": "string", "minLength": 1 },
+              "wallId": { "type": "string", "minLength": 1 },
+              "role": { "enum": ["stud", "king-stud", "jack-stud", "cripple-stud", "bottom-plate", "top-plate", "header", "sill"] },
+              "sectionMm": {
+                "type": "object",
+                "required": ["width", "height"],
+                "additionalProperties": false,
+                "properties": {
+                  "width": { "type": "number", "minimum": 1 },
+                  "height": { "type": "number", "minimum": 1 }
+                }
+              },
+              "lengthMm": { "type": "number", "minimum": 1 },
+              "orientation": {
+                "type": "object",
+                "required": ["mode", "angle", "roll"],
+                "additionalProperties": false,
+                "properties": {
+                  "mode": { "enum": ["x", "y", "z", "slope"] },
+                  "angle": { "type": "number" },
+                  "roll": { "type": "number" }
+                }
+              },
+              "position": {
+                "type": "object",
+                "required": ["x", "y", "z"],
+                "additionalProperties": false,
+                "properties": {
+                  "x": { "type": "number" },
+                  "y": { "type": "number" },
+                  "z": { "type": "number" }
+                }
+              },
+              "connectionIds": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "generated": { "type": "boolean" }
+            }
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "required": ["valid", "issues", "engineeringStatus"],
+      "additionalProperties": false,
+      "properties": {
+        "valid": { "type": "boolean" },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "severity", "path", "messageRu", "affectedIds"],
+            "additionalProperties": false,
+            "properties": {
+              "code": { "type": "string", "minLength": 1 },
+              "severity": { "enum": ["error", "warning", "info"] },
+              "path": { "type": "string" },
+              "messageRu": { "type": "string" },
+              "affectedIds": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        },
+        "engineeringStatus": { "enum": ["not_evaluated", "passed", "failed"] }
+      }
+    }
+  }
+}

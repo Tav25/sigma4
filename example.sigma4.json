@@ -1,0 +1,883 @@
+{
+  "project": {
+    "schemaVersion": "1.0.0",
+    "projectId": "example-001",
+    "projectName": "SIGMA4 Example Project",
+    "units": "mm",
+    "rulesetId": "sigma4-ruleset",
+    "rulesetVersion": "1.0.0",
+    "generatorVersion": "1.0.0"
+  },
+  "building": {
+    "materials": [
+      {
+        "id": "wood-c24",
+        "name": "Сосна/Ель С24",
+        "densityKgM3": 420,
+        "strengthClass": "C24"
+      }
+    ],
+    "walls": [
+      {
+        "wallId": "wall-001",
+        "lengthMm": 6000,
+        "heightMm": 2700,
+        "thicknessMm": 45,
+        "studSpacingMm": 600,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "orientation": "x",
+        "origin": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "openings": [
+          "W01",
+          "W02"
+        ]
+      }
+    ],
+    "openings": [
+      {
+        "id": "W01",
+        "wallId": "wall-001",
+        "type": "window",
+        "positionUmm": 900,
+        "widthMm": 1200,
+        "heightMm": 1200,
+        "sillHeightMm": 900
+      },
+      {
+        "id": "W02",
+        "wallId": "wall-001",
+        "type": "window",
+        "positionUmm": 3300,
+        "widthMm": 1200,
+        "heightMm": 1200,
+        "sillHeightMm": 900
+      }
+    ],
+    "markers": [
+      {
+        "openingId": "W01",
+        "anchor": "center",
+        "outsideOffsetMm": 50,
+        "elevationMm": 1500,
+        "visible": true,
+        "color": "#0066ff"
+      },
+      {
+        "openingId": "W02",
+        "anchor": "center",
+        "outsideOffsetMm": 50,
+        "elevationMm": 1500,
+        "visible": true,
+        "color": "#0066ff"
+      }
+    ]
+  },
+  "assembly": {
+    "elements": [
+      {
+        "elementId": "plate-bottom-1",
+        "wallId": "wall-001",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 6000,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "position": {
+          "x": 0,
+          "y": 22.5,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "stud-01",
+        "wallId": "wall-001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 22.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "stud-02",
+        "wallId": "wall-001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 622.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "stud-05",
+        "wallId": "wall-001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 2422.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "stud-06",
+        "wallId": "wall-001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 3022.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "stud-09",
+        "wallId": "wall-001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 4822.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "stud-10",
+        "wallId": "wall-001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 5422.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "stud-11",
+        "wallId": "wall-001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 5977.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plate-top-1",
+        "wallId": "wall-001",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 6000,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "position": {
+          "x": 0,
+          "y": 2632.5,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plate-top-2",
+        "wallId": "wall-001",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 6000,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "position": {
+          "x": 0,
+          "y": 2677.5,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-king-left",
+        "wallId": "wall-001",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 832.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-king-right",
+        "wallId": "wall-001",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 2167.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-jack-left",
+        "wallId": "wall-001",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2055,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 877.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-jack-right",
+        "wallId": "wall-001",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2055,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 2122.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-header-1",
+        "wallId": "wall-001",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1290,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 855,
+          "y": 2100,
+          "z": -50
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-header-2",
+        "wallId": "wall-001",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1290,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 855,
+          "y": 2100,
+          "z": 50
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-sill",
+        "wallId": "wall-001",
+        "role": "sill",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1200,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "position": {
+          "x": 900,
+          "y": 877.5,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-cripple-bottom-1",
+        "wallId": "wall-001",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 1222.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-cripple-bottom-2",
+        "wallId": "wall-001",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 1822.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-cripple-top-1",
+        "wallId": "wall-001",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 365,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 1222.5,
+          "y": 2245,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-cripple-top-2",
+        "wallId": "wall-001",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 365,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 1822.5,
+          "y": 2245,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-cripple-bottom-left",
+        "wallId": "wall-001",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 922.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W01-cripple-bottom-right",
+        "wallId": "wall-001",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 2077.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-king-left",
+        "wallId": "wall-001",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 3232.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-king-right",
+        "wallId": "wall-001",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 4567.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-jack-left",
+        "wallId": "wall-001",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2055,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 3277.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-jack-right",
+        "wallId": "wall-001",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2055,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 4522.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-header-1",
+        "wallId": "wall-001",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1290,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 3255,
+          "y": 2100,
+          "z": -50
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-header-2",
+        "wallId": "wall-001",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1290,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 3255,
+          "y": 2100,
+          "z": 50
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-sill",
+        "wallId": "wall-001",
+        "role": "sill",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1200,
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "position": {
+          "x": 3300,
+          "y": 877.5,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-cripple-bottom-1",
+        "wallId": "wall-001",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 3622.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-cripple-bottom-2",
+        "wallId": "wall-001",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 4222.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-cripple-top-1",
+        "wallId": "wall-001",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 365,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 3622.5,
+          "y": 2245,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-cripple-top-2",
+        "wallId": "wall-001",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 365,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 4222.5,
+          "y": 2245,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-cripple-bottom-left",
+        "wallId": "wall-001",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 3322.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "W02-cripple-bottom-right",
+        "wallId": "wall-001",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "position": {
+          "x": 4477.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "connectionIds": [],
+        "generated": true
+      }
+    ]
+  },
+  "validation": {
+    "valid": true,
+    "issues": [],
+    "engineeringStatus": "not_evaluated"
+  }
+}

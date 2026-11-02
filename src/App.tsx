@@ -1,13 +1,13 @@
-
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { SceneView } from './scene/SceneView'
 import { generateWallPanel } from './core/wall'
-import { generateWallWithOpenings } from './core/window'
+import { generateWallWithOpenings, type WindowOpening } from './core/window'
 import { timberVolumeM3, type TimberElement } from './core/timber'
 import { SafeNumberInput } from './components/SafeNumberInput'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { validateWallLength, validateInt } from './core/validation'
-import type { WindowOpening } from './core/window'
+import type { ProjectDocument } from './core/project'
+import { createProjectFromCurrentState, serializeProject } from './core/project-store'
 
 function findFreePosition(openings: WindowOpening[], wallLength: number, newW: number): number | null {
   for (let x = 135; x + newW + 90 <= wallLength; x += 50) {
@@ -37,43 +37,45 @@ export default function App() {
   const [showEdges, setShowEdges] = useState(true)
   const [doorEnabled, setDoorEnabled] = useState(false)
   const [doorParams, setDoorParams] = useState({ positionXmm: 3000, widthMm: 900, heightMm: 2100 })
+  const [projectDoc, setProjectDoc] = useState<ProjectDocument | null>(null)
   const idCounterRef = useRef(2)
 
   const selectedWindow = openings.find((o) => o.id === selectedWindowId) ?? null
 
   const params = { length, height, sectionWidth: 45, sectionHeight: 145, spacing, topLayers: 2 }
-  const defaultAssembly = useMemo(() => generateWallPanel({ length: 3000, height: 2700, sectionWidth: 45, sectionHeight: 145, spacing: 600, topLayers: 2 }), [])
-  const lastElementsRef = useRef(defaultAssembly.elements)
   const allOpenings = doorEnabled ? [...openings, { id: 'D01', positionXmm: doorParams.positionXmm, widthMm: doorParams.widthMm, heightMm: doorParams.heightMm, sillHeightMm: 0, type: 'door' } as WindowOpening] : openings
-  const doorOpening = allOpenings.find((o) => o.type === 'door') ?? null
+
   const assembly = useMemo(() => {
     try {
       const a = allOpenings.length > 0 ? generateWallWithOpenings(params, allOpenings) : generateWallPanel(params)
-      lastElementsRef.current = a.elements
       return a
     } catch (e) {
       console.error('Wall generation error:', e)
       return null
     }
   }, [length, height, spacing, openings, doorEnabled, doorParams])
-  const elements = assembly ? assembly.elements : lastElementsRef.current
+
+  const elements = assembly ? assembly.elements : []
+
+  useEffect(() => {
+    const doc = createProjectFromCurrentState({ length, height, spacing, openings: allOpenings, projectName: 'SIGMA4 Project' })
+    setProjectDoc(doc)
+  }, [length, height, spacing, openings, doorEnabled, doorParams])
+
   const selected = elements.find((e) => e.id === selectedId) ?? null
   useEffect(() => { if (selectedId && !elements.find((e) => e.id === selectedId)) setSelectedId(null) }, [elements, selectedId])
-
 
   const updateWindow = (id: string, patch: Partial<WindowOpening>) => {
     setOpenings((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
   }
   const updateDoor = (patch: Partial<WindowOpening>) => {
-    // door is stored separately via doorEnabled; update a synthetic door opening in allOpenings by regenerating
-    // We track door params in a state variable
     setDoorParams((prev) => ({ ...prev, ...patch }))
   }
 
   const addWindow = () => {
     const pos = findFreePosition(openings, length, 450)
     if (pos === null) {
-      alert('\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u043c\u0435\u0441\u0442\u0430 \u0434\u043b\u044f \u043d\u043e\u0432\u043e\u0433\u043e \u043e\u043a\u043d\u0430. \u0423\u0432\u0435\u043b\u0438\u0447\u044c\u0442\u0435 \u0434\u043b\u0438\u043d\u0443 \u0441\u0442\u0435\u043d\u044b \u0438\u043b\u0438 \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u0435 \u0440\u0430\u0437\u043c\u0435\u0440\u044b \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044e\u0449\u0438\u0445 \u043f\u0440\u043e\u0451\u043c\u043e\u0432.')
+      alert('Недостаточно места для нового окна. Увеличьте длину стены или измените размеры существующих проёмов.')
       return
     }
     idCounterRef.current += 1
@@ -88,6 +90,19 @@ export default function App() {
     if (selectedWindowId === id) setSelectedWindowId(null)
   }
 
+  const exportJson = () => {
+    if (projectDoc) {
+      const json = serializeProject(projectDoc)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'project.sigma4.json'
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }
+
   const dirText = (el: TimberElement) => {
     const m = el.orientation.mode
     if (m === 'x') return 'X'
@@ -96,10 +111,13 @@ export default function App() {
     return 'slope ' + el.orientation.angle
   }
 
+  const validation = projectDoc?.validation
+  const hasErrors = validation && !validation.valid
+
   return (
     <div className="app">
       <header className="top-bar">
-        <span className="app-title">Конструктор каркасных строений</span>
+        <span className="app-title">SIGMA4</span>
         <span className="app-version">0.0.14</span>
       </header>
       <div className="main">
@@ -109,10 +127,10 @@ export default function App() {
             <SafeNumberInput label="Длина (мм)" value={length} onChange={setLength} validate={(r) => validateWallLength(r)} />
           </div>
           <div className="param-group">
-            <SafeNumberInput label="Высота (мм)" value={height} onChange={setHeight} validate={(r) => validateInt(r, 300, 10000, '\u0432\u044b\u0441\u043e\u0442\u0443')} />
+            <SafeNumberInput label="Высота (мм)" value={height} onChange={setHeight} validate={(r) => validateInt(r, 300, 10000, 'высоту')} />
           </div>
           <div className="param-group">
-            <SafeNumberInput label="Шаг стоек (мм)" value={spacing} onChange={setSpacing} validate={(r) => validateInt(r, 100, 5000, '\u0448\u0430\u0433')} />
+            <SafeNumberInput label="Шаг стоек (мм)" value={spacing} onChange={setSpacing} validate={(r) => validateInt(r, 100, 5000, 'шаг')} />
           </div>
           <div className="param-group">
             <label className="param-label">Сечение</label>
@@ -156,10 +174,10 @@ export default function App() {
             <div className="props">
               <h3 className="props-title">Свойства детали ({selectedWindow.id})</h3>
               <div>ID: {selectedWindow.id}</div>
-              <SafeNumberInput label="Положение окна X (мм)" value={selectedWindow.positionXmm} onChange={(v) => updateWindow(selectedWindow.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, '\u043f\u043e\u043b\u043e\u0436\u0435\u043d\u0438\u0435')} />
-              <SafeNumberInput label="Ширина окна (мм)" value={selectedWindow.widthMm} onChange={(v) => updateWindow(selectedWindow.id, { widthMm: v })} validate={(r) => validateInt(r, 300, 5000, '\u0448\u0438\u0440\u0438\u043d\u0430')} />
-              <SafeNumberInput label="Высота окна (мм)" value={selectedWindow.heightMm} onChange={(v) => updateWindow(selectedWindow.id, { heightMm: v })} validate={(r) => validateInt(r, 300, 5000, '\u0432\u044b\u0441\u043e\u0442\u0430')} />
-              <SafeNumberInput label="Высота подоконника (мм)" value={selectedWindow.sillHeightMm} onChange={(v) => updateWindow(selectedWindow.id, { sillHeightMm: v })} validate={(r) => validateInt(r, 300, 5000, '\u0432\u044b\u0441\u043e\u0442\u0430 \u043f\u043e\u0434\u043e\u043a\u043e\u043d\u043d\u0438\u043a\u0430')} />
+              <SafeNumberInput label="Положение окна X (мм)" value={selectedWindow.positionXmm} onChange={(v) => updateWindow(selectedWindow.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
+              <SafeNumberInput label="Ширина окна (мм)" value={selectedWindow.widthMm} onChange={(v) => updateWindow(selectedWindow.id, { widthMm: v })} validate={(r) => validateInt(r, 300, 5000, 'ширина')} />
+              <SafeNumberInput label="Высота окна (мм)" value={selectedWindow.heightMm} onChange={(v) => updateWindow(selectedWindow.id, { heightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота')} />
+              <SafeNumberInput label="Высота подоконника (мм)" value={selectedWindow.sillHeightMm} onChange={(v) => updateWindow(selectedWindow.id, { sillHeightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота подоконника')} />
               <div style={{ marginTop: 8 }}>
                 <button type="button" className="param-input" onClick={() => deleteWindow(selectedWindow.id)} style={{ cursor: 'pointer' }}>Удалить окно</button>
               </div>
@@ -173,12 +191,35 @@ export default function App() {
               Добавить дверь
             </label>
           </div>
-          {doorEnabled && doorOpening && (
+          {doorEnabled && (
             <div className="props">
-              <div>ID: {doorOpening.id}</div>
-              <SafeNumberInput label="Положение X (мм)" value={doorOpening.positionXmm} onChange={(v) => updateDoor({ positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
-              <SafeNumberInput label="Ширина (мм)" value={doorOpening.widthMm} onChange={(v) => updateDoor({ widthMm: v })} validate={(r) => validateInt(r, 600, 5000, 'ширина')} />
-              <SafeNumberInput label="Высота (мм)" value={doorOpening.heightMm} onChange={(v) => updateDoor({ heightMm: v })} validate={(r) => validateInt(r, 1600, 5000, 'высота')} />
+              <div>ID: D01</div>
+              <SafeNumberInput label="Положение X (мм)" value={doorParams.positionXmm} onChange={(v) => updateDoor({ positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
+              <SafeNumberInput label="Ширина (мм)" value={doorParams.widthMm} onChange={(v) => updateDoor({ widthMm: v })} validate={(r) => validateInt(r, 600, 5000, 'ширина')} />
+              <SafeNumberInput label="Высота (мм)" value={doorParams.heightMm} onChange={(v) => updateDoor({ heightMm: v })} validate={(r) => validateInt(r, 1600, 5000, 'высота')} />
+            </div>
+          )}
+
+          <h2 className="panel-title" style={{ marginTop: 16 }}>Проект</h2>
+          <div className="param-group">
+            <button type="button" className="param-input" onClick={exportJson} style={{ cursor: 'pointer' }}>Экспорт JSON</button>
+          </div>
+          {projectDoc && (
+            <div className="props" style={{ fontSize: 12 }}>
+              <div>Project ID: {projectDoc.project.projectId}</div>
+              <div>Schema: {projectDoc.project.schemaVersion}</div>
+              <div>Ruleset: {projectDoc.project.rulesetVersion}</div>
+              <div>Generator: {projectDoc.project.generatorVersion}</div>
+              <div style={{ color: hasErrors ? '#cc0000' : '#006600', marginTop: 4 }}>
+                Валидация: {validation?.valid ? 'OK' : 'ОШИБКИ'}
+              </div>
+              {hasErrors && validation?.issues.length && (
+                <div style={{ marginTop: 4 }}>
+                  {validation.issues.filter(i => i.severity === 'error').slice(0, 3).map((i, idx) => (
+                    <div key={idx} style={{ color: '#cc0000' }}>{i.messageRu}</div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
