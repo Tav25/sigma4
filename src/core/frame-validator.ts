@@ -498,6 +498,32 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
         checkPositive(o.heightMm, 'heightMm', 'Высота проёма', 'f', path, issues, o.id ? [o.id] : [])
         checkNonNeg(o.sillHeightMm, 'sillHeightMm', 'Высота подоконника', path, issues, o.id ? [o.id] : [])
       })
+
+      // Geometry validation: check opening bounds and frame overlaps
+      b.walls.forEach((wall: any) => {
+        if (!wall.wallId) return
+        const wallOpenings = b.openings.filter((o: any) => o.wallId === wall.wallId).sort((a: any, b: any) => a.positionUmm - b.positionUmm)
+        wallOpenings.forEach((o: any) => {
+          const path = `building.openings[id=${o.id}]`
+          if (o.positionUmm + o.widthMm > wall.lengthMm) {
+            issues.push(createIssue('OPENING_OUT_OF_BOUNDS', 'error', path, 'Проём выходит за границы стены', [o.id, wall.wallId]))
+          }
+          if (o.sillHeightMm + o.heightMm > wall.heightMm) {
+            issues.push(createIssue('OPENING_TOO_TALL', 'error', path, 'Проём слишком высокий для стены', [o.id, wall.wallId]))
+          }
+        })
+        for (let i = 0; i < wallOpenings.length; i++) {
+          for (let j = i + 1; j < wallOpenings.length; j++) {
+            const a = wallOpenings[i]
+            const b = wallOpenings[j]
+            const aFrameMax = a.positionUmm + a.widthMm + 90
+            const bFrameMin = b.positionUmm - 90
+            if (aFrameMax > bFrameMin) {
+              issues.push(createIssue('OPENINGS_FRAME_OVERLAP', 'error', `building.openings[id=${a.id}],building.openings[id=${b.id}]`, 'Недостаточно места между проёмами для рамы', [a.id, b.id, wall.wallId]))
+            }
+          }
+        }
+      })
     }
 
     const materialIds = new Set<string>()

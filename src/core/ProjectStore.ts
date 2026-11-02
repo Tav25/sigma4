@@ -38,6 +38,7 @@ interface TransactionState {
   active: boolean
   baseDocument: ProjectDocument
   previewDocument: ProjectDocument
+  lastPreviewSuccess: boolean
 }
 
 type Subscriber = (document: ProjectDocument, revision: number) => void
@@ -81,14 +82,17 @@ export class ProjectStore {
   private trimHistory(): void {
     while (this.history.length > this.maxHistorySize) {
       this.history.shift()
+      this.historyIndex--
     }
     this.historyIndex = Math.min(this.historyIndex, this.history.length - 1)
   }
 
   private addToHistory(doc: ProjectDocument, command: ProjectCommand): void {
     this.revision++
+    // Truncate any redo branch
     this.history = this.history.slice(0, this.historyIndex + 1)
     this.history.push({ document: this.deepClone(doc), revision: this.revision, command })
+    this.historyIndex = this.history.length - 1
     this.trimHistory()
   }
 
@@ -153,6 +157,7 @@ export class ProjectStore {
       active: true,
       baseDocument: this.deepClone(this.document),
       previewDocument: this.deepClone(this.document),
+      lastPreviewSuccess: false,
     }
     return true
   }
@@ -164,10 +169,12 @@ export class ProjectStore {
 
     const candidate = this.applyCommand(this.transaction.previewDocument, command)
     if (!candidate.success) {
+      this.transaction.lastPreviewSuccess = false
       return { success: false, revision: this.revision, errorCode: candidate.errorCode, messageRu: candidate.messageRu, validation: candidate.validation }
     }
 
     this.transaction.previewDocument = candidate.document!
+    this.transaction.lastPreviewSuccess = true
     return { success: true, revision: this.revision, changedIds: candidate.changedIds, validation: candidate.validation }
   }
 
@@ -176,8 +183,17 @@ export class ProjectStore {
       return { success: false, revision: this.revision, errorCode: 'NO_ACTIVE_TRANSACTION', messageRu: 'Нет активной транзакции' }
     }
 
-    // Apply the final preview document directly
-    this.document = this.deepFreeze(this.deepClone(this.transaction.previewDocument))
+    if (!this.transaction.lastPreviewSuccess) {
+      return { success: false, revision: this.revision, errorCode: 'INVALID_TRANSACTION_STATE', messageRu: 'Последний preview завершился ошибкой, commit невозможен' }
+    }
+
+    // Re-validate the preview document before committing
+    const candidate = this.applyCommand(this.transaction.previewDocument, { type: 'REPLACE_PROJECT', payload: { document: this.transaction.previewDocument } })
+    if (!candidate.success) {
+      return { success: false, revision: this.revision, errorCode: candidate.errorCode, messageRu: candidate.messageRu, validation: candidate.validation }
+    }
+
+    this.document = candidate.document!
     this.addToHistory(this.document, { type: 'REPLACE_PROJECT', payload: { document: this.deepClone(this.document) } })
     this.transaction = null
     this.notifySubscribers()
@@ -360,7 +376,7 @@ export class ProjectStore {
           const candidate = this.deepClone(command.payload.document)
           const changedIds = ['building.openings']
           
-          // Validate source parameters
+          // Validate source parameters including geometry
           const structValidation = validateSourceParameters(candidate)
           if (structValidation.some(i => i.severity === 'error')) {
             const errors = structValidation.filter(i => i.severity === 'error')

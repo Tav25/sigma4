@@ -164,7 +164,15 @@ describe('S02 - ProjectStore', () => {
     for (let i = 0; i < 105; i++) {
       store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 6000 + i } })
     }
-    expect(store.getRevision()).toBeLessThanOrEqual(100)
+    // Revision is monotonic, history length is limited to 100
+    expect(store.getRevision()).toBe(105)
+    // But we can only undo 100 times (limited by maxHistorySize)
+    let undoCount = 0
+    while (store.canUndo()) {
+      store.undo()
+      undoCount++
+    }
+    expect(undoCount).toBeLessThanOrEqual(100)
   })
 
   // ТЕСТ 18: Отклонённая команда не добавляется в историю
@@ -248,21 +256,21 @@ describe('S02 - ProjectStore', () => {
 
   // ТЕСТ 27: Импорт валидного проекта заменяет состояние
   it('ТЕСТ 27: импорт валидного проекта заменяет состояние', () => {
-    store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 4000 } })
+    store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 7000 } })
     const json = store.exportJson()
     const newStore = createProjectStore(initialDoc)
     const result = newStore.importJson(json)
     expect(result.success).toBe(true)
-    expect(newStore.getSnapshot().building.walls[0].lengthMm).toBe(4000)
+    expect(newStore.getSnapshot().building.walls[0].lengthMm).toBe(7000)
   })
 
   // ТЕСТ 28: Импорт невалидного проекта сохраняет предыдущий проект
   it('ТЕСТ 28: импорт невалидного проекта сохраняет предыдущий проект', () => {
-    store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 4000 } })
+    store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 7000 } })
     const invalidJson = JSON.stringify({ ...JSON.parse(store.exportJson()), project: { schemaVersion: '999.0.0' } })
     const result = store.importJson(invalidJson)
     expect(result.success).toBe(false)
-    expect(store.getSnapshot().building.walls[0].lengthMm).toBe(4000)
+    expect(store.getSnapshot().building.walls[0].lengthMm).toBe(7000)
   })
 
   // ТЕСТ 29: Синтаксически повреждённый JSON не вызывает исключения
