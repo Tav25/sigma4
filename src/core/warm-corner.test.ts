@@ -67,19 +67,30 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(d.isEmpty() || Math.min(extents.x, extents.y, extents.z) < 1e-6).toBe(true)
   })
 
-  it('has a thin backing cleat and a cavity for insulation', () => {
+  it('forms a two-stud L corner with standard 45x145 mm boards', () => {
     const store = storeWithCorner()
-    const front = store.getSnapshot().assembly.elements
-    const cleat = front.find(e => e.elementId === 'warm-corner-cleat')!
-    expect(cleat.role).toBe('corner-backing')
-    expect(cleat.sectionMm.width).toBe(20)
-    const backer = bbox(store, 'warm-corner-cleat')
-    const terminal = front.filter(e => e.wallId === 'wall-001' && e.role === 'stud')
-      .sort((a, b) => b.position.x - a.position.x)[0]
-    const outside = bbox(store, terminal.elementId)
-    expect(backer.max.x).toBeCloseTo(5.875, 6)
-    expect(outside.min.x).toBeCloseTo(5.955, 6)
-    expect(outside.min.x - backer.max.x).toBeCloseTo(0.08, 6)
+    const doc = store.getSnapshot()
+    expect(doc.assembly.elements.some(e => e.role === 'corner-backing')).toBe(false)
+    const frontEnd = bbox(store, 'stud-11')
+    const sideStart = bbox(store, 'wall-002:stud-01')
+    // A 45 mm stud face joins a 145 mm deep edge at right angles.
+    expect(frontEnd.min.x).toBeCloseTo(5.955, 6)
+    expect(frontEnd.max.x).toBeCloseTo(6, 6)
+    expect(frontEnd.min.z).toBeCloseTo(-0.0725, 6)
+    expect(frontEnd.max.z).toBeCloseTo(0.0725, 6)
+    expect(sideStart.min.x).toBeCloseTo(5.855, 6)
+    expect(sideStart.max.x).toBeCloseTo(6, 6)
+    expect(sideStart.min.z).toBeCloseTo(-0.1175, 6)
+    expect(sideStart.max.z).toBeCloseTo(-0.0725, 6)
+    // They touch on the inside plane of the facade, without overlapping.
+    const overlap = frontEnd.clone().intersect(sideStart)
+    const size = overlap.getSize(new THREE.Vector3())
+    expect(Math.min(size.x, size.y, size.z)).toBeCloseTo(0, 6)
+    expect(doc.building.walls.map(w => w.thicknessMm)).toEqual([145, 145])
+    for (const id of ['stud-11', 'wall-002:stud-01']) {
+      const element = doc.assembly.elements.find(e => e.elementId === id)!
+      expect(element.sectionMm).toEqual({ width: 45, height: 145 })
+    }
   })
 
   it('first wall length changes move the side wall and preserve a single undo', () => {
@@ -104,7 +115,7 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(bbox(store, 'plate-top-2').max.y).toBeCloseTo(3, 6)
   })
 
-  it('rejects detached corners and frame openings that collide with the cleat', () => {
+  it('rejects detached corners and frame openings that collide with the corner framing', () => {
     const store = storeWithCorner()
     const before = store.exportJson()
     expect(store.dispatch({

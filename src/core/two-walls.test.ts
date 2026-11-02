@@ -17,7 +17,7 @@ function makeStore() {
 
 function wallTwo() {
   return {
-    wallId: 'wall-002', lengthMm: 3000, heightMm: 2700, thicknessMm: 45, studSpacingMm: 600,
+    wallId: 'wall-002', lengthMm: 3000, heightMm: 2700, thicknessMm: 145, studSpacingMm: 600,
     sectionMm: { width: 45, height: 145 }, orientation: 'z' as const,
     origin: { x: 5927.5, y: 0, z: -72.5 }, openings: [],
   }

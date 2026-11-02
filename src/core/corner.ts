@@ -12,10 +12,8 @@ export function rightCornerOrigin(front: Wall, side: Pick<Wall, 'sectionMm'>) {
   }
 }
 
-// Thin fixing cleat, not a solid third corner post. The remaining cavity
-// between cleat and outer corner stud is left open for insulation.
-export const CORNER_CLEAT_MM = 20
-
-export function canFitCornerBacking(front: Wall, openingEndsWithFrame: number): boolean {
+// Preserve clearance for the paired 45x145 corner studs and the
+// interior wall-to-wall connection. Drywall clips are not wood framing.
+export function canFitCornerFraming(front: Wall, openingEndsWithFrame: number): boolean {
   return openingEndsWithFrame <= front.lengthMm - front.sectionMm.height
 }

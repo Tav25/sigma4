@@ -19,7 +19,6 @@ import type {
   Orientation,
 } from './project'
 import { validateProject } from './frame-validator'
-import { CORNER_CLEAT_MM } from './corner'
 
 const SW = 45
 const SH = 145
@@ -90,21 +89,9 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
     if (front) {
       const top = assembly.elements.find(el => el.id === 'plate-top-2')
       if (top) top.length -= wall.sectionMm.height
-      // A slim inner fixing cleat provides drywall backing, leaving a cavity
-      // between it and the existing end stud for corner insulation.
-      assembly.elements.push({
-        id: 'warm-corner-cleat',
-        role: 'corner-backing',
-        length: wall.heightMm - wall.sectionMm.width * 3,
-        width: CORNER_CLEAT_MM,
-        height: wall.sectionMm.height,
-        position: {
-          x: wall.lengthMm - wall.sectionMm.height + CORNER_CLEAT_MM / 2,
-          y: wall.sectionMm.width,
-          z: -wall.sectionMm.height / 2,
-        },
-        orientation: { mode: 'y', angle: 0, roll: 0 },
-      })
+      // The two existing 45x145 end studs already form a two-stud L corner.
+      // Do not add a third full-height wooden piece: leave the cavity open
+      // for insulation. Interior sheathing uses separate drywall clips.
     }
     if (right) {
       const top = assembly.elements.find(el => el.id === 'plate-top-2')
@@ -218,7 +205,7 @@ export function createProjectFromCurrentState(params: {
     wallId: 'wall-001',
     lengthMm: params.length,
     heightMm: params.height,
-    thicknessMm: SW,
+    thicknessMm: SH,
     studSpacingMm: params.spacing,
     sectionMm: { width: SW, height: SH },
     orientation: 'x',
@@ -263,7 +250,20 @@ export function validateProjectSnapshot(doc: ProjectDocument): ValidationResult 
 }
 
 export function buildProjectSnapshot(doc: ProjectDocument): ProjectDocument {
-  const newDoc = { ...doc }
+  // Legacy SIGMA4 documents stored the 45mm stud face as wall thickness,
+  // even though the physical wall depth (stud section height) is 145mm.
+  // Correct it during a validated rebuild/import without changing the
+  // stud dimensions, wall placement, openings or the original input.
+  const newDoc: ProjectDocument = {
+    ...doc,
+    building: {
+      ...doc.building,
+      walls: doc.building.walls.map(wall => ({
+        ...wall,
+        thicknessMm: wall.sectionMm.height,
+      })),
+    },
+  }
   newDoc.assembly = generateAssemblyFromDocument(newDoc)
   newDoc.validation = validateProject(newDoc)
   return newDoc

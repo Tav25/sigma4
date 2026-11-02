@@ -4,7 +4,7 @@ import type {
   ValidationIssue,
   Opening,
 } from './project'
-import { canFitCornerBacking, rightCornerOrigin } from './corner'
+import { canFitCornerFraming, rightCornerOrigin } from './corner'
 
 const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
@@ -242,9 +242,9 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
         [front.wallId, right.wallId]))
     }
     for (const opening of building.openings.filter(o => o.wallId === front.wallId)) {
-      if (!canFitCornerBacking(front, opening.positionUmm + opening.widthMm + 90)) {
+      if (!canFitCornerFraming(front, opening.positionUmm + opening.widthMm + 90)) {
         issues.push(createIssue('CORNER_BACKING_OVERLAP', 'error', `building.openings[id=${opening.id}]`,
-          'Окно или дверь слишком близко к тёплому углу', [front.wallId, opening.id]))
+          'Окно или дверь слишком близко к угловым стойкам', [front.wallId, opening.id]))
       }
     }
   }
