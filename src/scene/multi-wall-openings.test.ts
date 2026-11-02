@@ -86,7 +86,10 @@ describe('S06.3: any wall owns its openings and physical framing', () => {
       new THREE.Vector3(-1, 0, 0),
     )
     const hit = ray.intersectObject(plane)
-    expect(hit).toHaveLength(1)
+    // PlaneGeometry consists of two triangles. A ray through their common
+    // diagonal can return two identical intersections; both are valid.
+    expect(hit.length).toBeGreaterThanOrEqual(1)
+    expect(hit[0].distance).toBeCloseTo(2, 6)
     expect(openingWorldToLocalU(w, hit[0].point)).toBeCloseTo(1.5, 6)
     plane.geometry.dispose()
     const original = scene.sceneOpenings.find(o => o.id === 'W01')!
