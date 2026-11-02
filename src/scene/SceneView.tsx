@@ -414,7 +414,7 @@ export function SceneView({
         const markerGeo = new THREE.SphereGeometry(0.03, 16, 16)
         const markerMat = new THREE.MeshStandardMaterial({ color: 0xff3333 })
         const marker = new THREE.Mesh(markerGeo, markerMat)
-        marker.position.set(mmToMeters(el.position.x), mmToMeters(el.position.y), mmToMeters(el.position.z))
+        marker.position.set(mmToMeters(spec.reference.x), mmToMeters(spec.reference.y), mmToMeters(spec.reference.z))
         marker.visible = selectedRef.current === el.id
         scene.add(marker)
         entry = { mesh, material: mat, marker, edges, edgesMat }
@@ -431,7 +431,7 @@ export function SceneView({
       const oldEdges = entry.edges.geometry
       entry.edges.geometry = new THREE.EdgesGeometry(newGeo)
       oldEdges.dispose()
-      entry.marker.position.set(mmToMeters(el.position.x), mmToMeters(el.position.y), mmToMeters(el.position.z))
+      entry.marker.position.set(mmToMeters(spec.reference.x), mmToMeters(spec.reference.y), mmToMeters(spec.reference.z))
     }
     entries.forEach((e, key) => {
       e.edges.visible = showEdgesRef.current

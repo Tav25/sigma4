@@ -1,5 +1,6 @@
 import type {
   ProjectDocument,
+  Wall,
   ValidationResult,
 } from './project'
 import { validateProject, validateProjectSnapshot, validateSourceParameters } from './frame-validator'
@@ -17,6 +18,8 @@ export type ProjectCommand =
   | { type: 'SET_MARKER_SETTINGS'; payload: { openingId: string; anchor?: 'center' | 'left' | 'right'; outsideOffsetMm?: number; elevationMm?: number; visible?: boolean; color?: string } }
   | { type: 'ADD_OPENING'; payload: { wallId: string; opening: { id: string; type: 'window' | 'door'; positionXmm: number; widthMm: number; heightMm: number; sillHeightMm: number } } }
   | { type: 'REMOVE_OPENING'; payload: { openingId: string } }
+  | { type: 'ADD_WALL'; payload: { wall: Wall } }
+  | { type: 'REMOVE_WALL'; payload: { wallId: string } }
   | { type: 'REPLACE_PROJECT'; payload: { document: ProjectDocument } }
 
 export interface CommandResult {
@@ -324,6 +327,34 @@ export class ProjectStore {
           if (elevationMm !== undefined) { marker.elevationMm = elevationMm; changedIds.push(`building.markers[${openingId}].elevationMm`) }
           if (visible !== undefined) { marker.visible = visible; changedIds.push(`building.markers[${openingId}].visible`) }
           if (color !== undefined) { marker.color = color; changedIds.push(`building.markers[${openingId}].color`) }
+          break
+        }
+        case 'ADD_WALL': {
+          const wall = command.payload.wall
+          if (candidate.building.walls.length !== 1) {
+            return { success: false, errorCode: 'WALL_LIMIT_REACHED', messageRu: 'Пока поддерживаются только две стены' }
+          }
+          if (candidate.building.walls.some(w => w.wallId === wall.wallId)) {
+            return { success: false, errorCode: 'DUPLICATE_WALL_ID', messageRu: 'Такой номер стены уже существует' }
+          }
+          if (wall.orientation !== 'z' || wall.openings.length > 0) {
+            return { success: false, errorCode: 'UNSUPPORTED_WALL', messageRu: 'Пока можно добавить только пустую стену вдоль Z' }
+          }
+          candidate.building.walls.push(this.deepClone(wall))
+          changedIds.push(`building.walls[${wall.wallId}]`)
+          break
+        }
+        case 'REMOVE_WALL': {
+          const wallId = command.payload.wallId
+          const index = candidate.building.walls.findIndex(w => w.wallId === wallId)
+          if (index <= 0) {
+            return { success: false, errorCode: 'WALL_NOT_REMOVABLE', messageRu: 'Первую стену удалить нельзя' }
+          }
+          if (candidate.building.openings.some(o => o.wallId === wallId)) {
+            return { success: false, errorCode: 'WALL_HAS_OPENINGS', messageRu: 'Сначала удалите проёмы из стены' }
+          }
+          candidate.building.walls.splice(index, 1)
+          changedIds.push(`building.walls[${wallId}]`)
           break
         }
         case 'ADD_OPENING': {

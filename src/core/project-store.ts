@@ -51,7 +51,7 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
   const { building } = doc
   const allElements: TimberElement[] = []
 
-  building.walls.forEach(wall => {
+  building.walls.forEach((wall, wallIndex) => {
     const params: WallPanelParams = {
       length: wall.lengthMm,
       height: wall.heightMm,
@@ -82,7 +82,7 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
 
     assembly.elements.forEach((el: any) => {
       const timberEl = createTimberElement({
-        elementId: el.id,
+        elementId: wallIndex === 0 ? el.id : `${wall.wallId}:${el.id}`,
         wallId: wall.wallId,
         role: el.role,
         sectionMm: { width: el.width, height: el.height },

@@ -22,6 +22,8 @@ export interface TimberElement {
   position: Vec3
   orientation: Orientation
   material: string
+  // Derived from a wall in the scene; the saved assembly keeps local positions.
+  wallTransform?: { origin: Vec3; orientation: 'x' | 'z' }
 }
 
 export interface GeometrySpec {
@@ -102,11 +104,22 @@ export function rotateVectorByQuaternion(v: Vec3, q: { x: number; y: number; z: 
 }
 
 export function generateTimberGeometry(element: TimberElement): GeometrySpec {
-  const q = orientationQuaternion(element.orientation)
+  const local = orientationQuaternion(element.orientation)
+  // A second wall along +Z rotates its local +X direction by -90° around Y.
+  const yaw = element.wallTransform?.orientation === 'z' ? -Math.PI / 2 : 0
+  const rotation = { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }
+  const q = {
+    x: rotation.w * local.x + rotation.x * local.w + rotation.y * local.z - rotation.z * local.y,
+    y: rotation.w * local.y - rotation.x * local.z + rotation.y * local.w + rotation.z * local.x,
+    z: rotation.w * local.z + rotation.x * local.y - rotation.y * local.x + rotation.z * local.w,
+    w: rotation.w * local.w - rotation.x * local.x - rotation.y * local.y - rotation.z * local.z,
+  }
+  const origin = element.wallTransform?.origin ?? { x: 0, y: 0, z: 0 }
+  const relative = rotateVectorByQuaternion(element.position, rotation)
   return {
     size: { x: element.length, y: element.height, z: element.width },
     centerOffset: { x: element.length / 2, y: element.height / 2, z: 0 },
-    reference: { ...element.position },
+    reference: { x: origin.x + relative.x, y: origin.y + relative.y, z: origin.z + relative.z },
     quaternion: q,
   }
 }

@@ -41,6 +41,7 @@ const store = createProjectStore(initialDoc)
 export default function App() {
   const [snapshot, setSnapshot] = useState(() => store.getSnapshot())
   const [revision, setRevision] = useState(() => store.getRevision())
+  const [selectedWallId, setSelectedWallId] = useState('wall-001')
   const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
@@ -55,7 +56,9 @@ export default function App() {
     return unsub
   }, [])
 
-  const wall = snapshot.building.walls[0]
+  const wall = snapshot.building.walls.find(w => w.wallId === selectedWallId) ?? snapshot.building.walls[0]
+  const mainWall = snapshot.building.walls[0]
+  const hasSecondWall = snapshot.building.walls.length > 1
   // Three.js reads a projection of ProjectDocument; it does not own geometry.
   const { openings: allOpenings, elements, markers } = projectToScene(snapshot)
   const selectedOpening = allOpenings.find((o) => o.id === selectedOpeningId) ?? null
@@ -101,6 +104,7 @@ export default function App() {
   }
 
   const addOpening = (type: 'window' | 'door') => {
+    if (wall.wallId !== mainWall.wallId) return
     const pos = findFreePosition(allOpenings, wall.lengthMm, type === 'door' ? 900 : 450)
     if (pos === null) {
       alert('Недостаточно места для нового проёма. Увеличьте длину стены или измените размеры существующих проёмов.')
@@ -142,6 +146,36 @@ export default function App() {
       store.rollbackTransaction()
       setSnapshot(store.getSnapshot())
       setCommandError(result.messageRu || 'Не удалось переместить проём')
+    }
+  }
+
+  const addSecondWall = () => {
+    if (hasSecondWall) return
+    const newWall = {
+      ...mainWall,
+      wallId: 'wall-002',
+      lengthMm: 3000,
+      origin: {
+        x: mainWall.origin.x + mainWall.lengthMm + mainWall.sectionMm.height / 2,
+        y: mainWall.origin.y,
+        z: mainWall.origin.z,
+      },
+      orientation: 'z' as const,
+      sectionMm: { ...mainWall.sectionMm },
+      openings: [],
+    }
+    if (dispatch({ type: 'ADD_WALL', payload: { wall: newWall } }).success) {
+      setSelectedWallId('wall-002')
+      setSelectedOpeningId(null)
+      setSelectedId(null)
+    }
+  }
+
+  const removeSecondWall = () => {
+    if (dispatch({ type: 'REMOVE_WALL', payload: { wallId: 'wall-002' } }).success) {
+      setSelectedWallId(mainWall.wallId)
+      setSelectedOpeningId(null)
+      setSelectedId(null)
     }
   }
 
@@ -205,7 +239,30 @@ export default function App() {
       </header>
       <div className="main">
         <aside className="left-panel">
-          <h2 className="panel-title">Стена</h2>
+          <h2 className="panel-title">Стены</h2>
+          <div className="param-group" style={{ display: 'flex', gap: 6 }}>
+            {snapshot.building.walls.map((item, index) => (
+              <button key={item.wallId} type="button" className="param-input"
+                style={{
+                  cursor: 'pointer',
+                  background: wall.wallId === item.wallId ? '#dbeafe' : '#fff',
+                }}
+                onClick={() => { setSelectedWallId(item.wallId); setSelectedOpeningId(null) }}>
+                Стена {index + 1}
+              </button>
+            ))}
+          </div>
+          <div className="param-group">
+            {!hasSecondWall
+              ? <button type="button" className="param-input" style={{ cursor: 'pointer' }}
+                  onClick={addSecondWall}>+ Добавить вторую стену</button>
+              : <button type="button" className="param-input" style={{ cursor: 'pointer' }}
+                  onClick={removeSecondWall}>Удалить вторую стену</button>}
+          </div>
+          {hasSecondWall && <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
+            Стены пока независимы: соединение угла сделаем следующим шагом.
+          </div>}
+          <h2 className="panel-title" style={{ marginTop: 14 }}>Стена {wall.wallId === mainWall.wallId ? '1' : '2'} — параметры</h2>
           <div className="param-group">
             <SafeNumberInput label="Длина (мм)" value={wall.lengthMm} onChange={updateLength} validate={(r) => validateWallLength(r)} />
           </div>
@@ -231,12 +288,13 @@ export default function App() {
 
           <h2 className="panel-title" style={{ marginTop: 16 }}>Проёмы</h2>
           <div className="param-group">
-            <button type="button" className="param-input" onClick={() => addOpening('window')} style={{ cursor: 'pointer' }}>Добавить окно</button>
-            <button type="button" className="param-input" onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
+            <button type="button" className="param-input" disabled={wall.wallId !== mainWall.wallId} onClick={() => addOpening('window')} style={{ cursor: 'pointer' }}>Добавить окно</button>
+            <button type="button" className="param-input" disabled={wall.wallId !== mainWall.wallId} onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
           </div>
+          {wall.wallId !== mainWall.wallId && <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>Окна и двери на второй стене добавим следующим шагом.</div>}
           <div className="param-group">
             <div style={{ fontWeight: 600, marginBottom: 4 }}>Список проёмов:</div>
-            {allOpenings.map((o) => (
+            {allOpenings.filter(o => snapshot.building.openings.find(opening => opening.id === o.id)?.wallId === wall.wallId).map((o) => (
               <div
                 key={o.id}
                 onClick={() => setSelectedOpeningId(o.id)}

@@ -31,6 +31,10 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
       position: { ...element.position },
       orientation: { ...element.orientation },
       material: 'wood',
+      wallTransform: (() => {
+        const wall = walls.get(element.wallId)
+        return wall ? { origin: { ...wall.origin }, orientation: wall.orientation === 'z' ? 'z' as const : 'x' as const } : undefined
+      })(),
     })),
     openings: document.building.openings.map(opening => ({
       id: opening.id,
