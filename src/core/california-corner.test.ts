@@ -109,4 +109,79 @@ describe('S05.6 California insulated three-stud corner: true top section', () =>
     expect(actualBounds(store, 'warm-corner-stud').min.x).toBeCloseTo(5.81, 6)
     expect(store.getSnapshot().building.walls[1].origin.x).toBe(5927.5)
   })
+
+  it('has no positive-volume board intersections across the complete 46-member assembly', () => {
+    const store = createCornerStore()
+    const ids = store.getSnapshot().assembly.elements.map(e => e.elementId)
+    expect(ids).toHaveLength(46)
+    expect(new Set(ids).size).toBe(ids.length)
+    const boxes = ids.map(id => actualBounds(store, id))
+    // Three.js world-space Box3, independent of the validation equations.
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const intersection = boxes[i].clone().intersect(boxes[j])
+        if (intersection.isEmpty()) continue
+        const depth = intersection.getSize(new THREE.Vector3())
+        const volumeIsPositive = depth.x > 0.00001 &&
+          depth.y > 0.00001 && depth.z > 0.00001 // 0.01 mm tolerance
+        expect(volumeIsPositive, 'Boards overlap: ' + ids[i] + ' / ' + ids[j]).toBe(false)
+      }
+    }
+  })
+
+  it('rejects a 10mm corner intersection, a 10mm gap and a wrongly rotated board', () => {
+    const source = createCornerStore().getSnapshot()
+    for (const corrupt of [
+      (e: { position: { x: number; z: number }; orientation: { roll: number } }) => { e.position.x += 10 },
+      (e: { position: { x: number; z: number }; orientation: { roll: number } }) => { e.position.x -= 10 },
+      (e: { position: { x: number; z: number }; orientation: { roll: number } }) => { e.position.z += 10 },
+      (e: { position: { x: number; z: number }; orientation: { roll: number } }) => { e.orientation.roll = 0 },
+    ]) {
+      const mutated = JSON.parse(JSON.stringify(source))
+      const board = mutated.assembly.elements.find((e: { elementId: string }) => e.elementId === 'warm-corner-stud')
+      corrupt(board)
+      mutated.validation.valid = true
+      const result = validateProject(mutated)
+      expect(result.valid).toBe(false)
+      expect(result.issues.map(issue => issue.code)).toContain('CALIFORNIA_CORNER_INVALID_CONTACT')
+    }
+    expect(validateProject(source).valid).toBe(true)
+  })
+
+  it('repairs stale generated geometry on JSON import, preserving authored wall and windows', () => {
+    const original = createCornerStore()
+    const before = original.getSnapshot()
+    const stale = JSON.parse(original.exportJson())
+    stale.validation.valid = true
+    const staleBacking = stale.assembly.elements.find((e: { elementId: string }) => e.elementId === 'warm-corner-stud')
+    staleBacking.position.x += 10
+    expect(validateProject(stale).valid).toBe(false)
+
+    const imported = createProjectStore(createProjectFromCurrentState({
+      projectId: 'roundtrip-destination',
+      length: 6000, height: 2700, spacing: 600, openings: [],
+    }))
+    expect(imported.importJson(JSON.stringify(stale)).success).toBe(true)
+    const result = imported.getSnapshot()
+    expect(result.building).toEqual(before.building)
+    expect(result.assembly).toEqual(before.assembly)
+    expect(result.validation.valid).toBe(true)
+    expect(imported.exportJson()).toBe(original.exportJson())
+  })
+
+  it('retains corner contacts during undo/redo of a facade-length edit', () => {
+    const store = createCornerStore()
+    const baseline = store.exportJson()
+    expect(store.dispatch({ type: 'SET_WALL_LENGTH', payload: {
+      wallId: 'wall-001', lengthMm: 6500,
+    } }).success).toBe(true)
+    const changed = store.exportJson()
+    expect(validateProject(store.getSnapshot()).valid).toBe(true)
+    expect(actualBounds(store, 'warm-corner-stud').max.x).toBeCloseTo(6.455, 6)
+    expect(store.undo().success).toBe(true)
+    expect(store.exportJson()).toBe(baseline)
+    expect(store.redo().success).toBe(true)
+    expect(store.exportJson()).toBe(changed)
+    expect(validateProject(store.getSnapshot()).valid).toBe(true)
+  })
 })

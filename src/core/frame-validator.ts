@@ -247,6 +247,52 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
           'Окно или дверь слишком близко к угловым стойкам', [front.wallId, opening.id]))
       }
     }
+    // Independently validate the materialized California corner contacts.
+    // A stud may be inside wall bounds yet overlap another stud or leave a gap.
+    const backing = assembly.elements.find(e => e.wallId === front.wallId && e.elementId === 'warm-corner-stud')
+    const endStud = assembly.elements
+      .filter(e => e.wallId === front.wallId && e.role === 'stud')
+      .sort((a, b) => b.position.x - a.position.x)[0]
+    const startStud = assembly.elements
+      .filter(e => e.wallId === right.wallId && e.role === 'stud')
+      .sort((a, b) => a.position.x - b.position.x)[0]
+
+    if (!backing || !endStud || !startStud) {
+      issues.push(createIssue('CALIFORNIA_CORNER_MISSING_BOARD', 'error',
+        'assembly.elements', 'В калифорнийском углу отсутствует одна из трёх стоек',
+        [front.wallId, right.wallId]))
+    } else {
+      // Rolled vertical member: local section height spans +X and the
+      // 45mm section width is centred across Z. The right wall points to -Z.
+      const backingMinX = front.origin.x + backing.position.x
+      const backingMaxX = backingMinX + backing.sectionMm.height
+      const frontEndMinX = front.origin.x + endStud.position.x - endStud.sectionMm.width / 2
+      const backingMinZ = front.origin.z + backing.position.z - backing.sectionMm.width / 2
+      const sideStartMaxZ = right.origin.z - startStud.position.x + startStud.sectionMm.width / 2
+      const sideStartMinX = right.origin.x + startStud.position.z
+      const sideStartMaxX = sideStartMinX + startStud.sectionMm.height
+      const sideOverlapX = Math.min(backingMaxX, sideStartMaxX) -
+        Math.max(backingMinX, sideStartMinX)
+      const toleranceMm = 0.01
+      const flat = backing.orientation.mode === 'y' && backing.orientation.roll === 90 &&
+        backing.orientation.angle === 0 &&
+        backing.sectionMm.width === front.sectionMm.width &&
+        backing.sectionMm.height === front.sectionMm.height
+      const alignedY = Math.abs(backing.position.y - endStud.position.y) <= toleranceMm &&
+        Math.abs(backing.lengthMm - endStud.lengthMm) <= toleranceMm &&
+        Math.abs(backing.position.y - startStud.position.y) <= toleranceMm &&
+        Math.abs(backing.lengthMm - startStud.lengthMm) <= toleranceMm
+
+      if (!flat || !alignedY ||
+        Math.abs(backingMaxX - frontEndMinX) > toleranceMm ||
+        Math.abs(backingMinZ - sideStartMaxZ) > toleranceMm ||
+        sideOverlapX <= toleranceMm) {
+        issues.push(createIssue('CALIFORNIA_CORNER_INVALID_CONTACT', 'error',
+          'assembly.elements[id=warm-corner-stud]',
+          'Калифорнийский угол: стойки должны касаться без зазора и пересечения',
+          [backing.elementId, endStud.elementId, startStud.elementId]))
+      }
+    }
   }
   const wallsById = new Map(building.walls.map(w => [w.wallId, w]))
   const openingsByWall = new Map<string, Opening[]>()
