@@ -14,7 +14,9 @@ interface SceneViewProps {
   wallLength?: number
   selectedWindowId: string | null
   onWindowSelect?: (id: string | null) => void
-  onWindowXChange?: (id: string, x: number) => void
+  onWindowDragStart?: (id: string) => boolean
+  onWindowDragPreview?: (id: string, x: number) => boolean
+  onWindowDragEnd?: (id: string, save: boolean) => void
   onSelect?: (id: string | null) => void
 }
 
@@ -33,7 +35,8 @@ interface WindowEntry {
 
 export function SceneView({
   elements, selectedId, showEdges = true,
-  openings, wallLength = 3000, selectedWindowId, onWindowSelect, onWindowXChange, onSelect,
+  openings, wallLength = 3000, selectedWindowId, onWindowSelect,
+  onWindowDragStart, onWindowDragPreview, onWindowDragEnd, onSelect,
 }: SceneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
@@ -51,7 +54,9 @@ export function SceneView({
   const hasCenteredRef = useRef<boolean>(false)
   const wallLengthRef = useRef<number>(wallLength)
 
-  const draggingRef = useRef<{ id: string; startX: number; startPointer: number } | null>(null)
+  const draggingRef = useRef<{ id: string; startX: number; startPointer: number; previewedX: number } | null>(null)
+  const dragCallbacksRef = useRef({ onWindowDragStart, onWindowDragPreview, onWindowDragEnd })
+  dragCallbacksRef.current = { onWindowDragStart, onWindowDragPreview, onWindowDragEnd }
   const rafRef = useRef<number | null>(null)
   const pendingXRef = useRef<{ id: string; x: number } | null>(null)
   const hoveredWindowRef = useRef<string | null>(null)
@@ -148,9 +153,9 @@ export function SceneView({
         if (hitId) {
           const win = openingsRef.current.find((o) => o.id === hitId)
           if (win) {
-            draggingRef.current = { id: hitId, startX: win.positionXmm, startPointer: 0 }
             const px = getWallIntersection(event)
-            if (px !== null) draggingRef.current.startPointer = px
+            if (px === null || dragCallbacksRef.current.onWindowDragStart?.(hitId) === false) return
+            draggingRef.current = { id: hitId, startX: win.positionXmm, startPointer: px, previewedX: win.positionXmm }
             windowSelectedRef.current = hitId
             lastDraggedRef.current = hitId
             if (onWindowSelect) onWindowSelect(hitId)
@@ -171,6 +176,16 @@ export function SceneView({
         for (const [id, e] of entriesRef.current) {
           if (e.mesh === hitMesh) { onSelect?.(id); break }
         }
+      }
+    }
+
+    const flushPreview = () => {
+      const pending = pendingXRef.current
+      pendingXRef.current = null
+      const drag = draggingRef.current
+      if (!pending || !drag || pending.id !== drag.id || pending.x === drag.previewedX) return
+      if (dragCallbacksRef.current.onWindowDragPreview?.(pending.id, pending.x)) {
+        drag.previewedX = pending.x
       }
     }
 
@@ -197,8 +212,7 @@ export function SceneView({
         if (rafRef.current === null) {
           rafRef.current = requestAnimationFrame(() => {
             rafRef.current = null
-            const p = pendingXRef.current
-            if (p && onWindowXChange) onWindowXChange(p.id, p.x)
+            flushPreview()
           })
         }
         return
@@ -226,70 +240,35 @@ export function SceneView({
       }
     }
 
-    const endDrag = () => {
-      if (!draggingRef.current) return
-      draggingRef.current = null
+    const stopDrag = (save: boolean) => {
+      const drag = draggingRef.current
+      if (!drag) return
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
       }
-      const p = pendingXRef.current
-      if (p && onWindowXChange) onWindowXChange(p.id, p.x)
+      if (save) flushPreview()
       pendingXRef.current = null
+      draggingRef.current = null
+      // One mouse drag = one undo step, rather than an entry per frame.
+      dragCallbacksRef.current.onWindowDragEnd?.(drag.id, save && drag.previewedX !== drag.startX)
       if (controlsRef.current) controlsRef.current.enabled = true
-      setCursor(hoveredWindowRef.current ? 'move' : 'default')
+      setCursor(save && hoveredWindowRef.current ? 'move' : 'default')
     }
 
     const onPointerUp = (event: PointerEvent) => {
       const ren = rendererRef.current
       if (ren) try { ren.domElement.releasePointerCapture(event.pointerId) } catch {}
-      endDrag()
+      stopDrag(true)
     }
 
-    const onPointerCancel = () => {
-      if (draggingRef.current) {
-        const drag = draggingRef.current
-        if (onWindowXChange) onWindowXChange(drag.id, drag.startX)
-      }
-      draggingRef.current = null
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = null
-      }
-      pendingXRef.current = null
-      if (controlsRef.current) controlsRef.current.enabled = true
-      setCursor('default')
+    const onPointerCancel = () => stopDrag(false)
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') stopDrag(false)
     }
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && draggingRef.current) {
-        const drag = draggingRef.current
-        if (onWindowXChange) onWindowXChange(drag.id, drag.startX)
-        draggingRef.current = null
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current)
-          rafRef.current = null
-        }
-        pendingXRef.current = null
-        if (controlsRef.current) controlsRef.current.enabled = true
-        setCursor('default')
-      }
-    }
-
-    const onBlur = () => {
-      if (draggingRef.current) {
-        const drag = draggingRef.current
-        if (onWindowXChange) onWindowXChange(drag.id, drag.startX)
-        draggingRef.current = null
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current)
-          rafRef.current = null
-        }
-        pendingXRef.current = null
-        if (controlsRef.current) controlsRef.current.enabled = true
-        setCursor('default')
-      }
-    }
+    const onBlur = () => stopDrag(false)
 
     renderer.domElement.addEventListener('pointerdown', onPointerDown)
     renderer.domElement.addEventListener('pointermove', onPointerMove)
@@ -342,6 +321,7 @@ export function SceneView({
     }
 
     return () => {
+      if (draggingRef.current) stopDrag(false)
       cancelAnimationFrame(frameId)
       resizeObserver.disconnect()
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)

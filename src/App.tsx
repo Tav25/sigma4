@@ -143,6 +143,31 @@ export default function App() {
     setSelectedOpeningId(newOpening.id)
   }
 
+  const startOpeningDrag = (_id: string): boolean => store.beginTransaction()
+
+  const previewOpeningX = (id: string, x: number): boolean => {
+    const result = store.preview({ type: 'SET_OPENING_POSITION', payload: { openingId: id, positionUmm: x } })
+    if (result.success) {
+      const preview = store.getPreviewSnapshot()
+      if (preview) setSnapshot(preview)
+    }
+    return result.success
+  }
+
+  const finishOpeningDrag = (_id: string, save: boolean) => {
+    if (!save) {
+      store.rollbackTransaction()
+      setSnapshot(store.getSnapshot())
+      return
+    }
+    const result = store.commitTransaction()
+    if (!result.success) {
+      store.rollbackTransaction()
+      setSnapshot(store.getSnapshot())
+      setCommandError(result.messageRu || 'Не удалось переместить проём')
+    }
+  }
+
   const deleteOpening = (id: string) => {
     if (selectedOpeningId === id) setSelectedOpeningId(null)
     dispatch({ type: 'REMOVE_OPENING', payload: { openingId: id } })
@@ -317,9 +342,9 @@ export default function App() {
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
               openings={allOpenings} selectedWindowId={selectedOpeningId} wallLength={wall.lengthMm}
-              onWindowXChange={(id, x) => {
-                updateOpening(id, { positionXmm: x })
-              }}
+              onWindowDragStart={startOpeningDrag}
+              onWindowDragPreview={previewOpeningX}
+              onWindowDragEnd={finishOpeningDrag}
               onWindowSelect={setSelectedOpeningId}
               onSelect={setSelectedId} />
           </ErrorBoundary>

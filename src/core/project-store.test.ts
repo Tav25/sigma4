@@ -382,4 +382,34 @@ describe('S02 - ProjectStore', () => {
     expect(store.getSnapshot().building.walls[0].lengthMm).toBe(6000)
   })
 
+
+  it('S02.5: multiple drag previews create only one undo entry', () => {
+    expect(store.beginTransaction()).toBe(true)
+    for (const positionUmm of [950, 1000, 1100, 1200, 1300, 1400]) {
+      expect(store.preview({ type: 'SET_OPENING_POSITION', payload: { openingId: 'W01', positionUmm } }).success).toBe(true)
+      expect(store.getPreviewSnapshot()?.building.openings[0].positionUmm).toBe(positionUmm)
+      expect(store.getSnapshot().building.openings[0].positionUmm).toBe(900)
+      expect(store.getRevision()).toBe(0)
+      expect(store.canUndo()).toBe(false)
+    }
+    expect(store.commitTransaction().success).toBe(true)
+    expect(store.getRevision()).toBe(1)
+    expect(store.getSnapshot().building.openings[0].positionUmm).toBe(1400)
+    expect(store.undo().success).toBe(true)
+    expect(store.getSnapshot().building.openings[0].positionUmm).toBe(900)
+    expect(store.canUndo()).toBe(false)
+    expect(store.redo().success).toBe(true)
+    expect(store.getSnapshot().building.openings[0].positionUmm).toBe(1400)
+  })
+
+  it('S02.5: cancelled drag creates no undo entry', () => {
+    expect(store.beginTransaction()).toBe(true)
+    expect(store.preview({ type: 'SET_OPENING_POSITION', payload: { openingId: 'W01', positionUmm: 1200 } }).success).toBe(true)
+    expect(store.rollbackTransaction().success).toBe(true)
+    expect(store.getPreviewSnapshot()).toBeNull()
+    expect(store.getSnapshot().building.openings[0].positionUmm).toBe(900)
+    expect(store.getRevision()).toBe(0)
+    expect(store.canUndo()).toBe(false)
+  })
+
 })

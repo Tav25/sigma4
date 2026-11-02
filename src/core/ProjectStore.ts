@@ -106,6 +106,11 @@ export class ProjectStore {
     return this.deepClone(this.document)
   }
 
+  // Uncommitted visual state for dragging. It does not enter undo history.
+  getPreviewSnapshot(): ProjectDocument | null {
+    return this.transaction ? this.deepClone(this.transaction.previewDocument) : null
+  }
+
   getRevision(): number {
     return this.revision
   }
