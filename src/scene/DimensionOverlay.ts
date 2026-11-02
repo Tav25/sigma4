@@ -36,7 +36,8 @@ function numericMesh(valueMm: number, color: number): THREE.Mesh {
   }
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
     color, transparent: false, side: THREE.DoubleSide,
-    depthWrite: false, depthTest: false,
+    // Respect timber depth: ground-plan numbers must not render THROUGH studs.
+    depthWrite: false, depthTest: true,
   }))
   mesh.renderOrder = 112
   return mesh
@@ -46,7 +47,7 @@ function numericMesh(valueMm: number, color: number): THREE.Mesh {
 function segmentLines(points: THREE.Vector3[], color: number): THREE.LineSegments {
   const mesh = new THREE.LineSegments(
     new THREE.BufferGeometry().setFromPoints(points),
-    new THREE.LineBasicMaterial({ color, depthTest: false, depthWrite: false }),
+    new THREE.LineBasicMaterial({ color, depthTest: true, depthWrite: false }),
   )
   mesh.renderOrder = 107
   return mesh
@@ -68,7 +69,7 @@ function arrowTriangles(a: THREE.Vector3, b: THREE.Vector3,
   geometry.computeVertexNormals()
   const arrows = new THREE.Mesh(geometry,
     new THREE.MeshBasicMaterial({
-      color, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+      color, side: THREE.DoubleSide, depthTest: true, depthWrite: false,
     }))
   arrows.name = 'dimension-arrows'
   arrows.renderOrder = 109
@@ -175,7 +176,7 @@ export function makeOriginGroup(): THREE.Group {
   }
   const origin = new THREE.Mesh(
     new THREE.SphereGeometry(0.03, 10, 10),
-    new THREE.MeshBasicMaterial({ color: 0x111111, depthTest: false }),
+    new THREE.MeshBasicMaterial({ color: 0x111111, depthTest: true }),
   )
   origin.position.set(0, 0.025, 0)
   group.add(origin)

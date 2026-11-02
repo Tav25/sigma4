@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { buildDimensionLayout, type DimensionLayout } from './dimension-model'
-import { makeDimensionGroup, orientDimensionNumbers, disposeDimensionGroup } from './DimensionOverlay'
+import { makeDimensionGroup, makeOriginGroup, orientDimensionNumbers, disposeDimensionGroup } from './DimensionOverlay'
 import { createProjectFromCurrentState, buildProjectSnapshot } from '../core/project-store'
 import { rightCornerOrigin } from '../core/corner'
 import { projectToScene } from './project-to-scene'
@@ -37,6 +37,25 @@ describe('S06.5.3 planar drawing legibility', () => {
     expect(mat.map).toBeNull()
     expect(digits.name).toBe('dimension-number-wall-dim-wall-001')
     disposeDimensionGroup(group)
+  })
+
+  it('occludes ground-plane annotations behind timber using the real depth buffer', () => {
+    const group = makeDimensionGroup(layout())
+    const marks = group.children.filter(obj =>
+      obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments)
+    // Annotations may render later for layer ordering, but MUST obey the
+    // depth buffer of the physically placed timber on the scene.
+    expect(marks.length).toBeGreaterThan(10)
+    for (const mark of marks) {
+      const material = mark.material as THREE.Material
+      expect(material.depthTest, mark.name).toBe(true)
+      expect(material.depthWrite, mark.name).toBe(false)
+    }
+    const origin = makeOriginGroup()
+    const core = origin.children.find(obj => obj instanceof THREE.Mesh) as THREE.Mesh
+    expect((core.material as THREE.Material).depthTest).toBe(true)
+    disposeDimensionGroup(group)
+    disposeDimensionGroup(origin)
   })
 
   it('keeps both arrows and extension lines exactly in the XZ plane', () => {
