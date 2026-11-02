@@ -65,11 +65,9 @@ const store = createProjectStore(initialDoc)
 export default function App() {
   const [snapshot, setSnapshot] = useState(() => store.getSnapshot())
   const [revision, setRevision] = useState(() => store.getRevision())
-  const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null)
+  const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
-  const [doorEnabled, setDoorEnabled] = useState(false)
-  const [doorParams, setDoorParams] = useState({ positionXmm: 3000, widthMm: 900, heightMm: 2100 })
   const [commandError, setCommandError] = useState<string | null>(null)
   const idCounterRef = useRef(2)
 
@@ -82,13 +80,9 @@ export default function App() {
   }, [])
 
   const wall = snapshot.building.walls[0]
-  const allOpeningsCore = doorEnabled
-    ? [...snapshot.building.openings, { id: 'D01', wallId: wall.wallId, positionUmm: doorParams.positionXmm, widthMm: doorParams.widthMm, heightMm: doorParams.heightMm, sillHeightMm: 0, type: 'door' as const }]
-    : snapshot.building.openings
-
-  const allOpenings = convertOpeningsToWindow(allOpeningsCore)
+  const allOpenings = convertOpeningsToWindow(snapshot.building.openings)
   const elements = snapshot.assembly.elements.map(convertToCoreTimber)
-  const selectedWindow = allOpenings.find((o) => o.id === selectedWindowId) ?? null
+  const selectedOpening = allOpenings.find((o) => o.id === selectedOpeningId) ?? null
   const selected = elements.find((e) => e.id === selectedId) ?? null
   const validation = snapshot.validation
   const hasErrors = validation && !validation.valid
@@ -114,7 +108,7 @@ export default function App() {
     dispatch({ type: 'SET_STUD_SPACING', payload: { wallId: wall.wallId, studSpacingMm: value } })
   }
 
-  const updateWindow = (id: string, patch: Partial<WindowOpening>) => {
+  const updateOpening = (id: string, patch: Partial<WindowOpening>) => {
     if (patch.positionXmm !== undefined) {
       dispatch({ type: 'SET_OPENING_POSITION', payload: { openingId: id, positionUmm: patch.positionXmm } })
     }
@@ -129,25 +123,29 @@ export default function App() {
     }
   }
 
-  const updateDoor = (patch: Partial<WindowOpening>) => {
-    setDoorParams((prev) => ({ ...prev, ...patch }))
-  }
-
-  const addWindow = () => {
-    const pos = findFreePosition(allOpenings, wall.lengthMm, 450)
+  const addOpening = (type: 'window' | 'door') => {
+    const pos = findFreePosition(allOpenings, wall.lengthMm, type === 'door' ? 900 : 450)
     if (pos === null) {
-      alert('Недостаточно места для нового окна. Увеличьте длину стены или измените размеры существующих проёмов.')
+      alert('Недостаточно места для нового проёма. Увеличьте длину стены или измените размеры существующих проёмов.')
       return
     }
     idCounterRef.current += 1
-    const id = 'W' + String(idCounterRef.current).padStart(2, '0')
-    const newWin: WindowOpening = { id, positionXmm: pos, widthMm: 450, heightMm: 1200, sillHeightMm: 900, type: 'window' }
-    console.log('Add window:', newWin)
+    const prefix = type === 'door' ? 'D' : 'W'
+    const id = prefix + String(idCounterRef.current).padStart(2, '0')
+    const newOpening: WindowOpening = type === 'door'
+      ? { id, positionXmm: pos, widthMm: 900, heightMm: 2100, sillHeightMm: 0, type: 'door' }
+      : { id, positionXmm: pos, widthMm: 450, heightMm: 1200, sillHeightMm: 900, type: 'window' }
+    
+    dispatch({
+      type: 'ADD_OPENING',
+      payload: { wallId: wall.wallId, opening: newOpening }
+    })
+    setSelectedOpeningId(newOpening.id)
   }
 
-  const deleteWindow = (id: string) => {
-    if (selectedWindowId === id) setSelectedWindowId(null)
-    console.log('Delete window:', id)
+  const deleteOpening = (id: string) => {
+    if (selectedOpeningId === id) setSelectedOpeningId(null)
+    dispatch({ type: 'REMOVE_OPENING', payload: { openingId: id } })
   }
 
   const exportJson = () => {
@@ -229,57 +227,47 @@ export default function App() {
             </label>
           </div>
 
-          <h2 className="panel-title" style={{ marginTop: 16 }}>Оконный проём</h2>
+          <h2 className="panel-title" style={{ marginTop: 16 }}>Проёмы</h2>
           <div className="param-group">
-            <button type="button" className="param-input" onClick={addWindow} style={{ cursor: 'pointer' }}>Добавить окно</button>
+            <button type="button" className="param-input" onClick={() => addOpening('window')} style={{ cursor: 'pointer' }}>Добавить окно</button>
+            <button type="button" className="param-input" onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
           </div>
           <div className="param-group">
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Количество элементов:</div>
-            {snapshot.building.openings.map((o) => (
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Список проёмов:</div>
+            {allOpenings.map((o) => (
               <div
                 key={o.id}
-                onClick={() => setSelectedWindowId(o.id)}
+                onClick={() => setSelectedOpeningId(o.id)}
                 style={{
                   cursor: 'pointer',
                   padding: '4px 6px',
                   borderRadius: 4,
-                  background: selectedWindowId === o.id ? '#dbeafe' : 'transparent',
-                  fontWeight: selectedWindowId === o.id ? 600 : 400,
+                  background: selectedOpeningId === o.id ? '#dbeafe' : 'transparent',
+                  fontWeight: selectedOpeningId === o.id ? 600 : 400,
                   fontSize: 13,
                 }}
               >
-                {o.id} (X={o.positionUmm})
+                {o.id} ({o.type === 'door' ? 'Дверь' : 'Окно'} X={o.positionXmm})
               </div>
             ))}
           </div>
 
-          {selectedWindow && (
+          {selectedOpening && (
             <div className="props">
-              <h3 className="props-title">Свойства детали ({selectedWindow.id})</h3>
-              <div>ID: {selectedWindow.id}</div>
-              <SafeNumberInput label="Положение окна X (мм)" value={selectedWindow.positionXmm} onChange={(v) => updateWindow(selectedWindow.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
-              <SafeNumberInput label="Ширина окна (мм)" value={selectedWindow.widthMm} onChange={(v) => updateWindow(selectedWindow.id, { widthMm: v })} validate={(r) => validateInt(r, 300, 5000, 'ширина')} />
-              <SafeNumberInput label="Высота окна (мм)" value={selectedWindow.heightMm} onChange={(v) => updateWindow(selectedWindow.id, { heightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота')} />
-              <SafeNumberInput label="Высота подоконника (мм)" value={selectedWindow.sillHeightMm} onChange={(v) => updateWindow(selectedWindow.id, { sillHeightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота подоконника')} />
+              <h3 className="props-title">
+                Свойства {selectedOpening.type === 'door' ? 'дверного проёма' : 'оконного проёма'} ({selectedOpening.id})
+              </h3>
+              <div>ID: {selectedOpening.id}</div>
+              <div>Тип: {selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
+              <SafeNumberInput label="Положение X (мм)" value={selectedOpening.positionXmm} onChange={(v) => updateOpening(selectedOpening.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
+              <SafeNumberInput label="Ширина (мм)" value={selectedOpening.widthMm} onChange={(v) => updateOpening(selectedOpening.id, { widthMm: v })} validate={(r) => validateInt(r, 300, 5000, 'ширина')} />
+              <SafeNumberInput label="Высота (мм)" value={selectedOpening.heightMm} onChange={(v) => updateOpening(selectedOpening.id, { heightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота')} />
+              {selectedOpening.type === 'window' && (
+                <SafeNumberInput label="Высота подоконника (мм)" value={selectedOpening.sillHeightMm} onChange={(v) => updateOpening(selectedOpening.id, { sillHeightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота подоконника')} />
+              )}
               <div style={{ marginTop: 8 }}>
-                <button type="button" className="param-input" onClick={() => deleteWindow(selectedWindow.id)} style={{ cursor: 'pointer' }}>Удалить окно</button>
+                <button type="button" className="param-input" onClick={() => deleteOpening(selectedOpening.id)} style={{ cursor: 'pointer' }}>Удалить {selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
               </div>
-            </div>
-          )}
-
-          <h2 className="panel-title" style={{ marginTop: 16 }}>Дверной проём</h2>
-          <div className="param-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-              <input type="checkbox" checked={doorEnabled} onChange={(e) => setDoorEnabled(e.target.checked)} />
-              Добавить дверь
-            </label>
-          </div>
-          {doorEnabled && (
-            <div className="props">
-              <div>ID: D01</div>
-              <SafeNumberInput label="Положение X (мм)" value={doorParams.positionXmm} onChange={(v) => updateDoor({ positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
-              <SafeNumberInput label="Ширина (мм)" value={doorParams.widthMm} onChange={(v) => updateDoor({ widthMm: v })} validate={(r) => validateInt(r, 600, 5000, 'ширина')} />
-              <SafeNumberInput label="Высота (мм)" value={doorParams.heightMm} onChange={(v) => updateDoor({ heightMm: v })} validate={(r) => validateInt(r, 1600, 5000, 'высота')} />
             </div>
           )}
 
@@ -328,12 +316,11 @@ export default function App() {
         <main className="viewport-wrap">
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
-              openings={allOpenings} selectedWindowId={selectedWindowId} wallLength={wall.lengthMm}
+              openings={allOpenings} selectedWindowId={selectedOpeningId} wallLength={wall.lengthMm}
               onWindowXChange={(id, x) => {
-                if (id.startsWith('D')) setDoorParams((prev) => ({ ...prev, positionXmm: x }))
-                else updateWindow(id, { positionXmm: x })
+                updateOpening(id, { positionXmm: x })
               }}
-              onWindowSelect={setSelectedWindowId}
+              onWindowSelect={setSelectedOpeningId}
               onSelect={setSelectedId} />
           </ErrorBoundary>
         </main>

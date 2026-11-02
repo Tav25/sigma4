@@ -15,6 +15,8 @@ export type ProjectCommand =
   | { type: 'SET_OPENING_HEIGHT'; payload: { openingId: string; heightMm: number } }
   | { type: 'SET_WINDOW_SILL_HEIGHT'; payload: { openingId: string; sillHeightMm: number } }
   | { type: 'SET_MARKER_SETTINGS'; payload: { openingId: string; anchor?: 'center' | 'left' | 'right'; outsideOffsetMm?: number; elevationMm?: number; visible?: boolean; color?: string } }
+  | { type: 'ADD_OPENING'; payload: { wallId: string; opening: { id: string; type: 'window' | 'door'; positionXmm: number; widthMm: number; heightMm: number; sillHeightMm: number } } }
+  | { type: 'REMOVE_OPENING'; payload: { openingId: string } }
   | { type: 'REPLACE_PROJECT'; payload: { document: ProjectDocument } }
 
 export interface CommandResult {
@@ -291,8 +293,95 @@ export class ProjectStore {
           if (color !== undefined) { marker.color = color; changedIds.push(`building.markers[${openingId}].color`) }
           break
         }
+        case 'ADD_OPENING': {
+          const { wallId, opening } = command.payload
+          const wall = candidate.building.walls.find(w => w.wallId === wallId)
+          if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: `Стена ${wallId} не найдена` }
+          // Check for duplicate ID
+          if (candidate.building.openings.some(o => o.id === opening.id)) {
+            return { success: false, errorCode: 'DUPLICATE_OPENING_ID', messageRu: `Проём с ID ${opening.id} уже существует` }
+          }
+          // Validate position
+          if (opening.positionXmm < 0) return { success: false, errorCode: 'INVALID_POSITION', messageRu: 'Положение проёма не может быть отрицательным' }
+          if (opening.positionXmm + opening.widthMm > wall.lengthMm) return { success: false, errorCode: 'OPENING_OUT_OF_BOUNDS', messageRu: 'Проём выходит за границы стены' }
+          if (opening.widthMm <= 0) return { success: false, errorCode: 'INVALID_WIDTH', messageRu: 'Ширина проёма должна быть положительной' }
+          if (opening.heightMm <= 0) return { success: false, errorCode: 'INVALID_HEIGHT', messageRu: 'Высота проёма должна быть положительной' }
+          if (opening.sillHeightMm < 0) return { success: false, errorCode: 'INVALID_SILL_HEIGHT', messageRu: 'Высота подоконника не может быть отрицательной' }
+          if (opening.sillHeightMm + opening.heightMm > wall.heightMm) return { success: false, errorCode: 'OPENING_TOO_TALL', messageRu: 'Проём слишком высокий для стены' }
+          // Check framing overlap with existing openings
+          const wallOpenings = candidate.building.openings.filter(o => o.wallId === wallId)
+          const newFrameMin = opening.positionXmm - 90
+          const newFrameMax = opening.positionXmm + opening.widthMm + 90
+          for (const existing of wallOpenings) {
+            const existingFrameMin = existing.positionUmm - 90
+            const existingFrameMax = existing.positionUmm + existing.widthMm + 90
+            if (newFrameMin < existingFrameMax && existingFrameMin < newFrameMax) {
+              return { success: false, errorCode: 'OPENINGS_FRAME_OVERLAP', messageRu: 'Недостаточно места между проёмами для рамы' }
+            }
+          }
+          candidate.building.openings.push({ ...opening, wallId, positionUmm: opening.positionXmm })
+          wall.openings.push(opening.id)
+          // Add marker for new opening
+          candidate.building.markers.push({
+            openingId: opening.id,
+            anchor: 'center',
+            outsideOffsetMm: 50,
+            elevationMm: opening.sillHeightMm + opening.heightMm / 2,
+            visible: true,
+            color: '#0066ff',
+          })
+          changedIds.push(`building.openings[${opening.id}]`)
+          changedIds.push(`building.walls[${wallId}].openings`)
+          changedIds.push(`building.markers[${opening.id}]`)
+          break
+        }
+        case 'REMOVE_OPENING': {
+          const { openingId } = command.payload
+          const openingIndex = candidate.building.openings.findIndex(o => o.id === openingId)
+          if (openingIndex === -1) return { success: false, errorCode: 'OPENING_NOT_FOUND', messageRu: `Проём ${openingId} не найден` }
+          const opening = candidate.building.openings[openingIndex]
+          const wall = candidate.building.walls.find(w => w.wallId === opening.wallId)
+          if (wall) {
+            wall.openings = wall.openings.filter(id => id !== openingId)
+          }
+          candidate.building.openings.splice(openingIndex, 1)
+          // Remove marker
+          const markerIndex = candidate.building.markers.findIndex(m => m.openingId === openingId)
+          if (markerIndex !== -1) {
+            candidate.building.markers.splice(markerIndex, 1)
+          }
+          changedIds.push(`building.openings[${openingId}]`)
+          if (wall) changedIds.push(`building.walls[${wall.wallId}].openings`)
+          changedIds.push(`building.markers[${openingId}]`)
+          break
+        }
         case 'REPLACE_PROJECT': {
-          return this.applyCommand(doc, { type: 'REPLACE_PROJECT', payload: { document: command.payload.document } })
+          // Directly apply the document without going through command system again
+          const candidate = this.deepClone(command.payload.document)
+          const changedIds = ['building.openings']
+          
+          // Validate source parameters
+          const structValidation = validateSourceParameters(candidate)
+          if (structValidation.some(i => i.severity === 'error')) {
+            const errors = structValidation.filter(i => i.severity === 'error')
+            return { success: false, errorCode: errors[0]?.code || 'VALIDATION_FAILED', messageRu: errors[0]?.messageRu || 'Ошибка валидации', validation: { valid: false, issues: structValidation, engineeringStatus: 'not_evaluated' } }
+          }
+
+          let rebuilt: ProjectDocument
+          try {
+            rebuilt = buildProjectSnapshot(candidate)
+          } catch (e) {
+            const error = e instanceof Error ? e.message : String(e)
+            return { success: false, errorCode: 'VALIDATION_FAILED', messageRu: `Ошибка генерации: ${error}`, validation: { valid: false, issues: [{ code: 'GENERATION_ERROR', severity: 'error', path: '', messageRu: error, affectedIds: [] }], engineeringStatus: 'not_evaluated' } }
+          }
+          const validation = validateProjectSnapshot(rebuilt)
+
+          if (!validation.valid) {
+            const errors = validation.issues.filter(i => i.severity === 'error')
+            return { success: false, errorCode: errors[0]?.code || 'VALIDATION_FAILED', messageRu: errors[0]?.messageRu || 'Ошибка валидации', validation }
+          }
+
+          return { success: true, document: rebuilt, changedIds, validation }
         }
         default:
           return { success: false, errorCode: 'UNKNOWN_COMMAND', messageRu: 'Неизвестная команда' }

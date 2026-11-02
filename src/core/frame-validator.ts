@@ -241,7 +241,7 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
   })
 
   building.walls.forEach(wall => {
-    const wallOpenings = wallOpeningsMap.get(wall.wallId) || []
+    const wallOpenings = [...(wallOpeningsMap.get(wall.wallId) || [])].sort((a, b) => a.positionUmm - b.positionUmm)
 
     wallOpenings.forEach(opening => {
       if (opening.positionUmm < 0) {
