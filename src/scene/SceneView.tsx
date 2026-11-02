@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { generateTimberGeometry, boxCenterWorld, mmToMeters, type TimberElement } from '../core/timber'
 import type { WindowOpening } from '../core/window'
 import { getWindowPositionBounds } from '../core/window'
+import { calculateWorldBounds, topViewDistance } from './view-bounds'
 import type { OpeningMarker } from './project-to-scene'
 
 interface SceneViewProps {
@@ -50,6 +51,7 @@ export function SceneView({
   const windowEntriesRef = useRef<Map<string, WindowEntry>>(new Map())
   const openingMarkerEntriesRef = useRef<Map<string, THREE.Mesh>>(new Map())
   const resetRef = useRef<(() => void) | null>(null)
+  const topViewRef = useRef<(() => void) | null>(null)
   const elementsRef = useRef<TimberElement[]>(elements)
   const selectedRef = useRef<string | null>(selectedId)
   const showEdgesRef = useRef<boolean>(showEdges)
@@ -309,36 +311,33 @@ export function SceneView({
     const resizeObserver = new ResizeObserver(handleResize)
     resizeObserver.observe(container)
 
-    resetRef.current = () => {
+    // Frame actual 3D rotated geometry from the canonical JSON projection.
+    const frameView = (mode: 'iso' | 'top') => {
       const els = elementsRef.current
-      if (els.length === 0 || container.clientWidth <= 0 || container.clientHeight <= 0) return
-      const fb = new THREE.Box3()
-      for (const el of els) {
-        const spec = generateTimberGeometry(el)
-        const c = boxCenterWorld(el)
-        const center2 = new THREE.Vector3(mmToMeters(c.x), mmToMeters(c.y), mmToMeters(c.z))
-        const hx = mmToMeters(spec.size.x) / 2
-        const hy = mmToMeters(spec.size.y) / 2
-        const hz = mmToMeters(spec.size.z) / 2
-        fb.expandByPoint(new THREE.Vector3(center2.x - hx, center2.y - hy, center2.z - hz))
-        fb.expandByPoint(new THREE.Vector3(center2.x + hx, center2.y + hy, center2.z + hz))
+      if (!els.length || !container.clientWidth || !container.clientHeight) return
+      const bounds = calculateWorldBounds(els)
+      if (bounds.isEmpty()) return
+      const ctr = bounds.getCenter(new THREE.Vector3())
+      const size = bounds.getSize(new THREE.Vector3())
+      const radius = Math.max(size.x, size.y, size.z) * 1.5 + 2
+      if (mode === 'top') {
+        const distance = topViewDistance(bounds, camera.fov, camera.aspect)
+        camera.up.set(0, 0, -1)
+        camera.position.set(ctr.x, ctr.y + distance, ctr.z)
+      } else {
+        camera.up.set(0, 1, 0)
+        const sign = wallCountRef.current > 1 ? -1 : 1
+        camera.position.copy(ctr.clone().add(new THREE.Vector3(
+          sign * radius * 0.6, radius * 0.5, sign * radius * 0.6,
+        )))
       }
-      const ctr = new THREE.Vector3()
-      fb.getCenter(ctr)
-      const sz = new THREE.Vector3()
-      fb.getSize(sz)
-      const md = Math.max(sz.x, sz.y, sz.z)
-      const cd = md * 1.5 + 2
-      const interiorView = wallCountRef.current > 1
-      camera.position.copy(ctr.clone().add(new THREE.Vector3(
-        interiorView ? -cd * 0.6 : cd * 0.6,
-        cd * 0.5,
-        interiorView ? -cd * 0.6 : cd * 0.6,
-      )))
+      camera.lookAt(ctr)
       controls.target.copy(ctr)
       controls.update()
       hasCenteredRef.current = true
     }
+    resetRef.current = () => frameView('iso')
+    topViewRef.current = () => frameView('top')
 
     return () => {
       if (draggingRef.current) stopDrag(false)
@@ -382,6 +381,7 @@ export function SceneView({
       rendererRef.current = null
       controlsRef.current = null
       resetRef.current = null
+      topViewRef.current = null
     }
   }, [])
 
@@ -597,6 +597,9 @@ export function SceneView({
     <div className="viewport" ref={containerRef}>
       <button type="button" className="reset-view" onClick={() => resetRef.current?.()}>
         Сбросить вид
+      </button>
+      <button type="button" className="reset-view top-view" onClick={() => topViewRef.current?.()}>
+        Вид сверху
       </button>
     </div>
   )

@@ -126,3 +126,5 @@ body,
   margin-bottom: 8px;
   color: #1f2937;
 }
+/* An inspection view placed below the existing reset camera button. */
+.top-view { top: 48px; }
