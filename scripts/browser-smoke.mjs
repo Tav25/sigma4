@@ -50,6 +50,7 @@ try {
     name: 'old.sigma4.json', mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(exported)),
   }])
+  await page.getByText('Rev: 2').waitFor()
   await page.getByText('Валидация: OK').waitFor()
   const secondDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()

@@ -320,17 +320,23 @@ export function SceneView({
       const ctr = bounds.getCenter(new THREE.Vector3())
       const size = bounds.getSize(new THREE.Vector3())
       const radius = Math.max(size.x, size.y, size.z) * 1.5 + 2
+      // Near-orthographic technical view: 1° perspective makes the
+      // parallax from the 2.7m studs negligible even at the image edges.
+      camera.fov = mode === 'top' ? 1 : 60
       if (mode === 'top') {
         const distance = topViewDistance(bounds, camera.fov, camera.aspect)
+        camera.far = Math.max(1000, distance * 3)
         camera.up.set(0, 0, -1)
         camera.position.set(ctr.x, ctr.y + distance, ctr.z)
       } else {
+        camera.far = 1000
         camera.up.set(0, 1, 0)
         const sign = wallCountRef.current > 1 ? -1 : 1
         camera.position.copy(ctr.clone().add(new THREE.Vector3(
           sign * radius * 0.6, radius * 0.5, sign * radius * 0.6,
         )))
       }
+      camera.updateProjectionMatrix()
       camera.lookAt(ctr)
       controls.target.copy(ctr)
       controls.update()

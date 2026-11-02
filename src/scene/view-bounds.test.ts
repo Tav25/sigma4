@@ -52,11 +52,16 @@ describe('S05.8 actual mesh bounds and top camera', () => {
   it('frames the full 6x3m L-corner from above at wide and narrow aspect ratios', () => {
     const bounds = calculateWorldBounds(elementsWithCorner())
     const size = bounds.getSize(new THREE.Vector3())
-    const tan = Math.tan(THREE.MathUtils.degToRad(30))
     for (const aspect of [16 / 9, 9 / 16]) {
-      const distance = topViewDistance(bounds, 60, aspect) - size.y / 2
-      expect(distance * tan).toBeGreaterThan(size.z / 2)
-      expect(distance * tan * aspect).toBeGreaterThan(size.x / 2)
+      const nearOrthoFov = 1
+      const distance = topViewDistance(bounds, nearOrthoFov, aspect)
+      const nearestSurface = distance - size.y / 2
+      const tanSmall = Math.tan(THREE.MathUtils.degToRad(nearOrthoFov / 2))
+      expect(nearestSurface * tanSmall).toBeGreaterThan(size.z / 2)
+      expect(nearestSurface * tanSmall * aspect).toBeGreaterThan(size.x / 2)
+      // Maximum parallax scaling from the nearest to farthest horizontal
+      // section of the frame must stay under 2% at the extremities.
+      expect((distance + size.y / 2) / nearestSurface).toBeLessThan(1.02)
     }
   })
 
