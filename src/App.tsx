@@ -9,6 +9,8 @@ import { projectToScene } from './scene/project-to-scene'
 import { createProjectFromCurrentState } from './core/project-store'
 import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 import { rightCornerOrigin } from './core/corner'
+import { ProjectTree } from './components/ProjectTree'
+import packageInfo from '../package.json'
 
 function findFreePosition(openings: WindowOpening[], wallLength: number, newW: number): number | null {
   for (let x = 135; x + newW + 90 <= wallLength; x += 50) {
@@ -53,6 +55,14 @@ export default function App() {
     const unsub = store.subscribe((doc, rev) => {
       setSnapshot(doc)
       setRevision(rev)
+      // Import / Undo may remove the previously selected wall or board.
+      setSelectedWallId(previous =>
+        doc.building.walls.some(w => w.wallId === previous)
+          ? previous : doc.building.walls[0]?.wallId ?? previous)
+      setSelectedOpeningId(previous =>
+        previous && doc.building.openings.some(o => o.id === previous) ? previous : null)
+      setSelectedId(previous =>
+        previous && doc.assembly.elements.some(e => e.elementId === previous) ? previous : null)
     })
     return unsub
   }, [])
@@ -227,7 +237,7 @@ export default function App() {
     <div className="app">
       <header className="top-bar">
         <span className="app-title">SIGMA4</span>
-        <span className="app-version">0.0.14</span>
+        <span className="app-version">{packageInfo.version}</span>
         <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <button onClick={undo} disabled={!canUndo} title="Отменить">↶</button>
           <button onClick={redo} disabled={!canRedo} title="Повторить">↷</button>
@@ -236,19 +246,29 @@ export default function App() {
       </header>
       <div className="main">
         <aside className="left-panel">
-          <h2 className="panel-title">Стены</h2>
-          <div className="param-group" style={{ display: 'flex', gap: 6 }}>
-            {snapshot.building.walls.map((item, index) => (
-              <button key={item.wallId} type="button" className="param-input"
-                style={{
-                  cursor: 'pointer',
-                  background: wall.wallId === item.wallId ? '#dbeafe' : '#fff',
-                }}
-                onClick={() => { setSelectedWallId(item.wallId); setSelectedOpeningId(null) }}>
-                Стена {index + 1}
-              </button>
-            ))}
-          </div>
+          <h2 className="panel-title">Дерево проекта</h2>
+          <ProjectTree
+            document={snapshot}
+            selectedWallId={wall.wallId}
+            selectedOpeningId={selectedOpeningId}
+            selectedElementId={selectedId}
+            onSelectWall={(wallId) => {
+              setSelectedWallId(wallId)
+              setSelectedOpeningId(null)
+              setSelectedId(null)
+            }}
+            onSelectOpening={(wallId, openingId) => {
+              setSelectedWallId(wallId)
+              setSelectedOpeningId(openingId)
+              setSelectedId(null)
+            }}
+            onSelectElement={(wallId, elementId) => {
+              setSelectedWallId(wallId)
+              setSelectedId(elementId)
+              setSelectedOpeningId(null)
+            }}
+          />
+          <h2 className="panel-title" style={{ marginTop: 16 }}>Стены</h2>
           <div className="param-group">
             {!hasSecondWall
               ? <button type="button" className="param-input" style={{ cursor: 'pointer' }}
@@ -289,26 +309,6 @@ export default function App() {
             <button type="button" className="param-input" disabled={wall.wallId !== mainWall.wallId} onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
           </div>
           {wall.wallId !== mainWall.wallId && <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>Окна и двери на второй стене добавим следующим шагом.</div>}
-          <div className="param-group">
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Список проёмов:</div>
-            {allOpenings.filter(o => snapshot.building.openings.find(opening => opening.id === o.id)?.wallId === wall.wallId).map((o) => (
-              <div
-                key={o.id}
-                onClick={() => setSelectedOpeningId(o.id)}
-                style={{
-                  cursor: 'pointer',
-                  padding: '4px 6px',
-                  borderRadius: 4,
-                  background: selectedOpeningId === o.id ? '#dbeafe' : 'transparent',
-                  fontWeight: selectedOpeningId === o.id ? 600 : 400,
-                  fontSize: 13,
-                }}
-              >
-                {o.id} ({o.type === 'door' ? 'Дверь' : 'Окно'} X={o.positionXmm})
-              </div>
-            ))}
-          </div>
-
           {selectedOpening && (
             <div className="props">
               <h3 className="props-title">

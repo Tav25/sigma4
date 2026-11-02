@@ -1,169 +1,31 @@
-import {
-  generateWallPanel,
-  type WallPanelParams,
-} from './wall'
-import {
-  generateWallWithOpenings,
-  type WindowOpening,
-} from './window'
+import type { WindowOpening } from './window'
 import type {
   ProjectDocument,
   Wall,
   Opening,
   Marker,
   Material,
-  TimberElement,
   Assembly,
   ValidationResult,
-  Vector3,
-  Orientation,
 } from './project'
 import { validateProject } from './frame-validator'
+import { generateWallModule } from './wall-module'
+import { connectRightCaliforniaCorner } from './corner-connection'
 
 const SW = 45
 const SH = 145
 
-function createTimberElement(params: {
-  elementId: string
-  wallId: string
-  role: TimberElement['role']
-  sectionMm: { width: number; height: number }
-  lengthMm: number
-  orientation: Orientation
-  position: Vector3
-  connectionIds?: string[]
-  generated?: boolean
-}): TimberElement {
-  return {
-    elementId: params.elementId,
-    wallId: params.wallId,
-    role: params.role,
-    sectionMm: params.sectionMm,
-    lengthMm: params.lengthMm,
-    orientation: params.orientation,
-    position: params.position,
-    connectionIds: params.connectionIds || [],
-    generated: params.generated ?? true,
-  }
-}
-
 export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
-  const { building } = doc
-  const allElements: TimberElement[] = []
-
-  building.walls.forEach((wall, wallIndex) => {
-    const params: WallPanelParams = {
-      length: wall.lengthMm,
-      height: wall.heightMm,
-      sectionWidth: wall.sectionMm.width,
-      sectionHeight: wall.sectionMm.height,
-      spacing: wall.studSpacingMm,
-      topLayers: 2,
-    }
-
-    const wallOpenings: WindowOpening[] = building.openings
-      .filter(o => o.wallId === wall.wallId)
-      .map(o => ({
-        id: o.id,
-        positionXmm: o.positionUmm,
-        widthMm: o.widthMm,
-        heightMm: o.heightMm,
-        sillHeightMm: o.sillHeightMm,
-        type: o.type,
-      }))
-      .sort((a, b) => a.positionXmm - b.positionXmm)
-
-    let assembly: { elements: any[] }
-    if (wallOpenings.length > 0) {
-      assembly = generateWallWithOpenings(params, wallOpenings)
-    } else {
-      assembly = generateWallPanel(params)
-    }
-
-    // Warm right-angle junction: the lower top plates meet at the faces.
-    // The uppermost plates lap: front stops one stud-depth before the end,
-    // side crosses over it by that depth, at the same Y level.
-    const inCorner = building.walls.length === 2
-    const front = inCorner && wallIndex === 0
-    const right = inCorner && wallIndex === 1
-    if (front) {
-      const top = assembly.elements.find(el => el.id === 'plate-top-2')
-      if (top) top.length -= wall.sectionMm.height
-      // APA insulated three-stud (California) outside corner.
-      // The third stud lies FLAT against the interior face of the facade,
-      // with its 145-mm face running ALONG the wall (local Y roll = 90°).
-      // Its 45-mm depth occupies only the inner portion of the 145-mm
-      // wall, leaving 100 mm of accessible insulation cavity behind it.
-      // It touches the facade end stud and the side wall starter, without
-      // penetrating either. All positions are derived from wall section.
-      assembly.elements.push({
-        id: 'warm-corner-stud',
-        role: 'corner-backing',
-        length: wall.heightMm - wall.sectionMm.width * 3,
-        width: wall.sectionMm.width,
-        height: wall.sectionMm.height,
-        position: {
-          // Position is the near X edge after a +90° roll (not the centre).
-          x: wall.lengthMm - wall.sectionMm.width - wall.sectionMm.height,
-          y: wall.sectionMm.width,
-          z: -wall.sectionMm.height / 2 + wall.sectionMm.width / 2,
-        },
-        orientation: { mode: 'y', angle: 0, roll: 90 },
-      })
-    }
-    if (right) {
-      const top = assembly.elements.find(el => el.id === 'plate-top-2')
-      if (top) {
-        top.position = { ...top.position, x: -wall.sectionMm.height }
-        top.length += wall.sectionMm.height
-      }
-    }
-
-    assembly.elements.forEach((el: any) => {
-      const timberEl = createTimberElement({
-        elementId: wallIndex === 0 ? el.id : `${wall.wallId}:${el.id}`,
-        wallId: wall.wallId,
-        role: el.role,
-        sectionMm: { width: el.width, height: el.height },
-        lengthMm: el.length,
-        orientation: el.orientation,
-        position: el.position,
-        connectionIds: [],
-        generated: true,
-      })
-      allElements.push(timberEl)
-    })
-  })
-
-  if (building.walls.length === 2) {
-    const front = building.walls[0]
-    const right = building.walls[1]
-    const firstEnd = allElements
-      .filter(e => e.wallId === front.wallId && e.role === 'stud')
-      .sort((a, b) => b.position.x - a.position.x)[0]
-    const rightStart = allElements
-      .filter(e => e.wallId === right.wallId && e.role === 'stud')
-      .sort((a, b) => a.position.x - b.position.x)[0]
-    if (firstEnd && rightStart) {
-      firstEnd.connectionIds = [rightStart.elementId]
-      rightStart.connectionIds = [firstEnd.elementId]
-    }
-    const insideStud = allElements.find(e => e.wallId === front.wallId && e.elementId === 'warm-corner-stud')
-    if (insideStud && rightStart && firstEnd) {
-      // The rotated backing stud contacts the front end and side starter
-      // studs on different faces, while opening up the insulation pocket.
-      insideStud.connectionIds = [firstEnd.elementId, rightStart.elementId]
-      firstEnd.connectionIds.push(insideStud.elementId)
-      rightStart.connectionIds.push(insideStud.elementId)
-    }
-    const frontUpper = allElements.find(e => e.wallId === front.wallId && e.elementId === 'plate-top-2')
-    const rightUpper = allElements.find(e => e.wallId === right.wallId && e.elementId === `${right.wallId}:plate-top-2`)
-    if (frontUpper && rightUpper) {
-      frontUpper.connectionIds = [rightUpper.elementId]
-      rightUpper.connectionIds = [frontUpper.elementId]
-    }
+  // This generator knows nothing about wall numbers. Every instance uses the
+  // same module; wallId ownership is preserved in each generated board.
+  const elements = doc.building.walls.flatMap((wall, index) =>
+    generateWallModule(wall, doc.building.openings, { unprefixedIds: index === 0 }))
+  // Topology-specific joinery is separate from the wall module.
+  // A 3+ wall connection graph is explicitly deferred to S06.2.
+  if (doc.building.walls.length === 2) {
+    connectRightCaliforniaCorner(elements, doc.building.walls[0], doc.building.walls[1])
   }
-  return { elements: allElements }
+  return { elements }
 }
 
 function createDefaultMarkers(openings: Opening[]): Marker[] {
