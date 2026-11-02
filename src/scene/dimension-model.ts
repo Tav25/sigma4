@@ -14,6 +14,9 @@ export interface DimensionLine {
   /** Where the arrow and extension line should be drawn. */
   dimensionFrom: DimensionPoint
   dimensionTo: DimensionPoint
+  /** Extension starts just outside this specific wall's timber footprint. */
+  extensionFrom: DimensionPoint
+  extensionTo: DimensionPoint
 }
 export interface DimensionLayout {
   lines: DimensionLine[]
@@ -40,23 +43,14 @@ export function dimensionLabelYaw(line: DimensionLine): number {
 }
 
 /**
- * Extension lines begin just OUTSIDE the entire assembly, never in front of
- * the studs or through an opening. Authoritative from/to endpoints are kept
- * for measurements and are not modified by this visual-only clipping.
+ * Extension lines start just outside their OWN wall's actual frame.
+ * Geometry is a derived annotation only; original measured endpoints and
+ * canonical source coordinates are never altered.
  */
 export function exteriorExtensionFoot(
-  line: DimensionLine, bounds: DimensionLayout['bounds'], end: 'from' | 'to',
+  line: DimensionLine, _bounds: DimensionLayout['bounds'], end: 'from' | 'to',
 ): DimensionPoint {
-  const source = end === 'from' ? line.from : line.to
-  const isAlongX = Math.abs(line.dimensionTo.x - line.dimensionFrom.x) >
-    Math.abs(line.dimensionTo.z - line.dimensionFrom.z)
-  const exteriorOffsetMm = 100
-  // Extension lines must never cross the overall plan footprint.
-  // The common camera in isometric mode looks from -X/-Z, so choose
-  // the NEAR (negative) exterior sides to prevent foreground overlays
-  // appearing across the studs and door/window openings.
-  if (isAlongX) return asPoint(source.x, bounds.minZ - exteriorOffsetMm)
-  return asPoint(bounds.minX - exteriorOffsetMm, source.z)
+  return end === 'from' ? line.extensionFrom : line.extensionTo
 }
 
 /**
@@ -76,44 +70,63 @@ export function buildDimensionLayout(walls: readonly Wall[], elements: TimberEle
   }
   const overallXmm = bounds.maxX - bounds.minX
   const overallZmm = bounds.maxZ - bounds.minZ
-  const offset = 650
-  const step = 250
-  const lines: DimensionLine[] = walls.map((wall, index) => {
+  // A wall dimension stays CLOSE to that wall, independent from the extent
+  // of adjacent/remote walls. For SIGMA4 orientations the outside is +Z
+  // for X facades and +X for -Z side walls (the open sides of the L).
+  const WALL_OFFSET_MM = 220
+  const OVERALL_OFFSET_MM = 460
+  const EXTENSION_START_MM = 45
+  const lines: DimensionLine[] = walls.map((wall) => {
     const alongX = wall.orientation === 'x'
     const from = asPoint(wall.origin.x, wall.origin.z)
     const to = asPoint(alongX ? wall.origin.x + wall.lengthMm : wall.origin.x,
       alongX ? wall.origin.z : wall.origin.z - wall.lengthMm)
-    const level = offset + index * step
-    const dimensionFrom = alongX
-      ? asPoint(from.x, bounds.minZ - level)
-      : asPoint(bounds.minX - level, from.z)
-    const dimensionTo = alongX
-      ? asPoint(to.x, bounds.minZ - level)
-      : asPoint(bounds.minX - level, to.z)
+    const ownElements = elements.filter(element => element.wallId === wall.wallId)
+    const ownAabb = calculateWorldBounds(ownElements)
+    // Each wall in a valid assembly has timber. Fallback is deterministic
+    // for a temporarily empty wall, without relying on global building bounds.
+    const faceZ = ownAabb.isEmpty()
+      ? wall.origin.z + wall.sectionMm.height / 2
+      : ownAabb.max.z * 1000
+    const faceX = ownAabb.isEmpty()
+      ? wall.origin.x + wall.sectionMm.height / 2
+      : ownAabb.max.x * 1000
+    const coordinate = alongX ? faceZ : faceX
+    const dimCoordinate = coordinate + WALL_OFFSET_MM
+    const footCoordinate = coordinate + EXTENSION_START_MM
     return {
       id: 'wall-dim-' + wall.wallId,
       kind: 'wall' as const,
       valueMm: wall.lengthMm,
-      from, to, dimensionFrom, dimensionTo,
+      from, to,
+      dimensionFrom: alongX ? asPoint(from.x, dimCoordinate) : asPoint(dimCoordinate, from.z),
+      dimensionTo: alongX ? asPoint(to.x, dimCoordinate) : asPoint(dimCoordinate, to.z),
+      extensionFrom: alongX ? asPoint(from.x, footCoordinate) : asPoint(footCoordinate, from.z),
+      extensionTo: alongX ? asPoint(to.x, footCoordinate) : asPoint(footCoordinate, to.z),
     }
   })
-  // Keep total dimension lines outside every per-wall annotation.
-  const totalOffset = offset + walls.length * step + 320
+  // The overall dimension is still measured against the actual exterior
+  // timber bounds, but it also stays near the facade instead of spanning the
+  // entire inside of an L-shaped construction.
   lines.push({
     id: 'overall-dimension-x', kind: 'overall',
     valueMm: overallXmm,
     from: asPoint(bounds.minX, bounds.maxZ),
     to: asPoint(bounds.maxX, bounds.maxZ),
-    dimensionFrom: asPoint(bounds.minX, bounds.minZ - totalOffset),
-    dimensionTo: asPoint(bounds.maxX, bounds.minZ - totalOffset),
+    dimensionFrom: asPoint(bounds.minX, bounds.maxZ + OVERALL_OFFSET_MM),
+    dimensionTo: asPoint(bounds.maxX, bounds.maxZ + OVERALL_OFFSET_MM),
+    extensionFrom: asPoint(bounds.minX, bounds.maxZ + EXTENSION_START_MM),
+    extensionTo: asPoint(bounds.maxX, bounds.maxZ + EXTENSION_START_MM),
   })
   lines.push({
     id: 'overall-dimension-z', kind: 'overall',
     valueMm: overallZmm,
     from: asPoint(bounds.maxX, bounds.maxZ),
     to: asPoint(bounds.maxX, bounds.minZ),
-    dimensionFrom: asPoint(bounds.minX - totalOffset, bounds.maxZ),
-    dimensionTo: asPoint(bounds.minX - totalOffset, bounds.minZ),
+    dimensionFrom: asPoint(bounds.maxX + OVERALL_OFFSET_MM, bounds.maxZ),
+    dimensionTo: asPoint(bounds.maxX + OVERALL_OFFSET_MM, bounds.minZ),
+    extensionFrom: asPoint(bounds.maxX + EXTENSION_START_MM, bounds.maxZ),
+    extensionTo: asPoint(bounds.maxX + EXTENSION_START_MM, bounds.minZ),
   })
   return { lines, bounds, overallXmm, overallZmm }
 }

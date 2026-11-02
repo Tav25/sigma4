@@ -28,30 +28,64 @@ describe('S06.5 coordinates and real dimensions', () => {
       .toBeCloseTo(Math.PI / 2, 8)
   })
 
-  it('starts both extension lines outside ALL actual frame geometry', () => {
+  it('puts the first wall dimension just 220 mm from its OWN timber even with a long second wall', () => {
     const doc = create(6000)
-    const first = doc.building.walls[0]
+    const front = doc.building.walls[0]
     doc.building.walls.push({
-      ...first, wallId: 'wall-002', lengthMm: 3000, orientation: 'z',
-      origin: rightCornerOrigin(first, first), openings: [],
+      ...front, wallId: 'wall-002', lengthMm: 10000,
+      orientation: 'z', origin: rightCornerOrigin(front, front), openings: [],
     })
     const rebuilt = buildProjectSnapshot(doc)
     const layout = buildDimensionLayout(rebuilt.building.walls, projectToScene(rebuilt).elements)
+    const facade = layout.lines[0]
+    const side = layout.lines[1]
+    const totalX = layout.lines[2]
+    const totalZ = layout.lines[3]
+    expect(facade.id).toBe('wall-dim-wall-001')
+    expect(side.id).toBe('wall-dim-wall-002')
+    // Local placements, not the 10-m global footprint!
+    expect(facade.dimensionFrom.z).toBeGreaterThan(front.origin.z)
+    expect(facade.dimensionFrom.z).toBeLessThan(front.origin.z + 400)
+    expect(side.dimensionFrom.x).toBeGreaterThan(doc.building.walls[1].origin.x)
+    expect(side.dimensionFrom.x).toBeLessThan(doc.building.walls[1].origin.x + 400)
+    expect(facade.dimensionFrom.z - facade.extensionFrom.z).toBeCloseTo(175, 6)
+    expect(side.dimensionFrom.x - side.extensionFrom.x).toBeCloseTo(175, 6)
+    // Global exterior dimensions are a second tier, nearby, not opposite.
+    expect(totalX.dimensionFrom.z).toBeGreaterThan(facade.dimensionFrom.z)
+    expect(totalX.dimensionFrom.z - facade.dimensionFrom.z).toBeLessThan(320)
+    expect(totalZ.dimensionFrom.x).toBeGreaterThan(side.dimensionFrom.x)
+    expect(totalZ.dimensionFrom.x - side.dimensionFrom.x).toBeLessThan(320)
+    expect(totalX.dimensionFrom.z - totalX.extensionFrom.z).toBeCloseTo(415, 6)
+    expect(totalZ.dimensionFrom.x - totalZ.extensionFrom.x).toBeCloseTo(415, 6)
     for (const line of layout.lines) {
-      for (const side of ['from', 'to'] as const) {
-        const foot = exteriorExtensionFoot(line, layout.bounds, side)
+      for (const end of ['from', 'to'] as const) {
+        const foot = exteriorExtensionFoot(line, layout.bounds, end)
+        const towards = end === 'from' ? line.dimensionFrom : line.dimensionTo
         expect(foot.y).toBe(0)
-        const alongX = Math.abs(line.dimensionTo.x - line.dimensionFrom.x) >
-          Math.abs(line.dimensionTo.z - line.dimensionFrom.z)
-        if (alongX) {
-          expect(foot.z).toBeLessThan(layout.bounds.minZ)
-          expect(foot.x).toBe(side === 'from' ? line.from.x : line.to.x)
+        if (Math.abs(line.dimensionFrom.x - line.dimensionTo.x) > 0) {
+          expect(foot.x).toBe(towards.x)
+          expect(foot.z).toBeLessThan(towards.z)
         } else {
-          expect(foot.x).toBeLessThan(layout.bounds.minX)
-          expect(foot.z).toBe(side === 'from' ? line.from.z : line.to.z)
+          expect(foot.z).toBe(towards.z)
+          expect(foot.x).toBeLessThan(towards.x)
         }
       }
     }
+  })
+
+  it('keeps independent wall dimensions near their individual wall, not the global model boundary', () => {
+    const doc = create()
+    const first = doc.building.walls[0]
+    doc.building.walls.push({
+      ...first, wallId: 'wall-002', origin: { x: 9500, y: 0, z: -12000 },
+      openings: [],
+    })
+    const rebuilt = buildProjectSnapshot(doc)
+    const dims = buildDimensionLayout(rebuilt.building.walls, projectToScene(rebuilt).elements)
+    expect(Math.abs(dims.lines[0].dimensionFrom.z - first.origin.z)).toBeLessThan(400)
+    expect(Math.abs(dims.lines[1].dimensionFrom.z + 12000)).toBeLessThan(400)
+    expect(dims.lines[0].dimensionFrom.z).toBeGreaterThan(dims.bounds.minZ + 10000)
+    expect(dims.lines[1].dimensionFrom.z).toBeLessThan(dims.bounds.maxZ - 10000)
   })
 
   it('keeps render geometry and text metadata independent from JSON', () => {
@@ -61,7 +95,7 @@ describe('S06.5 coordinates and real dimensions', () => {
     const yaw = dimensionLabelYaw(layout.lines[0])
     const feet = exteriorExtensionFoot(layout.lines[0], layout.bounds, 'from')
     expect(yaw).toBe(0)
-    expect(feet.z).toBeLessThan(layout.bounds.minZ)
+    expect(feet.z).toBeGreaterThan(layout.bounds.maxZ)
     expect(JSON.stringify(doc)).toBe(before)
   })
 

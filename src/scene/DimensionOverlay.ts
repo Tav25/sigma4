@@ -83,8 +83,8 @@ function appendDimension(group: THREE.Group, line: DimensionLine, layout: Dimens
   const isAlongX = Math.abs(axis.x) > Math.abs(axis.z)
   // Always move away from timber, not toward the inside of the L.
   const side = isAlongX
-    ? Math.sign(line.dimensionFrom.z - layout.bounds.maxZ) || -1
-    : Math.sign(line.dimensionFrom.x - layout.bounds.maxX) || -1
+    ? Math.sign(line.dimensionFrom.z - line.extensionFrom.z) || 1
+    : Math.sign(line.dimensionFrom.x - line.extensionFrom.x) || 1
   const outward = isAlongX
     ? new THREE.Vector3(0, 0, side)
     : new THREE.Vector3(side, 0, 0)
@@ -113,7 +113,7 @@ function appendDimension(group: THREE.Group, line: DimensionLine, layout: Dimens
   number.quaternion.copy(yaw.multiply(tilt))
   number.userData.dimensionBaseYaw = baseYaw
   number.position.copy(a.clone().add(b).multiplyScalar(0.5))
-  number.position.addScaledVector(outward, 0.24)
+  number.position.addScaledVector(outward, 0.16)
   number.position.y = GROUND_Y + 0.005
   group.add(number)
 }

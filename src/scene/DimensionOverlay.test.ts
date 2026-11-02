@@ -106,22 +106,31 @@ describe('S06.5.3 planar drawing legibility', () => {
     disposeDimensionGroup(group)
   })
 
-  it('places all annotations on negative outer sides, never inside construction', () => {
+  it('places individual dimensions adjacent to their own walls, not the global remote bounds', () => {
     const dim = layout()
+    const first = dim.lines.find(line => line.id === 'wall-dim-wall-001')!
+    const second = dim.lines.find(line => line.id === 'wall-dim-wall-002')!
+    expect(first.dimensionFrom.z).toBeGreaterThan(0)
+    expect(first.dimensionFrom.z).toBeLessThan(400)
+    expect(second.dimensionFrom.x).toBeGreaterThan(5900)
+    expect(second.dimensionFrom.x).toBeLessThan(6400)
     for (const line of dim.lines) {
-      const alongX = Math.abs(line.dimensionTo.x - line.dimensionFrom.x) >
-        Math.abs(line.dimensionTo.z - line.dimensionFrom.z)
-      if (alongX) {
-        expect(line.dimensionFrom.z).toBeLessThan(dim.bounds.minZ)
-        expect(line.dimensionTo.z).toBeLessThan(dim.bounds.minZ)
-      } else {
-        expect(line.dimensionFrom.x).toBeLessThan(dim.bounds.minX)
-        expect(line.dimensionTo.x).toBeLessThan(dim.bounds.minX)
+      if (line.id === 'overall-dimension-x') {
+        expect(line.dimensionFrom.z).toBeGreaterThan(first.dimensionFrom.z)
+      } else if (line.id === 'overall-dimension-z') {
+        expect(line.dimensionFrom.x).toBeGreaterThan(second.dimensionFrom.x)
       }
     }
     const group = makeDimensionGroup(dim)
     const all = group.children.filter(obj => obj instanceof THREE.LineSegments)
     expect(all).toHaveLength(dim.lines.length)
+    // The extension segments are near the individual measured walls;
+    // do not stretch through the L-shaped building's interior.
+    const strokes = all[0] as THREE.LineSegments
+    const positions = strokes.geometry.getAttribute('position') as THREE.BufferAttribute
+    expect(positions.getZ(0) * 1000).toBeCloseTo(first.extensionFrom.z, 4)
+    expect(positions.getZ(2) * 1000).toBeCloseTo(first.extensionTo.z, 4)
     disposeDimensionGroup(group)
   })
+
 })
