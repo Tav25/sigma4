@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.21')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.22')
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -61,6 +61,12 @@ try {
   await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(400)
   await page.screenshot({ path: dir + '/02-isometric.png' })
+  // Confirm both wall lengths and the exterior sizes while the CAD
+  // annotation layer is enabled. A top and ISO screenshot is retained
+  // for visual orientation/legibility inspection of the vector labels.
+  assert.equal(await viewport.getAttribute('data-dimension-total-x'), '6000')
+  assert.equal(await viewport.getAttribute('data-dimension-total-z'), '3145')
+  await page.screenshot({ path: dir + '/09-vector-dimensions-iso.png' })
 
   const firstDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
@@ -264,7 +270,7 @@ try {
   await wallLengthInput.press('Tab')
   await page.locator('.viewport[data-dimension-total-x="5000"]').waitFor()
   assert.equal(errors.length, 0, 'Unexpected browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.0.21 ground-plane dimension numerals only; 4m and 5m; corner; garage+door; JSON')
+  console.log('SIGMA4 BROWSER PASS: v0.0.22 vector numerals; aligned axes; exterior arrows; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()

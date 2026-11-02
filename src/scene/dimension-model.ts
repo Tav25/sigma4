@@ -30,6 +30,36 @@ export function formatDimensionNumber(valueMm: number): string {
   return String(Math.round(valueMm))
 }
 
+/** Angle about global Y: local text baseline tracks a wall's length axis. */
+export function dimensionLabelYaw(line: DimensionLine): number {
+  const dx = line.dimensionTo.x - line.dimensionFrom.x
+  const dz = line.dimensionTo.z - line.dimensionFrom.z
+  if (Math.hypot(dx, dz) < 1e-6) return 0
+  return Math.atan2(-dz, dx)
+}
+
+/**
+ * Extension lines begin just OUTSIDE the entire assembly, never in front of
+ * the studs or through an opening. Authoritative from/to endpoints are kept
+ * for measurements and are not modified by this visual-only clipping.
+ */
+export function exteriorExtensionFoot(
+  line: DimensionLine, bounds: DimensionLayout['bounds'], end: 'from' | 'to',
+): DimensionPoint {
+  const source = end === 'from' ? line.from : line.to
+  const isAlongX = Math.abs(line.dimensionTo.x - line.dimensionFrom.x) >
+    Math.abs(line.dimensionTo.z - line.dimensionFrom.z)
+  const exteriorOffsetMm = 100
+  if (isAlongX) {
+    const outsideZ = line.dimensionFrom.z >= bounds.maxZ
+      ? bounds.maxZ + exteriorOffsetMm : bounds.minZ - exteriorOffsetMm
+    return asPoint(source.x, outsideZ)
+  }
+  const outsideX = line.dimensionFrom.x >= bounds.maxX
+    ? bounds.maxX + exteriorOffsetMm : bounds.minX - exteriorOffsetMm
+  return asPoint(outsideX, source.z)
+}
+
 /**
  * Dimension source: wall model for authored lengths, actual assembly mesh AABB
  * for exterior sizes. Never infer outer dimensions by summing wall lengths:
@@ -47,7 +77,7 @@ export function buildDimensionLayout(walls: readonly Wall[], elements: TimberEle
   }
   const overallXmm = bounds.maxX - bounds.minX
   const overallZmm = bounds.maxZ - bounds.minZ
-  const offset = 450
+  const offset = 650
   const step = 250
   const lines: DimensionLine[] = walls.map((wall, index) => {
     const alongX = wall.orientation === 'x'

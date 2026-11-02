@@ -1,36 +1,79 @@
 import * as THREE from 'three'
-import { formatDimensionNumber, type DimensionLayout, type DimensionLine, type DimensionPoint } from './dimension-model'
+import {
+  dimensionLabelYaw,
+  exteriorExtensionFoot,
+  formatDimensionNumber,
+  type DimensionLayout,
+  type DimensionLine,
+  type DimensionPoint,
+} from './dimension-model'
 
-/** Everything dimension-related lies on the horizontal XZ drawing plane. */
-const GROUND_Y = 0.025
-const mm = (value: number) => value / 1000
-const planar = (p: DimensionPoint) => new THREE.Vector3(mm(p.x), GROUND_Y, mm(p.z))
+/**
+ * Dimension marks are CAD-like vector geometry, not canvas images.
+ * Vector digits remain sharp under oblique views, zoom and rotation.
+ * All geometry stays on the XZ plane; no camera-facing billboards.
+ */
+const GROUND_Y = 0.026
+const mm = (number: number) => number / 1000
+const point = (p: DimensionPoint) => new THREE.Vector3(mm(p.x), GROUND_Y, mm(p.z))
 
-/** Actual typography on a flat plane, not a billboard or a floating label. */
-function numericLabel(valueMm: number, color: string): THREE.Mesh {
+/** Monoline numerals with normalized X=0..1 and Y=0..1.5. */
+const DIGIT_PATHS: Record<string, number[][][]> = {
+  '0': [[[0.16, 0], [0.84, 0], [1, 0.16], [1, 1.34], [0.84, 1.5], [0.16, 1.5], [0, 1.34], [0, 0.16], [0.16, 0]]],
+  '1': [[[0.16, 1.15], [0.53, 1.5], [0.53, 0]], [[0.16, 0], [0.88, 0]]],
+  '2': [[[0, 1.28], [0.18, 1.5], [0.82, 1.5], [1, 1.26], [1, 0.98], [0, 0.13], [0, 0], [1, 0]]],
+  '3': [[[0, 1.5], [1, 1.5], [0.45, 0.78], [0.9, 0.78], [1, 0.58], [1, 0.19], [0.82, 0], [0, 0]]],
+  '4': [[[0.83, 0], [0.83, 1.5]], [[0, 1.5], [0, 0.54], [1, 0.54]]],
+  '5': [[[1, 1.5], [0, 1.5], [0, 0.78], [0.78, 0.78], [1, 0.6], [1, 0.18], [0.83, 0], [0, 0]]],
+  '6': [[[0.94, 1.5], [0.2, 0.93], [0, 0.63], [0, 0.17], [0.16, 0], [0.82, 0], [1, 0.17], [1, 0.61], [0.82, 0.78], [0.18, 0.78]]],
+  '7': [[[0, 1.5], [1, 1.5], [0.3, 0]]],
+  '8': [[[0.18, 0.78], [0, 0.95], [0, 1.3], [0.18, 1.5], [0.82, 1.5], [1, 1.3], [1, 0.95], [0.82, 0.78], [0.18, 0.78], [0, 0.56], [0, 0.2], [0.18, 0], [0.82, 0], [1, 0.2], [1, 0.56], [0.82, 0.78]]],
+  '9': [[[1, 0.72], [0.82, 0.72], [0.18, 0.72], [0, 0.9], [0, 1.3], [0.18, 1.5], [0.82, 1.5], [1, 1.3], [1, 0.6], [0.15, 0]]],
+}
+
+/** Closed quadrilateral, two triangles: a stroked segment with real width. */
+function appendStroke(out: number[], ax: number, ay: number, bx: number, by: number, stroke: number) {
+  const dx = bx - ax, dy = by - ay
+  const magnitude = Math.hypot(dx, dy)
+  if (magnitude < 1e-8) return
+  const nx = dy / magnitude * stroke / 2
+  const ny = -dx / magnitude * stroke / 2
+  out.push(
+    ax - nx, ay - ny, 0, bx - nx, by - ny, 0, bx + nx, by + ny, 0,
+    ax - nx, ay - ny, 0, bx + nx, by + ny, 0, ax + nx, ay + ny, 0,
+  )
+}
+
+function numericMesh(valueMm: number, color: number): THREE.Mesh {
   const digits = formatDimensionNumber(valueMm)
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 128
-  const context = canvas.getContext('2d')
-  if (!context) throw new Error('2D canvas unavailable for dimension numbers')
-  context.clearRect(0, 0, canvas.width, canvas.height)
-  context.font = 'bold 85px Arial, sans-serif'
-  context.fillStyle = color
-  context.textAlign = 'center'
-  context.textBaseline = 'middle'
-  context.fillText(digits, 256, 64, 495)
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
+  const vertices: number[] = []
+  const advance = 0.265
+  const digitWidth = 0.20
+  const digitHeight = 0.36
+  const strokeWidth = 0.024
+  for (let i = 0; i < digits.length; i++) {
+    const paths = DIGIT_PATHS[digits[i]]
+    if (!paths) throw new Error('Unsupported numeric dimension glyph')
+    const originX = (i - (digits.length - 1) / 2) * advance - digitWidth / 2
+    for (const path of paths) {
+      for (let k = 1; k < path.length; k++) {
+        const a = path[k - 1], b = path[k]
+        appendStroke(vertices,
+          originX + a[0] * digitWidth, (a[1] / 1.5 - 0.5) * digitHeight,
+          originX + b[0] * digitWidth, (b[1] / 1.5 - 0.5) * digitHeight,
+          strokeWidth,
+        )
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  geometry.computeVertexNormals()
   const material = new THREE.MeshBasicMaterial({
-    map: texture, side: THREE.DoubleSide, transparent: true,
-    depthWrite: false, depthTest: false,
+    color, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
   })
-  const length = Math.max(0.58, digits.length * 0.16)
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(length, 0.28), material)
-  // Local XY -> world XZ, facing the top (+Y) view. No camera billboarding.
-  mesh.rotation.x = -Math.PI / 2
-  mesh.renderOrder = 111
+  const mesh = new THREE.Mesh(geometry, material)
+  mesh.renderOrder = 112
   return mesh
 }
 
@@ -44,49 +87,54 @@ function segments(points: THREE.Vector3[], color: number): THREE.LineSegments {
   return lines
 }
 
-function appendDimension(group: THREE.Group, dim: DimensionLine) {
-  const start = planar(dim.from)
-  const end = planar(dim.to)
-  const a = planar(dim.dimensionFrom)
-  const b = planar(dim.dimensionTo)
+function appendDimension(group: THREE.Group, line: DimensionLine, layout: DimensionLayout) {
+  const a = point(line.dimensionFrom), b = point(line.dimensionTo)
   const axis = b.clone().sub(a).normalize()
-  const normal = new THREE.Vector3(-axis.z, 0, axis.x)
-  // Short dimensions (e.g. 145-mm stud depth) must not have opposing
-  // arrowheads longer than the dimension itself.
-  const arrowLength = Math.min(0.13, Math.max(0.02, mm(dim.valueMm) * 0.22))
+  const outward = new THREE.Vector3(-axis.z, 0, axis.x)
+  const footA = point(exteriorExtensionFoot(line, layout.bounds, 'from'))
+  const footB = point(exteriorExtensionFoot(line, layout.bounds, 'to'))
+  const arrowLength = Math.min(0.13, Math.max(0.02, mm(line.valueMm) * 0.22))
   const arrowHalf = Math.min(0.055, arrowLength * 0.46)
-  const arrow = (tip: THREE.Vector3, toward: THREE.Vector3) => {
-    const base = tip.clone().addScaledVector(toward, arrowLength)
+  const arrow = (tip: THREE.Vector3, forward: THREE.Vector3) => {
+    const base = tip.clone().addScaledVector(forward, arrowLength)
     return [
-      tip.clone(), base.clone().addScaledVector(normal, arrowHalf),
-      tip.clone(), base.clone().addScaledVector(normal, -arrowHalf),
+      tip.clone(), base.clone().addScaledVector(outward, arrowHalf),
+      tip.clone(), base.clone().addScaledVector(outward, -arrowHalf),
     ]
   }
   const points = [
-    start, a.clone().addScaledVector(a.clone().sub(start).normalize(), 0.09),
-    end, b.clone().addScaledVector(b.clone().sub(end).normalize(), 0.09),
+    // Both extension lines start OUTSIDE the model's entire XZ footprint.
+    footA, a.clone().addScaledVector(a.clone().sub(footA).normalize(), 0.08),
+    footB, b.clone().addScaledVector(b.clone().sub(footB).normalize(), 0.08),
     a, b,
     ...arrow(a, axis), ...arrow(b, axis.clone().negate()),
   ]
-  group.add(segments(points, dim.kind === 'overall' ? 0x1562a8 : 0x274559))
-  const number = numericLabel(dim.valueMm, dim.kind === 'overall' ? '#1562a8' : '#274559')
-  number.name = 'dimension-number-' + dim.id
+  const overall = line.kind === 'overall'
+  group.add(segments(points, overall ? 0x1562a8 : 0x274559))
+  const number = numericMesh(line.valueMm, overall ? 0x134f89 : 0x20374e)
+  number.name = 'dimension-number-' + line.id
+  const tilt = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(1, 0, 0), -Math.PI / 2,
+  )
+  const yaw = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(0, 1, 0), dimensionLabelYaw(line),
+  )
+  number.quaternion.copy(yaw.multiply(tilt))
   number.position.copy(a.clone().add(b).multiplyScalar(0.5))
-  // Put digits next to, not across, the dimension stroke on the same plane.
-  number.position.addScaledVector(normal, 0.38)
-  number.position.y = GROUND_Y + 0.004
+  number.position.addScaledVector(outward, 0.48)
+  number.position.y = GROUND_Y + 0.005
   group.add(number)
 }
 
-/** Derived visualization only: no canonical JSON mutation. */
+/** Render-only measurements; canonical JSON is not changed. */
 export function makeDimensionGroup(layout: DimensionLayout): THREE.Group {
   const group = new THREE.Group()
   group.name = 'sigma4-planar-dimensions'
-  for (const dim of layout.lines) appendDimension(group, dim)
+  for (const line of layout.lines) appendDimension(group, line, layout)
   return group
 }
 
-/** World-origin geometry is separate from engineering dimensions. */
+/** World origin is independent of the dimension annotation layer. */
 export function makeOriginGroup(): THREE.Group {
   const group = new THREE.Group()
   group.name = 'sigma4-world-origin'
@@ -116,10 +164,7 @@ export function disposeDimensionGroup(group: THREE.Group): void {
       object instanceof THREE.LineSegments) {
       object.geometry.dispose()
       const materials = Array.isArray(object.material) ? object.material : [object.material]
-      for (const material of materials) {
-        if (material instanceof THREE.MeshBasicMaterial) material.map?.dispose()
-        material.dispose()
-      }
+      for (const material of materials) material.dispose()
     }
   })
 }

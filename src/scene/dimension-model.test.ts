@@ -2,13 +2,70 @@ import { describe, it, expect } from 'vitest'
 import { createProjectFromCurrentState, buildProjectSnapshot } from '../core/project-store'
 import { rightCornerOrigin } from '../core/corner'
 import { projectToScene } from './project-to-scene'
-import { buildDimensionLayout, formatDimensionNumber } from './dimension-model'
+import { buildDimensionLayout, formatDimensionNumber, dimensionLabelYaw, exteriorExtensionFoot } from './dimension-model'
 
 const create = (length = 4000) => createProjectFromCurrentState({
   projectId: 's06-5-coordinates', length, height: 2700, spacing: 600, openings: [],
 })
 
 describe('S06.5 coordinates and real dimensions', () => {
+  it('aligns numeric labels along their own X and -Z wall, not a common axis', () => {
+    const doc = create(6000)
+    const first = doc.building.walls[0]
+    doc.building.walls.push({
+      ...first, wallId: 'wall-002', lengthMm: 3000, orientation: 'z',
+      origin: rightCornerOrigin(first, first), openings: [],
+    })
+    const rebuilt = buildProjectSnapshot(doc)
+    const layout = buildDimensionLayout(rebuilt.building.walls, projectToScene(rebuilt).elements)
+    const xWall = layout.lines.find(line => line.id === 'wall-dim-wall-001')!
+    const zWall = layout.lines.find(line => line.id === 'wall-dim-wall-002')!
+    expect(dimensionLabelYaw(xWall)).toBeCloseTo(0, 8)
+    expect(dimensionLabelYaw(zWall)).toBeCloseTo(Math.PI / 2, 8)
+    expect(dimensionLabelYaw(layout.lines.find(line => line.id === 'overall-dimension-x')!))
+      .toBeCloseTo(0, 8)
+    expect(dimensionLabelYaw(layout.lines.find(line => line.id === 'overall-dimension-z')!))
+      .toBeCloseTo(Math.PI / 2, 8)
+  })
+
+  it('starts both extension lines outside ALL actual frame geometry', () => {
+    const doc = create(6000)
+    const first = doc.building.walls[0]
+    doc.building.walls.push({
+      ...first, wallId: 'wall-002', lengthMm: 3000, orientation: 'z',
+      origin: rightCornerOrigin(first, first), openings: [],
+    })
+    const rebuilt = buildProjectSnapshot(doc)
+    const layout = buildDimensionLayout(rebuilt.building.walls, projectToScene(rebuilt).elements)
+    for (const line of layout.lines) {
+      for (const side of ['from', 'to'] as const) {
+        const foot = exteriorExtensionFoot(line, layout.bounds, side)
+        expect(foot.y).toBe(0)
+        const alongX = Math.abs(line.dimensionTo.x - line.dimensionFrom.x) >
+          Math.abs(line.dimensionTo.z - line.dimensionFrom.z)
+        if (alongX) {
+          expect(foot.z).toBeGreaterThan(layout.bounds.maxZ)
+          expect(foot.x).toBe(side === 'from' ? line.from.x : line.to.x)
+        } else {
+          expect(foot.x).toBeGreaterThan(layout.bounds.maxX)
+          expect(foot.z).toBe(side === 'from' ? line.from.z : line.to.z)
+        }
+      }
+    }
+  })
+
+  it('keeps render geometry and text metadata independent from JSON', () => {
+    const doc = create()
+    const before = JSON.stringify(doc)
+    const layout = buildDimensionLayout(doc.building.walls, projectToScene(doc).elements)
+    const yaw = dimensionLabelYaw(layout.lines[0])
+    const feet = exteriorExtensionFoot(layout.lines[0], layout.bounds, 'from')
+    expect(yaw).toBe(0)
+    expect(feet.z).toBeGreaterThan(layout.bounds.maxZ)
+    expect(JSON.stringify(doc)).toBe(before)
+  })
+
+
   it('renders numerical millimetres only, without labels or units', () => {
     expect(formatDimensionNumber(4000)).toBe('4000')
     expect(formatDimensionNumber(3145.2)).toBe('3145')
