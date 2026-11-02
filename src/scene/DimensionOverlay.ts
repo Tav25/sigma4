@@ -138,8 +138,11 @@ export function orientDimensionNumbers(group: THREE.Group, camera: THREE.Camera)
     // In overhead mode the camera has no useful horizontal direction, so
     // retain the project's natural +X/-Z annotation orientation.
     const worldDirection = worldUp.clone().applyQuaternion(yaw)
-    direction.subVectors(camera.position, item.position).setY(0)
-    const flip = direction.lengthSq() > 1e-4 &&
+    // Use the CAMERA'S forward vector, not camera-to-label position:
+    // in top view the latter points sideways for off-centre dimensions
+    // and incorrectly mirrors '6000' into '0009'.
+    camera.getWorldDirection(direction).multiplyScalar(-1).setY(0)
+    const flip = direction.lengthSq() > 0.04 &&
       worldDirection.dot(direction.normalize()) < -0.01
     if (flip) yaw.multiply(new THREE.Quaternion().setFromAxisAngle(
       new THREE.Vector3(0, 1, 0), Math.PI,

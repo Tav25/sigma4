@@ -65,6 +65,7 @@ describe('S06.5.3 planar drawing legibility', () => {
     const camera = new THREE.PerspectiveCamera()
     for (const position of [[-8, 8, -8], [8, 8, 8], [-8, 8, 8]] as const) {
       camera.position.set(position[0], position[1], position[2])
+      camera.lookAt(0, 0, 0)
       orientDimensionNumbers(group, camera)
       const directionA = new THREE.Vector3(1, 0, 0).applyQuaternion(a.quaternion)
       const directionB = new THREE.Vector3(1, 0, 0).applyQuaternion(b.quaternion)
@@ -73,6 +74,16 @@ describe('S06.5.3 planar drawing legibility', () => {
       expect(Math.abs(directionB.z)).toBeCloseTo(1, 6)
       expect(Math.abs(directionB.x)).toBeLessThan(1e-6)
     }
+    // Top view: camera is vertically above target. Text must never flip
+    // solely because the label is off-centre; 6000 must read left-to-right.
+    camera.up.set(0, 0, -1)
+    camera.position.set(3, 100, -3)
+    camera.lookAt(3, 0, -3)
+    orientDimensionNumbers(group, camera)
+    const topBaselineX = new THREE.Vector3(1, 0, 0).applyQuaternion(a.quaternion)
+    expect(topBaselineX.x).toBeGreaterThan(0.99)
+    const topBaselineZ = new THREE.Vector3(1, 0, 0).applyQuaternion(b.quaternion)
+    expect(topBaselineZ.z).toBeLessThan(-0.99)
     disposeDimensionGroup(group)
   })
 
