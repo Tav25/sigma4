@@ -296,6 +296,9 @@ export class ProjectStore {
           const opening = candidate.building.openings.find(o => o.id === openingId)
           if (!opening) return { success: false, errorCode: 'OPENING_NOT_FOUND', messageRu: `Проём ${openingId} не найден` }
           if (heightMm <= 0) return { success: false, errorCode: 'INVALID_HEIGHT', messageRu: 'Высота проёма должна быть положительной' }
+          // Keep a manually adjusted marker at the same relative height in its opening.
+          const marker = candidate.building.markers.find(m => m.openingId === openingId)
+          if (marker) marker.elevationMm += (heightMm - opening.heightMm) / 2
           opening.heightMm = heightMm
           changedIds.push(`building.openings[${openingId}].heightMm`)
           break
@@ -305,6 +308,9 @@ export class ProjectStore {
           const opening = candidate.building.openings.find(o => o.id === openingId)
           if (!opening) return { success: false, errorCode: 'OPENING_NOT_FOUND', messageRu: `Проём ${openingId} не найден` }
           if (sillHeightMm < 0) return { success: false, errorCode: 'INVALID_SILL_HEIGHT', messageRu: 'Высота подоконника не может быть отрицательной' }
+          // Move the marker vertically when the window sill moves.
+          const marker = candidate.building.markers.find(m => m.openingId === openingId)
+          if (marker) marker.elevationMm += sillHeightMm - opening.sillHeightMm
           opening.sillHeightMm = sillHeightMm
           changedIds.push(`building.openings[${openingId}].sillHeightMm`)
           break

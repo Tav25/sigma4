@@ -5,12 +5,14 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { generateTimberGeometry, boxCenterWorld, mmToMeters, type TimberElement } from '../core/timber'
 import type { WindowOpening } from '../core/window'
 import { getWindowPositionBounds } from '../core/window'
+import type { OpeningMarker } from './project-to-scene'
 
 interface SceneViewProps {
   elements: TimberElement[]
   selectedId: string | null
   showEdges?: boolean
   openings: WindowOpening[]
+  markers: OpeningMarker[]
   wallLength?: number
   selectedWindowId: string | null
   onWindowSelect?: (id: string | null) => void
@@ -35,7 +37,7 @@ interface WindowEntry {
 
 export function SceneView({
   elements, selectedId, showEdges = true,
-  openings, wallLength = 3000, selectedWindowId, onWindowSelect,
+  openings, markers, wallLength = 3000, selectedWindowId, onWindowSelect,
   onWindowDragStart, onWindowDragPreview, onWindowDragEnd, onSelect,
 }: SceneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,6 +47,7 @@ export function SceneView({
   const controlsRef = useRef<OrbitControls | null>(null)
   const entriesRef = useRef<Map<string, MeshEntry>>(new Map())
   const windowEntriesRef = useRef<Map<string, WindowEntry>>(new Map())
+  const openingMarkerEntriesRef = useRef<Map<string, THREE.Mesh>>(new Map())
   const resetRef = useRef<(() => void) | null>(null)
   const elementsRef = useRef<TimberElement[]>(elements)
   const selectedRef = useRef<string | null>(selectedId)
@@ -356,6 +359,12 @@ export function SceneView({
         ;(w.outline.material as THREE.Material).dispose()
       })
       windowEntriesRef.current.clear()
+      openingMarkerEntriesRef.current.forEach(mesh => {
+        scene.remove(mesh)
+        mesh.geometry.dispose()
+        ;(mesh.material as THREE.Material).dispose()
+      })
+      openingMarkerEntriesRef.current.clear()
       renderer.dispose()
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement)
@@ -499,6 +508,41 @@ export function SceneView({
       w.outline.visible = sel || hov
     }
   }, [openings])
+
+  // Small, non-interactive opening markers derived from JSON. Do not raycast
+  // against them or use them as an alternative source of opening coordinates.
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    const existing = openingMarkerEntriesRef.current
+    const wanted = new Set(markers.map(marker => marker.openingId))
+    for (const [id, mesh] of existing) {
+      if (!wanted.has(id)) {
+        scene.remove(mesh)
+        mesh.geometry.dispose()
+        ;(mesh.material as THREE.Material).dispose()
+        existing.delete(id)
+      }
+    }
+    for (const marker of markers) {
+      let mesh = existing.get(marker.openingId)
+      if (!mesh) {
+        mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.018, 12, 10),
+          new THREE.MeshBasicMaterial({ color: marker.color }),
+        )
+        scene.add(mesh)
+        existing.set(marker.openingId, mesh)
+      }
+      mesh.position.set(
+        mmToMeters(marker.position.x),
+        mmToMeters(marker.position.y),
+        mmToMeters(marker.position.z),
+      )
+      mesh.visible = marker.visible
+      ;(mesh.material as THREE.MeshBasicMaterial).color.set(marker.color)
+    }
+  }, [markers])
 
   // highlight wood + edges on selectedId change
   useEffect(() => {

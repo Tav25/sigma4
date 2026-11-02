@@ -57,8 +57,9 @@ export default function App() {
 
   const wall = snapshot.building.walls[0]
   // Three.js reads a projection of ProjectDocument; it does not own geometry.
-  const { openings: allOpenings, elements } = projectToScene(snapshot)
+  const { openings: allOpenings, elements, markers } = projectToScene(snapshot)
   const selectedOpening = allOpenings.find((o) => o.id === selectedOpeningId) ?? null
+  const selectedMarker = snapshot.building.markers.find(marker => marker.openingId === selectedOpeningId) ?? null
   const selected = elements.find((e) => e.id === selectedId) ?? null
   const validation = snapshot.validation
   const hasErrors = validation && !validation.valid
@@ -266,6 +267,16 @@ export default function App() {
               {selectedOpening.type === 'window' && (
                 <SafeNumberInput label="Высота подоконника (мм)" value={selectedOpening.sillHeightMm} onChange={(v) => updateOpening(selectedOpening.id, { sillHeightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота подоконника')} />
               )}
+              {selectedMarker && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13 }}>
+                  <input type="checkbox" checked={selectedMarker.visible}
+                    onChange={e => dispatch({
+                      type: 'SET_MARKER_SETTINGS',
+                      payload: { openingId: selectedOpening.id, visible: e.target.checked },
+                    })} />
+                  Показывать маркер проёма
+                </label>
+              )}
               <div style={{ marginTop: 8 }}>
                 <button type="button" className="param-input" onClick={() => deleteOpening(selectedOpening.id)} style={{ cursor: 'pointer' }}>Удалить {selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
               </div>
@@ -317,7 +328,7 @@ export default function App() {
         <main className="viewport-wrap">
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
-              openings={allOpenings} selectedWindowId={selectedOpeningId} wallLength={wall.lengthMm}
+              openings={allOpenings} markers={markers} selectedWindowId={selectedOpeningId} wallLength={wall.lengthMm}
               onWindowDragStart={startOpeningDrag}
               onWindowDragPreview={previewOpeningX}
               onWindowDragEnd={finishOpeningDrag}
