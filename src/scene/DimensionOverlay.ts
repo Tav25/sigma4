@@ -96,10 +96,6 @@ export function makeOriginGroup(): THREE.Group {
       new THREE.Vector3(0, 0.03, 0), axis.end.length(), axis.color, 0.16, 0.08)
     arrow.renderOrder = 102
     group.add(arrow)
-    const label = labelSprite(axis.axis)
-    label.scale.set(0.45, 0.24, 1)
-    label.position.copy(axis.end).add(new THREE.Vector3(0, 0.18, 0))
-    group.add(label)
   }
   const pointMarker = new THREE.Mesh(
     new THREE.SphereGeometry(0.055, 12, 10),
