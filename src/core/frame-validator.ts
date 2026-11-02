@@ -21,6 +21,38 @@ function createIssue(
   return { code, severity, path, messageRu, affectedIds }
 }
 
+function checkPositive(
+  val: any,
+  field: string,
+  label: string,
+  gender: 'm' | 'f' | 'n' = 'n',
+  path: string,
+  issues: ValidationIssue[],
+  affectedIds: string[]
+): boolean {
+  if (typeof val !== 'number' || val <= 0) {
+    const verb = gender === 'f' ? 'должна быть положительной' : gender === 'm' ? 'должен быть положительным' : 'должно быть положительным'
+    issues.push(createIssue('INVALID_POSITIVE_VALUE', 'error', `${path}.${field}`, `${label} ${verb}`, affectedIds))
+    return true
+  }
+  return false
+}
+
+function checkNonNeg(
+  val: any,
+  field: string,
+  label: string,
+  path: string,
+  issues: ValidationIssue[],
+  affectedIds: string[]
+): boolean {
+  if (typeof val !== 'number' || val < 0) {
+    issues.push(createIssue('INVALID_NON_NEGATIVE', 'error', `${path}.${field}`, `${label} не может быть отрицательным`, affectedIds))
+    return true
+  }
+  return false
+}
+
 export function validateStructure(doc: any): ValidationIssue[] {
   const issues: ValidationIssue[] = []
 
@@ -63,18 +95,13 @@ export function validateStructure(doc: any): ValidationIssue[] {
         else if (wallIds.has(w.wallId)) issues.push(createIssue('DUPLICATE_WALL_ID', 'error', path, `Дублирующийся wallId: ${w.wallId}`, [w.wallId]))
         else wallIds.add(w.wallId)
 
-        const checkPositive = (val: any, field: string, label: string) => {
-          if (typeof val !== 'number' || val <= 0) {
-            issues.push(createIssue('INVALID_POSITIVE_VALUE', 'error', `${path}.${field}`, `${label} должно быть положительным числом`, w.wallId ? [w.wallId] : []))
-          }
-        }
-        checkPositive(w.lengthMm, 'lengthMm', 'Длина стены')
-        checkPositive(w.heightMm, 'heightMm', 'Высота стены')
-        checkPositive(w.thicknessMm, 'thicknessMm', 'Толщина стены')
-        checkPositive(w.studSpacingMm, 'studSpacingMm', 'Шаг стоек')
+        checkPositive(w.lengthMm, 'lengthMm', 'Длина стены', 'f', path, issues, w.wallId ? [w.wallId] : [])
+        checkPositive(w.heightMm, 'heightMm', 'Высота стены', 'f', path, issues, w.wallId ? [w.wallId] : [])
+        checkPositive(w.thicknessMm, 'thicknessMm', 'Толщина стены', 'f', path, issues, w.wallId ? [w.wallId] : [])
+        checkPositive(w.studSpacingMm, 'studSpacingMm', 'Шаг стоек', 'm', path, issues, w.wallId ? [w.wallId] : [])
         if (w.sectionMm) {
-          checkPositive(w.sectionMm.width, 'sectionMm.width', 'Ширина сечения')
-          checkPositive(w.sectionMm.height, 'sectionMm.height', 'Высота сечения')
+          checkPositive(w.sectionMm.width, 'sectionMm.width', 'Ширина сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
+          checkPositive(w.sectionMm.height, 'sectionMm.height', 'Высота сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
         }
         if (!['x', 'y', 'z'].includes(w.orientation)) {
           issues.push(createIssue('INVALID_WALL_ORIENTATION', 'error', `${path}.orientation`, 'Недопустимая ориентация стены', w.wallId ? [w.wallId] : []))
@@ -115,14 +142,9 @@ export function validateStructure(doc: any): ValidationIssue[] {
             issues.push(createIssue('INVALID_NON_NEGATIVE', 'error', `${path}.${field}`, `${label} не может быть отрицательным`, o.id ? [o.id] : []))
           }
         }
-        const checkPositive = (val: any, field: string, label: string) => {
-          if (typeof val !== 'number' || val <= 0) {
-            issues.push(createIssue('INVALID_POSITIVE_VALUE', 'error', `${path}.${field}`, `${label} должно быть положительным`, o.id ? [o.id] : []))
-          }
-        }
         checkNonNeg(o.positionUmm, 'positionUmm', 'Положение проёма')
-        checkPositive(o.widthMm, 'widthMm', 'Ширина проёма')
-        checkPositive(o.heightMm, 'heightMm', 'Высота проёма')
+        checkPositive(o.widthMm, 'widthMm', 'Ширина проёма', 'f', path, issues, o.id ? [o.id] : [])
+        checkPositive(o.heightMm, 'heightMm', 'Высота проёма', 'f', path, issues, o.id ? [o.id] : [])
         checkNonNeg(o.sillHeightMm, 'sillHeightMm', 'Высота подоконника')
       })
     }
@@ -136,7 +158,7 @@ export function validateStructure(doc: any): ValidationIssue[] {
         else materialIds.add(m.id)
         if (!m.name) issues.push(createIssue('MISSING_MATERIAL_NAME', 'error', path, 'Отсутствует название материала', m.id ? [m.id] : []))
         if (typeof m.densityKgM3 !== 'number' || m.densityKgM3 <= 0) {
-          issues.push(createIssue('INVALID_MATERIAL_DENSITY', 'error', `${path}.densityKgM3`, 'Плотность должна быть положительным числом', m.id ? [m.id] : []))
+          issues.push(createIssue('INVALID_MATERIAL_DENSITY', 'error', `${path}.densityKgM3`, 'Плотность должна быть положительной', m.id ? [m.id] : []))
         }
       })
     }
@@ -173,11 +195,11 @@ export function validateStructure(doc: any): ValidationIssue[] {
       }
 
       if (e.sectionMm) {
-        if (typeof e.sectionMm.width !== 'number' || e.sectionMm.width <= 0) issues.push(createIssue('INVALID_ELEMENT_SECTION_WIDTH', 'error', `${path}.sectionMm.width`, 'Ширина сечения должна быть положительной', e.elementId ? [e.elementId] : []))
-        if (typeof e.sectionMm.height !== 'number' || e.sectionMm.height <= 0) issues.push(createIssue('INVALID_ELEMENT_SECTION_HEIGHT', 'error', `${path}.sectionMm.height`, 'Высота сечения должна быть положительной', e.elementId ? [e.elementId] : []))
+        checkPositive(e.sectionMm.width, 'sectionMm.width', 'Ширина сечения', 'f', path, issues, e.elementId ? [e.elementId] : [])
+        checkPositive(e.sectionMm.height, 'sectionMm.height', 'Высота сечения', 'f', path, issues, e.elementId ? [e.elementId] : [])
       }
 
-      if (typeof e.lengthMm !== 'number' || e.lengthMm <= 0) issues.push(createIssue('INVALID_ELEMENT_LENGTH', 'error', `${path}.lengthMm`, 'Длина элемента должна быть положительной', e.elementId ? [e.elementId] : []))
+      checkPositive(e.lengthMm, 'lengthMm', 'Длина элемента', 'f', path, issues, e.elementId ? [e.elementId] : [])
 
       if (e.orientation) {
         if (!['x', 'y', 'z', 'slope'].includes(e.orientation.mode)) issues.push(createIssue('INVALID_ORIENTATION_MODE', 'error', `${path}.orientation.mode`, 'Недопустимый режим ориентации', e.elementId ? [e.elementId] : []))
@@ -387,4 +409,126 @@ export function validateProject(doc: any): ValidationResult {
 
 export function validateProjectSnapshot(doc: any): ValidationResult {
   return validateProject(doc)
+}
+
+export function validateSourceParameters(doc: any): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+
+  if (!doc || typeof doc !== 'object') {
+    issues.push(createIssue('INVALID_DOCUMENT', 'error', '', 'Документ не является объектом', []))
+    return issues
+  }
+
+  if (!doc.project) issues.push(createIssue('MISSING_PROJECT', 'error', 'project', 'Отсутствует раздел project', []))
+  if (!doc.building) issues.push(createIssue('MISSING_BUILDING', 'error', 'building', 'Отсутствует раздел building', []))
+
+  if (doc.project) {
+    const p = doc.project
+    if (!SUPPORTED_SCHEMA_VERSIONS.includes(p.schemaVersion)) {
+      issues.push(createIssue('UNSUPPORTED_SCHEMA_VERSION', 'error', 'project.schemaVersion', `Неподдерживаемая версия схемы: ${p.schemaVersion}`, []))
+    }
+    if (!p.projectId) issues.push(createIssue('MISSING_PROJECT_ID', 'error', 'project.projectId', 'Отсутствует projectId', []))
+    if (!p.projectName) issues.push(createIssue('MISSING_PROJECT_NAME', 'error', 'project.projectName', 'Отсутствует projectName', []))
+    if (p.units !== 'mm') issues.push(createIssue('INVALID_UNITS', 'error', 'project.units', 'Поддерживаются только миллиметры', []))
+    if (!SUPPORTED_RULESET_VERSIONS.includes(p.rulesetVersion)) {
+      issues.push(createIssue('UNSUPPORTED_RULESET_VERSION', 'error', 'project.rulesetVersion', `Неподдерживаемая версия наборa правил: ${p.rulesetVersion}`, []))
+    }
+    if (!SUPPORTED_GENERATOR_VERSIONS.includes(p.generatorVersion)) {
+      issues.push(createIssue('UNSUPPORTED_GENERATOR_VERSION', 'error', 'project.generatorVersion', `Неподдерживаемая версия генератора: ${p.generatorVersion}`, []))
+    }
+  }
+
+  const wallIds = new Set<string>()
+  const openingIds = new Set<string>()
+
+  if (doc.building) {
+    const b = doc.building
+
+    if (Array.isArray(b.walls)) {
+      b.walls.forEach((w: any, i: number) => {
+        const path = `building.walls[${i}]`
+        if (!w.wallId) issues.push(createIssue('MISSING_WALL_ID', 'error', path, 'Отсутствует wallId', []))
+        else if (wallIds.has(w.wallId)) issues.push(createIssue('DUPLICATE_WALL_ID', 'error', path, `Дублирующийся wallId: ${w.wallId}`, [w.wallId]))
+        else wallIds.add(w.wallId)
+
+        checkPositive(w.lengthMm, 'lengthMm', 'Длина стены', 'f', path, issues, w.wallId ? [w.wallId] : [])
+        checkPositive(w.heightMm, 'heightMm', 'Высота стены', 'f', path, issues, w.wallId ? [w.wallId] : [])
+        checkPositive(w.thicknessMm, 'thicknessMm', 'Толщина стены', 'f', path, issues, w.wallId ? [w.wallId] : [])
+        checkPositive(w.studSpacingMm, 'studSpacingMm', 'Шаг стоек', 'm', path, issues, w.wallId ? [w.wallId] : [])
+        if (w.sectionMm) {
+          checkPositive(w.sectionMm.width, 'sectionMm.width', 'Ширина сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
+          checkPositive(w.sectionMm.height, 'sectionMm.height', 'Высота сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
+        }
+        if (!['x', 'y', 'z'].includes(w.orientation)) {
+          issues.push(createIssue('INVALID_WALL_ORIENTATION', 'error', `${path}.orientation`, 'Недопустимая ориентация стены', w.wallId ? [w.wallId] : []))
+        }
+        if (w.origin) {
+          ['x', 'y', 'z'].forEach(coord => {
+            if (typeof w.origin[coord] !== 'number') {
+              issues.push(createIssue('INVALID_ORIGIN_COORD', 'error', `${path}.origin.${coord}`, `Координата ${coord} должна быть числом`, w.wallId ? [w.wallId] : []))
+            }
+          })
+        }
+        if (Array.isArray(w.openings)) {
+          w.openings.forEach((oid: string) => {
+            if (typeof oid !== 'string' || !oid) {
+              issues.push(createIssue('INVALID_OPENING_REF', 'error', `${path}.openings[]`, 'Ссылка на проём должна быть непустой строкой', w.wallId ? [w.wallId] : []))
+            }
+          })
+        }
+      })
+    }
+
+    if (Array.isArray(b.openings)) {
+      b.openings.forEach((o: any, i: number) => {
+        const path = `building.openings[${i}]`
+        if (!o.id) issues.push(createIssue('MISSING_OPENING_ID', 'error', path, 'Отсутствует id проёма', []))
+        else if (openingIds.has(o.id)) issues.push(createIssue('DUPLICATE_OPENING_ID', 'error', path, `Дублирующийся id проёма: ${o.id}`, [o.id]))
+        else openingIds.add(o.id)
+
+        if (!o.wallId) issues.push(createIssue('MISSING_OPENING_WALL_ID', 'error', path, 'Отсутствует wallId у проёма', o.id ? [o.id] : []))
+        else if (!wallIds.has(o.wallId)) issues.push(createIssue('OPENING_REF_INVALID_WALL', 'error', path, `Проём ссылается на несуществующую стену: ${o.wallId}`, o.id ? [o.id] : []))
+
+        if (!['window', 'door'].includes(o.type)) {
+          issues.push(createIssue('INVALID_OPENING_TYPE', 'error', `${path}.type`, 'Тип проёма должен быть window или door', o.id ? [o.id] : []))
+        }
+
+        checkNonNeg(o.positionUmm, 'positionUmm', 'Положение проёма', path, issues, o.id ? [o.id] : [])
+        checkPositive(o.widthMm, 'widthMm', 'Ширина проёма', 'f', path, issues, o.id ? [o.id] : [])
+        checkPositive(o.heightMm, 'heightMm', 'Высота проёма', 'f', path, issues, o.id ? [o.id] : [])
+        checkNonNeg(o.sillHeightMm, 'sillHeightMm', 'Высота подоконника', path, issues, o.id ? [o.id] : [])
+      })
+    }
+
+    const materialIds = new Set<string>()
+    if (Array.isArray(b.materials)) {
+      b.materials.forEach((m: any, i: number) => {
+        const path = `building.materials[${i}]`
+        if (!m.id) issues.push(createIssue('MISSING_MATERIAL_ID', 'error', path, 'Отсутствует id материала', []))
+        else if (materialIds.has(m.id)) issues.push(createIssue('DUPLICATE_MATERIAL_ID', 'error', path, `Дублирующийся id материала: ${m.id}`, [m.id]))
+        else materialIds.add(m.id)
+        if (!m.name) issues.push(createIssue('MISSING_MATERIAL_NAME', 'error', path, 'Отсутствует название материала', m.id ? [m.id] : []))
+        if (typeof m.densityKgM3 !== 'number' || m.densityKgM3 <= 0) {
+          issues.push(createIssue('INVALID_MATERIAL_DENSITY', 'error', `${path}.densityKgM3`, 'Плотность должна быть положительной', m.id ? [m.id] : []))
+        }
+      })
+    }
+
+    if (Array.isArray(b.markers)) {
+      b.markers.forEach((m: any, i: number) => {
+        const path = `building.markers[${i}]`
+        if (!m.openingId) issues.push(createIssue('MISSING_MARKER_OPENING_ID', 'error', path, 'Отсутствует openingId у маркера', []))
+        else if (!openingIds.has(m.openingId)) issues.push(createIssue('MARKER_REF_INVALID_OPENING', 'error', path, `Маркер ссылается на несуществующий проём: ${m.openingId}`, []))
+        if (!['center', 'left', 'right'].includes(m.anchor)) {
+          issues.push(createIssue('INVALID_MARKER_ANCHOR', 'error', `${path}.anchor`, 'Некорректный якорь маркера', m.openingId ? [m.openingId] : []))
+        }
+        if (typeof m.outsideOffsetMm !== 'number') issues.push(createIssue('INVALID_MARKER_OFFSET', 'error', `${path}.outsideOffsetMm`, 'outsideOffsetMm должен быть числом', m.openingId ? [m.openingId] : []))
+        if (typeof m.elevationMm !== 'number') issues.push(createIssue('INVALID_MARKER_ELEVATION', 'error', `${path}.elevationMm`, 'elevationMm должен быть числом', m.openingId ? [m.openingId] : []))
+        if (typeof m.visible !== 'boolean') issues.push(createIssue('INVALID_MARKER_VISIBLE', 'error', `${path}.visible`, 'visible должен быть булевым', m.openingId ? [m.openingId] : []))
+        if (!m.color || !/^#[0-9a-fA-F]{6}$/.test(m.color)) issues.push(createIssue('INVALID_MARKER_COLOR', 'error', `${path}.color`, 'Цвет должен быть в формате #RRGGBB', m.openingId ? [m.openingId] : []))
+      })
+    }
+  }
+
+  return issues
 }

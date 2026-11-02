@@ -1,13 +1,13 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { SceneView } from './scene/SceneView'
-import { generateWallPanel } from './core/wall'
-import { generateWallWithOpenings, type WindowOpening } from './core/window'
-import { timberVolumeM3, type TimberElement } from './core/timber'
+import { timberVolumeM3, type TimberElement as CoreTimberElement } from './core/timber'
 import { SafeNumberInput } from './components/SafeNumberInput'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { validateWallLength, validateInt } from './core/validation'
-import type { ProjectDocument } from './core/project'
-import { createProjectFromCurrentState, serializeProject } from './core/project-store'
+import type { WindowOpening } from './core/window'
+import type { TimberElement, Opening } from './core/project'
+import { createProjectFromCurrentState } from './core/project-store'
+import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 
 function findFreePosition(openings: WindowOpening[], wallLength: number, newW: number): number | null {
   for (let x = 135; x + newW + 90 <= wallLength; x += 50) {
@@ -24,56 +24,117 @@ function findFreePosition(openings: WindowOpening[], wallLength: number, newW: n
   return null
 }
 
-export default function App() {
-  const [length, setLength] = useState(6000)
-  const [height, setHeight] = useState(2700)
-  const [spacing, setSpacing] = useState(600)
-  const [openings, setOpenings] = useState<WindowOpening[]>([
+function convertToCoreTimber(el: TimberElement): CoreTimberElement {
+  return {
+    id: el.elementId,
+    role: el.role,
+    length: el.lengthMm,
+    width: el.sectionMm.width,
+    height: el.sectionMm.height,
+    position: el.position,
+    orientation: el.orientation,
+    material: 'wood',
+  }
+}
+
+function convertOpeningsToWindow(openings: Opening[]): WindowOpening[] {
+  return openings.map(o => ({
+    id: o.id,
+    positionXmm: o.positionUmm,
+    widthMm: o.widthMm,
+    heightMm: o.heightMm,
+    sillHeightMm: o.sillHeightMm,
+    type: o.type,
+  }))
+}
+
+const initialDoc = createProjectFromCurrentState({
+  length: 6000,
+  height: 2700,
+  spacing: 600,
+  openings: [
     { id: 'W01', positionXmm: 900, widthMm: 1200, heightMm: 1200, sillHeightMm: 900, type: 'window' },
     { id: 'W02', positionXmm: 3300, widthMm: 1200, heightMm: 1200, sillHeightMm: 900, type: 'window' },
-  ])
+  ],
+  projectId: 'proj-001',
+  projectName: 'SIGMA4 Project',
+})
+
+const store = createProjectStore(initialDoc)
+
+export default function App() {
+  const [snapshot, setSnapshot] = useState(() => store.getSnapshot())
+  const [revision, setRevision] = useState(() => store.getRevision())
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
   const [doorEnabled, setDoorEnabled] = useState(false)
   const [doorParams, setDoorParams] = useState({ positionXmm: 3000, widthMm: 900, heightMm: 2100 })
-  const [projectDoc, setProjectDoc] = useState<ProjectDocument | null>(null)
+  const [commandError, setCommandError] = useState<string | null>(null)
   const idCounterRef = useRef(2)
 
-  const selectedWindow = openings.find((o) => o.id === selectedWindowId) ?? null
-
-  const params = { length, height, sectionWidth: 45, sectionHeight: 145, spacing, topLayers: 2 }
-  const allOpenings = doorEnabled ? [...openings, { id: 'D01', positionXmm: doorParams.positionXmm, widthMm: doorParams.widthMm, heightMm: doorParams.heightMm, sillHeightMm: 0, type: 'door' } as WindowOpening] : openings
-
-  const assembly = useMemo(() => {
-    try {
-      const a = allOpenings.length > 0 ? generateWallWithOpenings(params, allOpenings) : generateWallPanel(params)
-      return a
-    } catch (e) {
-      console.error('Wall generation error:', e)
-      return null
-    }
-  }, [length, height, spacing, openings, doorEnabled, doorParams])
-
-  const elements = assembly ? assembly.elements : []
-
   useEffect(() => {
-    const doc = createProjectFromCurrentState({ length, height, spacing, openings: allOpenings, projectName: 'SIGMA4 Project' })
-    setProjectDoc(doc)
-  }, [length, height, spacing, openings, doorEnabled, doorParams])
+    const unsub = store.subscribe((doc, rev) => {
+      setSnapshot(doc)
+      setRevision(rev)
+    })
+    return unsub
+  }, [])
 
+  const wall = snapshot.building.walls[0]
+  const allOpeningsCore = doorEnabled
+    ? [...snapshot.building.openings, { id: 'D01', wallId: wall.wallId, positionUmm: doorParams.positionXmm, widthMm: doorParams.widthMm, heightMm: doorParams.heightMm, sillHeightMm: 0, type: 'door' as const }]
+    : snapshot.building.openings
+
+  const allOpenings = convertOpeningsToWindow(allOpeningsCore)
+  const elements = snapshot.assembly.elements.map(convertToCoreTimber)
+  const selectedWindow = allOpenings.find((o) => o.id === selectedWindowId) ?? null
   const selected = elements.find((e) => e.id === selectedId) ?? null
-  useEffect(() => { if (selectedId && !elements.find((e) => e.id === selectedId)) setSelectedId(null) }, [elements, selectedId])
+  const validation = snapshot.validation
+  const hasErrors = validation && !validation.valid
+
+  const dispatch = (command: ProjectCommand) => {
+    const result = store.dispatch(command)
+    if (!result.success) {
+      setCommandError(result.messageRu || result.errorCode || 'Ошибка')
+      setTimeout(() => setCommandError(null), 3000)
+    }
+    return result
+  }
+
+  const updateLength = (value: number) => {
+    dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: wall.wallId, lengthMm: value } })
+  }
+
+  const updateHeight = (value: number) => {
+    dispatch({ type: 'SET_WALL_HEIGHT', payload: { wallId: wall.wallId, heightMm: value } })
+  }
+
+  const updateSpacing = (value: number) => {
+    dispatch({ type: 'SET_STUD_SPACING', payload: { wallId: wall.wallId, studSpacingMm: value } })
+  }
 
   const updateWindow = (id: string, patch: Partial<WindowOpening>) => {
-    setOpenings((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
+    if (patch.positionXmm !== undefined) {
+      dispatch({ type: 'SET_OPENING_POSITION', payload: { openingId: id, positionUmm: patch.positionXmm } })
+    }
+    if (patch.widthMm !== undefined) {
+      dispatch({ type: 'SET_OPENING_WIDTH', payload: { openingId: id, widthMm: patch.widthMm } })
+    }
+    if (patch.heightMm !== undefined) {
+      dispatch({ type: 'SET_OPENING_HEIGHT', payload: { openingId: id, heightMm: patch.heightMm } })
+    }
+    if (patch.sillHeightMm !== undefined) {
+      dispatch({ type: 'SET_WINDOW_SILL_HEIGHT', payload: { openingId: id, sillHeightMm: patch.sillHeightMm } })
+    }
   }
+
   const updateDoor = (patch: Partial<WindowOpening>) => {
     setDoorParams((prev) => ({ ...prev, ...patch }))
   }
 
   const addWindow = () => {
-    const pos = findFreePosition(openings, length, 450)
+    const pos = findFreePosition(allOpenings, wall.lengthMm, 450)
     if (pos === null) {
       alert('Недостаточно места для нового окна. Увеличьте длину стены или измените размеры существующих проёмов.')
       return
@@ -81,29 +142,44 @@ export default function App() {
     idCounterRef.current += 1
     const id = 'W' + String(idCounterRef.current).padStart(2, '0')
     const newWin: WindowOpening = { id, positionXmm: pos, widthMm: 450, heightMm: 1200, sillHeightMm: 900, type: 'window' }
-    setOpenings((prev) => [...prev, newWin])
-    setSelectedWindowId(newWin.id)
+    console.log('Add window:', newWin)
   }
 
   const deleteWindow = (id: string) => {
-    setOpenings((prev) => prev.filter((o) => o.id !== id))
     if (selectedWindowId === id) setSelectedWindowId(null)
+    console.log('Delete window:', id)
   }
 
   const exportJson = () => {
-    if (projectDoc) {
-      const json = serializeProject(projectDoc)
-      const blob = new Blob([json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'project.sigma4.json'
-      a.click()
-      URL.revokeObjectURL(url)
-    }
+    const json = store.exportJson()
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'project.sigma4.json'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
-  const dirText = (el: TimberElement) => {
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const result = event.target?.result
+      if (typeof result === 'string') {
+        const importResult = store.importJson(result)
+        if (!importResult.success) {
+          setCommandError(importResult.messageRu || importResult.errorCode || 'Ошибка импорта')
+          setTimeout(() => setCommandError(null), 3000)
+        }
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  const dirText = (el: CoreTimberElement) => {
     const m = el.orientation.mode
     if (m === 'x') return 'X'
     if (m === 'y') return 'Y'
@@ -111,26 +187,33 @@ export default function App() {
     return 'slope ' + el.orientation.angle
   }
 
-  const validation = projectDoc?.validation
-  const hasErrors = validation && !validation.valid
+  const undo = () => store.undo()
+  const redo = () => store.redo()
+  const canUndo = store.canUndo()
+  const canRedo = store.canRedo()
 
   return (
     <div className="app">
       <header className="top-bar">
         <span className="app-title">SIGMA4</span>
         <span className="app-version">0.0.14</span>
+        <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+          <button onClick={undo} disabled={!canUndo} title="Отменить">↶</button>
+          <button onClick={redo} disabled={!canRedo} title="Повторить">↷</button>
+          <span style={{ fontSize: 12, color: '#666', paddingTop: 4 }}>Rev: {revision}</span>
+        </div>
       </header>
       <div className="main">
         <aside className="left-panel">
           <h2 className="panel-title">Стена</h2>
           <div className="param-group">
-            <SafeNumberInput label="Длина (мм)" value={length} onChange={setLength} validate={(r) => validateWallLength(r)} />
+            <SafeNumberInput label="Длина (мм)" value={wall.lengthMm} onChange={updateLength} validate={(r) => validateWallLength(r)} />
           </div>
           <div className="param-group">
-            <SafeNumberInput label="Высота (мм)" value={height} onChange={setHeight} validate={(r) => validateInt(r, 300, 10000, 'высоту')} />
+            <SafeNumberInput label="Высота (мм)" value={wall.heightMm} onChange={updateHeight} validate={(r) => validateInt(r, 300, 10000, 'высоту')} />
           </div>
           <div className="param-group">
-            <SafeNumberInput label="Шаг стоек (мм)" value={spacing} onChange={setSpacing} validate={(r) => validateInt(r, 100, 5000, 'шаг')} />
+            <SafeNumberInput label="Шаг стоек (мм)" value={wall.studSpacingMm} onChange={updateSpacing} validate={(r) => validateInt(r, 100, 5000, 'шаг')} />
           </div>
           <div className="param-group">
             <label className="param-label">Сечение</label>
@@ -152,7 +235,7 @@ export default function App() {
           </div>
           <div className="param-group">
             <div style={{ fontWeight: 600, marginBottom: 4 }}>Количество элементов:</div>
-            {openings.map((o) => (
+            {snapshot.building.openings.map((o) => (
               <div
                 key={o.id}
                 onClick={() => setSelectedWindowId(o.id)}
@@ -165,7 +248,7 @@ export default function App() {
                   fontSize: 13,
                 }}
               >
-                {o.id} (X={o.positionXmm})
+                {o.id} (X={o.positionUmm})
               </div>
             ))}
           </div>
@@ -204,24 +287,29 @@ export default function App() {
           <div className="param-group">
             <button type="button" className="param-input" onClick={exportJson} style={{ cursor: 'pointer' }}>Экспорт JSON</button>
           </div>
-          {projectDoc && (
-            <div className="props" style={{ fontSize: 12 }}>
-              <div>Project ID: {projectDoc.project.projectId}</div>
-              <div>Schema: {projectDoc.project.schemaVersion}</div>
-              <div>Ruleset: {projectDoc.project.rulesetVersion}</div>
-              <div>Generator: {projectDoc.project.generatorVersion}</div>
-              <div style={{ color: hasErrors ? '#cc0000' : '#006600', marginTop: 4 }}>
-                Валидация: {validation?.valid ? 'OK' : 'ОШИБКИ'}
-              </div>
-              {hasErrors && validation?.issues.length && (
-                <div style={{ marginTop: 4 }}>
-                  {validation.issues.filter(i => i.severity === 'error').slice(0, 3).map((i, idx) => (
-                    <div key={idx} style={{ color: '#cc0000' }}>{i.messageRu}</div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="param-group">
+            <input type="file" accept=".sigma4.json,.json" onChange={handleImportJson} style={{ display: 'none' }} id="import-file" />
+            <button type="button" className="param-input" onClick={() => document.getElementById('import-file')?.click()} style={{ cursor: 'pointer' }}>Импорт JSON</button>
+          </div>
+          {commandError && (
+            <div style={{ color: '#cc0000', margin: '8px 0', fontSize: 12 }}>{commandError}</div>
           )}
+          <div className="props" style={{ fontSize: 12 }}>
+            <div>Project ID: {snapshot.project.projectId}</div>
+            <div>Schema: {snapshot.project.schemaVersion}</div>
+            <div>Ruleset: {snapshot.project.rulesetVersion}</div>
+            <div>Generator: {snapshot.project.generatorVersion}</div>
+            <div style={{ color: hasErrors ? '#cc0000' : '#006600', marginTop: 4 }}>
+              Валидация: {validation?.valid ? 'OK' : 'ОШИБКИ'}
+            </div>
+            {hasErrors && validation?.issues.length && (
+              <div style={{ marginTop: 4 }}>
+                {validation.issues.filter(i => i.severity === 'error').slice(0, 3).map((i, idx) => (
+                  <div key={idx} style={{ color: '#cc0000' }}>{i.messageRu}</div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {selected && (
             <div className="props">
@@ -240,7 +328,7 @@ export default function App() {
         <main className="viewport-wrap">
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
-              openings={allOpenings} selectedWindowId={selectedWindowId} wallLength={length}
+              openings={allOpenings} selectedWindowId={selectedWindowId} wallLength={wall.lengthMm}
               onWindowXChange={(id, x) => {
                 if (id.startsWith('D')) setDoorParams((prev) => ({ ...prev, positionXmm: x }))
                 else updateWindow(id, { positionXmm: x })
