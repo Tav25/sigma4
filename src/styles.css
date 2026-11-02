@@ -172,3 +172,22 @@ body,
 }
 .tree-selected { background: #dbeafe !important; color: #1d4ed8; font-weight: 650; }
 .project-tree-connections { border-top: 1px solid #e6eaf0; margin-top: 3px; }
+
+/* S06.5: technical dimensions are projected from the canonical project. */
+.dimension-readout {
+  position: absolute;
+  top: 86px;
+  right: 12px;
+  z-index: 5;
+  border: 1px solid rgba(41,78,116,0.22);
+  border-radius: 7px;
+  padding: 8px 11px;
+  background: rgba(255,255,255,0.93);
+  color: #16364f;
+  font: 12px/1.5 system-ui, sans-serif;
+  pointer-events: none;
+  max-width: min(250px, calc(100% - 24px));
+}
+.dimension-readout strong, .dimension-readout span { display: block; }
+.dimension-readout .dimension-total { font-weight: 650; color: #175ea1; }
+.dimension-readout .dimension-origin { color: #46566b; }

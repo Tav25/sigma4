@@ -7,6 +7,8 @@ import { getWindowPositionBounds } from '../core/window'
 import type { SceneOpening3D } from './project-to-scene'
 import { openingLocalToWorld, openingWorldToLocalU, openingYaw } from './opening-geometry'
 import { calculateWorldBounds, topViewDistance } from './view-bounds'
+import type { DimensionLayout } from './dimension-model'
+import { makeDimensionGroup, makeOriginGroup, disposeDimensionGroup } from './DimensionOverlay'
 import type { OpeningMarker } from './project-to-scene'
 
 interface SceneViewProps {
@@ -16,6 +18,8 @@ interface SceneViewProps {
   openings: SceneOpening3D[]
   markers: OpeningMarker[]
   wallCount: number
+  dimensions: DimensionLayout
+  showDimensions: boolean
   selectedWindowId: string | null
   onWindowSelect?: (id: string | null) => void
   onWindowDragStart?: (id: string) => boolean
@@ -39,7 +43,7 @@ interface WindowEntry {
 
 export function SceneView({
   elements, selectedId, showEdges = true,
-  openings, markers, wallCount, selectedWindowId, onWindowSelect,
+  openings, markers, wallCount, dimensions, showDimensions, selectedWindowId, onWindowSelect,
   onWindowDragStart, onWindowDragPreview, onWindowDragEnd, onSelect,
 }: SceneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -50,6 +54,10 @@ export function SceneView({
   const entriesRef = useRef<Map<string, MeshEntry>>(new Map())
   const windowEntriesRef = useRef<Map<string, WindowEntry>>(new Map())
   const openingMarkerEntriesRef = useRef<Map<string, THREE.Mesh>>(new Map())
+  const dimensionGroupRef = useRef<THREE.Group | null>(null)
+  const originGroupRef = useRef<THREE.Group | null>(null)
+  const dimensionsRef = useRef(dimensions)
+  const showDimensionsRef = useRef(showDimensions)
   const resetRef = useRef<(() => void) | null>(null)
   const topViewRef = useRef<(() => void) | null>(null)
   const elementsRef = useRef<TimberElement[]>(elements)
@@ -75,6 +83,8 @@ export function SceneView({
   useEffect(() => { showEdgesRef.current = showEdges }, [showEdges])
   useEffect(() => { openingsRef.current = openings }, [openings])
   useEffect(() => { windowSelectedRef.current = selectedWindowId }, [selectedWindowId])
+  dimensionsRef.current = dimensions
+  showDimensionsRef.current = showDimensions
 
   // mount
   useEffect(() => {
@@ -102,8 +112,11 @@ export function SceneView({
 
     const grid = new THREE.GridHelper(40, 40, 0x888888, 0xcccccc)
     scene.add(grid)
-    const axes = new THREE.AxesHelper(2)
-    scene.add(axes)
+    // Origin marker is at the immutable world (0,0,0), never at the camera
+    // target or the visual centre of the first wall.
+    const originGroup = makeOriginGroup()
+    originGroupRef.current = originGroup
+    scene.add(originGroup)
 
     const ambient = new THREE.AmbientLight(0xffffff, 0.6)
     scene.add(ambient)
@@ -327,6 +340,17 @@ export function SceneView({
       if (!els.length || !container.clientWidth || !container.clientHeight) return
       const bounds = calculateWorldBounds(els)
       if (bounds.isEmpty()) return
+      // Dimension labels and arrows must remain in view when enabled.
+      if (showDimensionsRef.current) {
+        for (const dim of dimensionsRef.current.lines) {
+          for (const p of [dim.dimensionFrom, dim.dimensionTo]) {
+            bounds.expandByPoint(new THREE.Vector3(
+              mmToMeters(p.x), mmToMeters(p.y), mmToMeters(p.z),
+            ))
+          }
+        }
+        bounds.expandByScalar(0.7)
+      }
       const ctr = bounds.getCenter(new THREE.Vector3())
       const size = bounds.getSize(new THREE.Vector3())
       const radius = Math.max(size.x, size.y, size.z) * 1.5 + 2
@@ -388,6 +412,16 @@ export function SceneView({
         ;(mesh.material as THREE.Material).dispose()
       })
       openingMarkerEntriesRef.current.clear()
+      if (dimensionGroupRef.current) {
+        scene.remove(dimensionGroupRef.current)
+        disposeDimensionGroup(dimensionGroupRef.current)
+        dimensionGroupRef.current = null
+      }
+      if (originGroupRef.current) {
+        scene.remove(originGroupRef.current)
+        disposeDimensionGroup(originGroupRef.current)
+        originGroupRef.current = null
+      }
       renderer.dispose()
       if (renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement)
@@ -486,6 +520,23 @@ export function SceneView({
   useEffect(() => {
     resetRef.current?.()
   }, [wallCount])
+
+  // Dimension lines and the world origin are render-only views of model
+  // geometry. They never participate in raycasts against wooden boards.
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    if (dimensionGroupRef.current) {
+      scene.remove(dimensionGroupRef.current)
+      disposeDimensionGroup(dimensionGroupRef.current)
+      dimensionGroupRef.current = null
+    }
+    if (showDimensions) {
+      const group = makeDimensionGroup(dimensions)
+      dimensionGroupRef.current = group
+      scene.add(group)
+    }
+  }, [dimensions, showDimensions])
 
   // reconcile window hit planes/outlines
   useEffect(() => {
@@ -615,6 +666,11 @@ export function SceneView({
     })
   }, [selectedWindowId])
 
+  // Refitting after toggling dimensions ensures all extension lines are visible.
+  useEffect(() => {
+    resetRef.current?.()
+  }, [showDimensions])
+
   // cursor style
   useEffect(() => {
     const container = containerRef.current
@@ -623,6 +679,19 @@ export function SceneView({
 
   return (
     <div className="viewport" ref={containerRef}>
+      {showDimensions && (
+        <div className="dimension-readout" data-testid="dimension-readout" aria-label="Размеры каркаса">
+          <strong>Размеры каркаса · мм</strong>
+          <span data-testid="dimension-total-x" className="dimension-total">
+            Наружный X: {Math.round(dimensions.overallXmm)} мм
+          </span>
+          <span data-testid="dimension-total-z" className="dimension-total">
+            Наружный Z: {Math.round(dimensions.overallZmm)} мм
+          </span>
+          <span className="dimension-origin">Оси: 0, 0, 0 — глобальное начало</span>
+          <span className="dimension-origin">Размеры отдельных стен указаны на линиях</span>
+        </div>
+      )}
       <button type="button" className="reset-view" onClick={() => resetRef.current?.()}>
         Сбросить вид
       </button>

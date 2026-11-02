@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.19')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.20')
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -40,6 +40,18 @@ try {
   await page.getByText('Количество элементов: 46').waitFor()
   await page.getByText('Валидация: OK').waitFor()
   await page.locator('.viewport canvas').waitFor({ state: 'visible' })
+  // S06.5: all dimensions are derived from actual timber world bounds.
+  const readout = page.getByTestId('dimension-readout')
+  await readout.waitFor()
+  assert.match(await page.getByTestId('dimension-total-x').textContent(), /6000 мм/)
+  assert.match(await page.getByTestId('dimension-total-z').textContent(), /\d+ мм/)
+  assert.match(await readout.textContent(), /0, 0, 0/)
+  const dimensionsControl = page.getByTestId('show-wall-dimensions')
+  assert.equal(await dimensionsControl.isChecked(), true)
+  await dimensionsControl.uncheck()
+  await readout.waitFor({ state: 'hidden' })
+  await dimensionsControl.check()
+  await readout.waitFor()
   await page.getByRole('button', { name: 'Вид сверху' }).click()
   await page.waitForTimeout(400)
   await page.screenshot({ path: dir + '/01-top.png' })
@@ -218,7 +230,38 @@ try {
   await page.waitForTimeout(450)
   await page.screenshot({ path: dir + '/07-garage-window-and-door-fixed.png' })
   assert.equal(errors.length, 0)
-  console.log('SIGMA4 BROWSER PASS: v0.0.19 garage + window + pedestrian door, unique bottom plates, 9 walls, JSON')
+  // S06.5: import a clean 4 m wall, prove the left end stays at X=0,
+  // inspect the dimension readout and capture a real-world-axis screenshot.
+  await page.reload({ waitUntil: 'networkidle' })
+  const blankDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const single = JSON.parse(await readFile(await (await blankDownload).path(), 'utf8'))
+  single.building.walls[0].lengthMm = 4000
+  single.building.walls[0].origin = { x: 0, y: 0, z: 0 }
+  single.building.walls[0].openings = []
+  single.building.openings = []
+  single.building.markers = []
+  await page.locator('#import-file').setInputFiles([{
+    name: 's06-5-four-metre-wall.sigma4.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(single)),
+  }])
+  await page.getByTestId('dimension-total-x').getByText('4000 мм', { exact: false }).waitFor()
+  assert.match(await page.getByTestId('dimension-total-z').textContent(), /145 мм/)
+  const fourDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const four = JSON.parse(await readFile(await (await fourDownload).path(), 'utf8'))
+  assert.deepEqual(four.building.walls[0].origin, { x: 0, y: 0, z: 0 })
+  assert.equal(four.building.walls[0].lengthMm, 4000)
+  assert.equal(four.assembly.elements.find(e => e.elementId === 'plate-bottom-1').position.x, 0)
+  await page.getByRole('button', { name: 'Вид сверху' }).click()
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: dir + '/08-first-wall-4000mm.png' })
+  const wallLengthInput = page.getByText('Длина (мм)', { exact: true }).locator('..').locator('input')
+  await wallLengthInput.fill('5000')
+  await wallLengthInput.press('Tab')
+  await page.getByTestId('dimension-total-x').getByText('5000 мм', { exact: false }).waitFor()
+  assert.equal(errors.length, 0, 'Unexpected browser exceptions')
+  console.log('SIGMA4 BROWSER PASS: v0.0.20 origin 0,0,0; 4m and 5m dimensions; corner externals; garage+door; JSON')
 
 } finally {
   await browser?.close()

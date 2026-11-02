@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { SceneView } from './scene/SceneView'
 import { timberVolumeM3, type TimberElement as CoreTimberElement } from './core/timber'
 import { SafeNumberInput } from './components/SafeNumberInput'
@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { validateWallLength, validateInt } from './core/validation'
 import type { WindowOpening } from './core/window'
 import { projectToScene } from './scene/project-to-scene'
+import { buildDimensionLayout } from './scene/dimension-model'
 import { createProjectFromCurrentState } from './core/project-store'
 import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 import { rightCornerOrigin } from './core/corner'
@@ -51,6 +52,7 @@ export default function App() {
   const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
+  const [showDimensions, setShowDimensions] = useState(true)
   const [commandError, setCommandError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -75,7 +77,12 @@ export default function App() {
   const wallLinks = effectiveConnections(snapshot)
   const wallHasParent = wallLinks.some(link => link.toWallId === wall.wallId)
   // Three.js reads a projection of ProjectDocument; it does not own geometry.
-  const { openings: allOpenings, sceneOpenings, elements, markers } = projectToScene(snapshot)
+  const { openings: allOpenings, sceneOpenings, elements, markers } =
+    useMemo(() => projectToScene(snapshot), [snapshot])
+  const dimensions = useMemo(
+    () => buildDimensionLayout(snapshot.building.walls, elements),
+    [snapshot, elements],
+  )
   const selectedOpening = allOpenings.find((o) => o.id === selectedOpeningId) ?? null
   const selectedMarker = snapshot.building.markers.find(marker => marker.openingId === selectedOpeningId) ?? null
   const selected = elements.find((e) => e.id === selectedId) ?? null
@@ -394,6 +401,11 @@ export default function App() {
               <input type="checkbox" checked={showEdges} onChange={(e) => setShowEdges(e.target.checked)} />
               Показывать рёбра
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 9 }}>
+              <input type="checkbox" data-testid="show-wall-dimensions"
+                checked={showDimensions} onChange={e => setShowDimensions(e.target.checked)} />
+              Показывать размеры стен
+            </label>
           </div>
 
           <h2 className="panel-title" style={{ marginTop: 16 }}>Проёмы</h2>
@@ -515,7 +527,9 @@ export default function App() {
         <main className="viewport-wrap">
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
-              openings={sceneOpenings} markers={markers} wallCount={snapshot.building.walls.length} selectedWindowId={selectedOpeningId}
+              openings={sceneOpenings} markers={markers} wallCount={snapshot.building.walls.length}
+              dimensions={dimensions} showDimensions={showDimensions}
+              selectedWindowId={selectedOpeningId}
               onWindowDragStart={startOpeningDrag}
               onWindowDragPreview={previewOpeningX}
               onWindowDragEnd={finishOpeningDrag}
