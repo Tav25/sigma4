@@ -468,7 +468,13 @@ export class ProjectStore {
               return { success: false, errorCode: 'OPENINGS_FRAME_OVERLAP', messageRu: 'Недостаточно места между проёмами для рамы' }
             }
           }
-          candidate.building.openings.push({ ...opening, wallId, positionUmm: opening.positionXmm })
+          // Store the canonical Opening shape: do not leak editor-only
+          // 'positionXmm' into the JSON source model.
+          candidate.building.openings.push({
+            id: opening.id, wallId, type: opening.type,
+            positionUmm: opening.positionXmm, widthMm: opening.widthMm,
+            heightMm: opening.heightMm, sillHeightMm: opening.sillHeightMm,
+          })
           wall.openings.push(opening.id)
           // Add marker for new opening
           candidate.building.markers.push({

@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { generateTimberGeometry, boxCenterWorld, mmToMeters, type TimberElement } from '../core/timber'
-import type { WindowOpening } from '../core/window'
 import { getWindowPositionBounds } from '../core/window'
+import type { SceneOpening3D } from './project-to-scene'
+import { openingLocalToWorld, openingWorldToLocalU, openingYaw } from './opening-geometry'
 import { calculateWorldBounds, topViewDistance } from './view-bounds'
 import type { OpeningMarker } from './project-to-scene'
 
@@ -12,10 +13,9 @@ interface SceneViewProps {
   elements: TimberElement[]
   selectedId: string | null
   showEdges?: boolean
-  openings: WindowOpening[]
+  openings: SceneOpening3D[]
   markers: OpeningMarker[]
   wallCount: number
-  wallLength?: number
   selectedWindowId: string | null
   onWindowSelect?: (id: string | null) => void
   onWindowDragStart?: (id: string) => boolean
@@ -39,7 +39,7 @@ interface WindowEntry {
 
 export function SceneView({
   elements, selectedId, showEdges = true,
-  openings, markers, wallCount, wallLength = 3000, selectedWindowId, onWindowSelect,
+  openings, markers, wallCount, selectedWindowId, onWindowSelect,
   onWindowDragStart, onWindowDragPreview, onWindowDragEnd, onSelect,
 }: SceneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -55,12 +55,11 @@ export function SceneView({
   const elementsRef = useRef<TimberElement[]>(elements)
   const selectedRef = useRef<string | null>(selectedId)
   const showEdgesRef = useRef<boolean>(showEdges)
-  const openingsRef = useRef<WindowOpening[]>(openings)
+  const openingsRef = useRef<SceneOpening3D[]>(openings)
   const windowSelectedRef = useRef<string | null>(selectedWindowId)
   const hasCenteredRef = useRef<boolean>(false)
   const wallCountRef = useRef(wallCount)
   wallCountRef.current = wallCount
-  const wallLengthRef = useRef<number>(wallLength)
 
   const draggingRef = useRef<{ id: string; startX: number; startPointer: number; previewedX: number } | null>(null)
   const dragCallbacksRef = useRef({ onWindowDragStart, onWindowDragPreview, onWindowDragEnd })
@@ -75,7 +74,6 @@ export function SceneView({
   useEffect(() => { selectedRef.current = selectedId }, [selectedId])
   useEffect(() => { showEdgesRef.current = showEdges }, [showEdges])
   useEffect(() => { openingsRef.current = openings }, [openings])
-  useEffect(() => { wallLengthRef.current = wallLength }, [wallLength])
   useEffect(() => { windowSelectedRef.current = selectedWindowId }, [selectedWindowId])
 
   // mount
@@ -116,29 +114,35 @@ export function SceneView({
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
 
-    const getWallIntersection = (event: PointerEvent | MouseEvent): number | null => {
+    /** Intersect the selected opening's OWN wall plane in local U metres. */
+    const getWallIntersection = (event: PointerEvent | MouseEvent, id: string): number | null => {
+      const opening = openingsRef.current.find(o => o.id === id)
       const cam = cameraRef.current
       const ren = rendererRef.current
-      if (!cam || !ren) return null
+      if (!opening || !cam || !ren) return null
       const rect = ren.domElement.getBoundingClientRect()
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(pointer, cam)
-      const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)
-      const target = new THREE.Vector3()
-      const hit = raycaster.ray.intersectPlane(plane, target)
+      const normal = opening.wallOrientation === 'z'
+        ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1)
+      const planePoint = opening.wallOrigin
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, new THREE.Vector3(
+        mmToMeters(planePoint.x), mmToMeters(planePoint.y), mmToMeters(planePoint.z),
+      ))
+      const hit = raycaster.ray.intersectPlane(plane, new THREE.Vector3())
       if (!hit) return null
-      return target.x
+      return openingWorldToLocalU(opening, hit)
     }
 
-    const clampX = (id: string, x: number, w: number) => {
-      const win = openingsRef.current.find((o) => o.id === id)
+    const clampX = (id: string, x: number, width: number) => {
+      const win = openingsRef.current.find(o => o.id === id)
       if (!win) return x
-      const others = openingsRef.current.filter((o) => o.id !== id)
-      const bounds2 = getWindowPositionBounds(wallLengthRef.current, { positionXmm: x, widthMm: w }, others)
-      const minX = bounds2.minX
-      const maxX = bounds2.maxX
-      return Math.max(minX, Math.min(maxX, x))
+      const others = openingsRef.current.filter(o => o.wallId === win.wallId && o.id !== id)
+      const result = getWindowPositionBounds(win.wallLengthMm, {
+        positionXmm: x, widthMm: width,
+      }, others)
+      return Math.max(result.minX, Math.min(result.maxX, x))
     }
 
     const onPointerDown = (event: PointerEvent) => {
@@ -164,7 +168,7 @@ export function SceneView({
         if (hitId) {
           const win = openingsRef.current.find((o) => o.id === hitId)
           if (win) {
-            const px = getWallIntersection(event)
+            const px = getWallIntersection(event, hitId)
             if (px === null || dragCallbacksRef.current.onWindowDragStart?.(hitId) === false) return
             draggingRef.current = { id: hitId, startX: win.positionXmm, startPointer: px, previewedX: win.positionXmm }
             windowSelectedRef.current = hitId
@@ -209,7 +213,7 @@ export function SceneView({
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
 
       if (draggingRef.current) {
-        const px = getWallIntersection(event)
+        const px = getWallIntersection(event, draggingRef.current.id)
         if (px === null) return
         const drag = draggingRef.current
         const win = openingsRef.current.find((o) => o.id === drag.id)
@@ -507,13 +511,19 @@ export function SceneView({
         w = { hitPlane, outline }
         wEntries.set(o.id, w)
       }
-      const x0 = o.positionXmm / 1000
-      const y0 = o.sillHeightMm / 1000
-      const x1 = (o.positionXmm + o.widthMm) / 1000
-      const y1 = (o.sillHeightMm + o.heightMm) / 1000
+      // Local U axis rotates into world -Z for a second-wall orientation.
+      const yaw = openingYaw(o)
+      const x0 = mmToMeters(o.positionXmm)
+      const y0 = mmToMeters(o.sillHeightMm)
+      const x1 = mmToMeters(o.positionXmm + o.widthMm)
+      const y1 = mmToMeters(o.sillHeightMm + o.heightMm)
       w.hitPlane.geometry.dispose()
-      w.hitPlane.geometry = new THREE.PlaneGeometry(o.widthMm / 1000, o.heightMm / 1000)
-      w.hitPlane.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0)
+      w.hitPlane.geometry = new THREE.PlaneGeometry(mmToMeters(o.widthMm), mmToMeters(o.heightMm))
+      const centre = openingLocalToWorld(
+        o, o.positionXmm + o.widthMm / 2, o.sillHeightMm + o.heightMm / 2,
+      )
+      w.hitPlane.position.set(mmToMeters(centre.x), mmToMeters(centre.y), mmToMeters(centre.z))
+      w.hitPlane.rotation.set(0, yaw, 0)
       const pts = [
         new THREE.Vector3(x0, y0, 0),
         new THREE.Vector3(x1, y0, 0),
@@ -523,6 +533,10 @@ export function SceneView({
       ]
       w.outline.geometry.dispose()
       w.outline.geometry = new THREE.BufferGeometry().setFromPoints(pts)
+      w.outline.position.set(
+        mmToMeters(o.wallOrigin.x), mmToMeters(o.wallOrigin.y), mmToMeters(o.wallOrigin.z),
+      )
+      w.outline.rotation.set(0, yaw, 0)
       const sel = o.id === windowSelectedRef.current
       const hov = hoveredWindowRef.current === o.id
       w.outline.visible = sel || hov

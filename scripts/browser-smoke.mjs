@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.16')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.17')
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -71,7 +71,25 @@ try {
   assert.equal(rebuilt.assembly.elements.find(e => e.elementId === 'warm-corner-stud').position.x, 5810)
   assert.deepEqual(errors, [], 'Uncaught browser errors')
   await tree.getByTestId('wall-node-wall-002').waitFor()
-
+  // S06.3: window and door on the *second* (perpendicular) wall.
+  await tree.locator('[data-testid="wall-node-wall-002"] > summary').click()
+  await page.getByRole('button', { name: 'Добавить окно' }).click()
+  await tree.getByTestId('tree-opening-W03').waitFor()
+  await page.getByRole('button', { name: 'Добавить дверь' }).click()
+  await tree.getByTestId('tree-opening-D01').waitFor()
+  await page.getByText('Валидация: OK').waitFor()
+  const sideDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const side = JSON.parse(await readFile(await (await sideDownload).path(), 'utf8'))
+  assert.deepEqual(side.building.walls[1].openings, ['W03', 'D01'])
+  assert.deepEqual(side.building.openings.filter(o => o.wallId === 'wall-002').map(o => o.id), ['W03', 'D01'])
+  assert.ok(side.assembly.elements.some(e => e.wallId === 'wall-002' && e.elementId.includes('W03')))
+  assert.ok(side.assembly.elements.some(e => e.wallId === 'wall-002' && e.elementId.includes('D01')))
+  assert.equal(side.building.markers.filter(m => ['W03', 'D01'].includes(m.openingId)).length, 2)
+  // Screenshot with its own opening framing before nine-wall overview.
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: dir + '/03-second-wall-openings.png' })
   for (let n = 3; n <= 9; n++) {
     await page.getByRole('button', { name: '+ Продолжить стену' }).click()
     await tree.getByTestId('wall-node-wall-' + String(n).padStart(3, '0')).waitFor()
@@ -96,14 +114,24 @@ try {
   assert.equal(await selectedNinth.getAttribute('open'), null)
   await tree.locator('[data-testid="wall-node-wall-009"] > summary').click()
   assert.notEqual(await selectedNinth.getAttribute('open'), null)
+  // All nine walls inherit the same ADD_OPENING mechanics.
+  await page.getByRole('button', { name: 'Добавить дверь' }).click()
+  await tree.getByTestId('tree-opening-D02').waitFor()
+  const finalDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const finalProject = JSON.parse(await readFile(await (await finalDownload).path(), 'utf8'))
+  assert.deepEqual(finalProject.building.walls[8].openings, ['D02'])
+  assert.ok(finalProject.assembly.elements.some(e =>
+    e.wallId === 'wall-009' && e.elementId.includes('D02')))
+  assert.equal(finalProject.building.markers.some(m => m.openingId === 'D02'), true)
   await page.getByRole('button', { name: 'Вид сверху' }).click()
   await page.waitForTimeout(350)
-  await page.screenshot({ path: dir + '/03-nine-walls.png' })
+  await page.screenshot({ path: dir + '/04-nine-walls-with-openings.png' })
   const beforeMove = nine.building.walls[8].origin.z
   await page.getByRole('button', { name: 'Отменить' }).count() // Undo must remain available
   assert.equal(errors.length, 0, 'Unexpected browser exception')
   assert.ok(Number.isFinite(beforeMove))
-  console.log('SIGMA4 BROWSER PASS: 0.0.16, 9 walls, 8 joins, corner, top/iso, JSON')
+  console.log('SIGMA4 BROWSER PASS: 0.0.17, window and door on wall 2, door on wall 9, 8 joins, JSON')
 
 } finally {
   await browser?.close()

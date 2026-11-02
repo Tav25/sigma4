@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { SceneView } from './scene/SceneView'
 import { timberVolumeM3, type TimberElement as CoreTimberElement } from './core/timber'
 import { SafeNumberInput } from './components/SafeNumberInput'
@@ -51,7 +51,6 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
   const [commandError, setCommandError] = useState<string | null>(null)
-  const idCounterRef = useRef(2)
 
   useEffect(() => {
     const unsub = store.subscribe((doc, rev) => {
@@ -75,7 +74,7 @@ export default function App() {
   const wallLinks = effectiveConnections(snapshot)
   const wallHasParent = wallLinks.some(link => link.toWallId === wall.wallId)
   // Three.js reads a projection of ProjectDocument; it does not own geometry.
-  const { openings: allOpenings, elements, markers } = projectToScene(snapshot)
+  const { openings: allOpenings, sceneOpenings, elements, markers } = projectToScene(snapshot)
   const selectedOpening = allOpenings.find((o) => o.id === selectedOpeningId) ?? null
   const selectedMarker = snapshot.building.markers.find(marker => marker.openingId === selectedOpeningId) ?? null
   const selected = elements.find((e) => e.id === selectedId) ?? null
@@ -119,24 +118,40 @@ export default function App() {
   }
 
   const addOpening = (type: 'window' | 'door') => {
-    if (wall.wallId !== mainWall.wallId) return
-    const pos = findFreePosition(allOpenings, wall.lengthMm, type === 'door' ? 900 : 450)
+    // Find room only among this wall's openings, in its own local U.
+    const onThisWall = snapshot.building.openings
+      .filter(opening => opening.wallId === wall.wallId)
+      .map(opening => ({
+        id: opening.id, positionXmm: opening.positionUmm,
+        widthMm: opening.widthMm, heightMm: opening.heightMm,
+        sillHeightMm: opening.sillHeightMm, type: opening.type,
+      }))
+    const isCornerFacade = wall.wallId === mainWall.wallId &&
+      wallLinks.some(link => link.fromWallId === wall.wallId && link.type === 'california-right')
+    const availableLength = wall.lengthMm - (isCornerFacade ? wall.sectionMm.height : 0)
+    const pos = findFreePosition(onThisWall, availableLength, type === 'door' ? 900 : 450)
     if (pos === null) {
       alert('Недостаточно места для нового проёма. Увеличьте длину стены или измените размеры существующих проёмов.')
       return
     }
-    idCounterRef.current += 1
+    // The counter is derived from canonical JSON, not from a session ref:
+    // importing a project can never introduce duplicate W/D IDs.
     const prefix = type === 'door' ? 'D' : 'W'
-    const id = prefix + String(idCounterRef.current).padStart(2, '0')
+    const existing = new Set(snapshot.building.openings.map(opening => opening.id))
+    let number = 1
+    while (existing.has(prefix + String(number).padStart(2, '0'))) number++
+    const id = prefix + String(number).padStart(2, '0')
     const newOpening: WindowOpening = type === 'door'
       ? { id, positionXmm: pos, widthMm: 900, heightMm: 2100, sillHeightMm: 0, type: 'door' }
       : { id, positionXmm: pos, widthMm: 450, heightMm: 1200, sillHeightMm: 900, type: 'window' }
     
-    dispatch({
+    if (dispatch({
       type: 'ADD_OPENING',
-      payload: { wallId: wall.wallId, opening: newOpening }
-    })
-    setSelectedOpeningId(newOpening.id)
+      payload: { wallId: wall.wallId, opening: newOpening },
+    }).success) {
+      setSelectedOpeningId(newOpening.id)
+      setSelectedId(null)
+    }
   }
 
   const startOpeningDrag = (_id: string): boolean => store.beginTransaction()
@@ -377,10 +392,9 @@ export default function App() {
 
           <h2 className="panel-title" style={{ marginTop: 16 }}>Проёмы</h2>
           <div className="param-group">
-            <button type="button" className="param-input" disabled={wall.wallId !== mainWall.wallId} onClick={() => addOpening('window')} style={{ cursor: 'pointer' }}>Добавить окно</button>
-            <button type="button" className="param-input" disabled={wall.wallId !== mainWall.wallId} onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
+            <button type="button" className="param-input" onClick={() => addOpening('window')} style={{ cursor: 'pointer' }}>Добавить окно</button>
+            <button type="button" className="param-input" onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
           </div>
-          {wall.wallId !== mainWall.wallId && <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>Окна и двери на второй стене добавим следующим шагом.</div>}
           {selectedOpening && (
             <div className="props">
               <h3 className="props-title">
@@ -388,7 +402,7 @@ export default function App() {
               </h3>
               <div>ID: {selectedOpening.id}</div>
               <div>Тип: {selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
-              <SafeNumberInput label="Положение X (мм)" value={selectedOpening.positionXmm} onChange={(v) => updateOpening(selectedOpening.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
+              <SafeNumberInput label="Положение вдоль стены U (мм)" value={selectedOpening.positionXmm} onChange={(v) => updateOpening(selectedOpening.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
               <SafeNumberInput label="Ширина (мм)" value={selectedOpening.widthMm} onChange={(v) => updateOpening(selectedOpening.id, { widthMm: v })} validate={(r) => validateInt(r, 300, 5000, 'ширина')} />
               <SafeNumberInput label="Высота (мм)" value={selectedOpening.heightMm} onChange={(v) => updateOpening(selectedOpening.id, { heightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота')} />
               {selectedOpening.type === 'window' && (
@@ -455,11 +469,18 @@ export default function App() {
         <main className="viewport-wrap">
           <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
-              openings={allOpenings} markers={markers} wallCount={snapshot.building.walls.length} selectedWindowId={selectedOpeningId} wallLength={mainWall.lengthMm}
+              openings={sceneOpenings} markers={markers} wallCount={snapshot.building.walls.length} selectedWindowId={selectedOpeningId}
               onWindowDragStart={startOpeningDrag}
               onWindowDragPreview={previewOpeningX}
               onWindowDragEnd={finishOpeningDrag}
-              onWindowSelect={setSelectedOpeningId}
+              onWindowSelect={id => {
+                setSelectedOpeningId(id)
+                setSelectedId(null)
+                if (id) {
+                  const opening = store.getSnapshot().building.openings.find(item => item.id === id)
+                  if (opening) setSelectedWallId(opening.wallId)
+                }
+              }}
               onSelect={setSelectedId} />
           </ErrorBoundary>
         </main>
