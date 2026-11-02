@@ -35,7 +35,8 @@ export function dimensionLabelYaw(line: DimensionLine): number {
   const dx = line.dimensionTo.x - line.dimensionFrom.x
   const dz = line.dimensionTo.z - line.dimensionFrom.z
   if (Math.hypot(dx, dz) < 1e-6) return 0
-  return Math.atan2(-dz, dx)
+  const radians = Math.atan2(-dz, dx)
+  return radians === 0 ? 0 : radians // normalize negative zero for stable output
 }
 
 /**
