@@ -155,7 +155,24 @@ try {
   await page.waitForTimeout(350)
   await page.screenshot({ path: dir + '/05-garage-door.png' })
   assert.equal(errors.length, 0, 'Unexpected browser exception')
-  console.log('SIGMA4 BROWSER PASS: 0.0.18, garage door on wall 3, preview lintel warning, windows/doors, 9 walls, JSON')
+  // Focused real-3D visual check: one untouched facade, one garage wall.
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '+ Добавить вторую стену' }).click()
+  await page.getByTestId('add-garage-door').click()
+  await page.getByText('Свойства гаражных ворот (G01)').waitFor()
+  await page.getByText('Гаражные ворота: расчёт несущей перемычки', { exact: false }).waitFor()
+  await page.getByText('Валидация: OK').waitFor()
+  const focusedDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const focused = JSON.parse(await readFile(await (await focusedDownload).path(), 'utf8'))
+  assert.equal(focused.building.openings.find(o => o.id === 'G01').wallId, 'wall-002')
+  assert.equal(focused.assembly.elements.filter(e => e.wallId === 'wall-002' &&
+    e.role === 'garage-lintel-preview').length, 2)
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: dir + '/06-focused-second-wall-garage.png' })
+  assert.equal(errors.length, 0)
+  console.log('SIGMA4 BROWSER PASS: 0.0.18, focused garage on wall 2, garage on wall 3, warnings, 9 walls, JSON')
 
 } finally {
   await browser?.close()

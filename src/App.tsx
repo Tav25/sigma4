@@ -438,7 +438,7 @@ export default function App() {
                     (selectedOpening.garage?.minBackRoomExtraMm ?? 0)} мм</div>
                   <div style={{ marginTop: 7, color: '#a25a00' }}>
                     Перемычка {selectedOpening.garage?.lintelPreviewDepthMm} мм и
-                    {selectedOpening.garage?.jackStudsPerSide} опорные стойки на сторону — предварительная компоновка.
+                    {' '}{selectedOpening.garage?.jackStudsPerSide} опорные стойки на сторону — предварительная компоновка.
                     Несущая способность, portal frame и реальные зазоры НЕ проверены.
                   </div>
                 </div>
@@ -484,6 +484,11 @@ export default function App() {
             <div style={{ color: hasErrors ? '#cc0000' : '#006600', marginTop: 4 }}>
               Валидация: {validation?.valid ? 'OK' : 'ОШИБКИ'}
             </div>
+            {snapshot.building.openings.some(o => o.type === 'garage-door') && (
+              <div style={{ color: '#a25a00', marginTop: 4 }}>
+                Гаражные ворота: расчёт несущей перемычки и пространственной жёсткости не выполнен.
+              </div>
+            )}
             {hasErrors && validation?.issues.length && (
               <div style={{ marginTop: 4 }}>
                 {validation.issues.filter(i => i.severity === 'error').slice(0, 3).map((i, idx) => (
