@@ -62,7 +62,9 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(frontTop.min.y).toBeCloseTo(2.655, 6)
     expect(sideTop.min.y).toBeCloseTo(2.655, 6)
     const d = frontTop.clone().intersect(sideTop)
-    expect(d.isEmpty() || d.getSize(new THREE.Vector3()).length() < 1e-6).toBe(true)
+    const extents = d.getSize(new THREE.Vector3())
+    // Contact along a face is allowed; positive volume overlap is not.
+    expect(d.isEmpty() || Math.min(extents.x, extents.y, extents.z) < 1e-6).toBe(true)
   })
 
   it('has a thin backing cleat and a cavity for insulation', () => {
