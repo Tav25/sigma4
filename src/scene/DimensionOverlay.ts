@@ -26,8 +26,8 @@ function numericLabel(valueMm: number, color: string): THREE.Mesh {
     map: texture, side: THREE.DoubleSide, transparent: true,
     depthWrite: false, depthTest: false,
   })
-  const length = Math.max(0.54, digits.length * 0.145)
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(length, 0.22), material)
+  const length = Math.max(0.58, digits.length * 0.16)
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(length, 0.28), material)
   // Local XY -> world XZ, facing the top (+Y) view. No camera billboarding.
   mesh.rotation.x = -Math.PI / 2
   mesh.renderOrder = 111
@@ -51,8 +51,10 @@ function appendDimension(group: THREE.Group, dim: DimensionLine) {
   const b = planar(dim.dimensionTo)
   const axis = b.clone().sub(a).normalize()
   const normal = new THREE.Vector3(-axis.z, 0, axis.x)
-  const arrowLength = 0.13
-  const arrowHalf = 0.055
+  // Short dimensions (e.g. 145-mm stud depth) must not have opposing
+  // arrowheads longer than the dimension itself.
+  const arrowLength = Math.min(0.13, Math.max(0.02, mm(dim.valueMm) * 0.22))
+  const arrowHalf = Math.min(0.055, arrowLength * 0.46)
   const arrow = (tip: THREE.Vector3, toward: THREE.Vector3) => {
     const base = tip.clone().addScaledVector(toward, arrowLength)
     return [
@@ -71,7 +73,7 @@ function appendDimension(group: THREE.Group, dim: DimensionLine) {
   number.name = 'dimension-number-' + dim.id
   number.position.copy(a.clone().add(b).multiplyScalar(0.5))
   // Put digits next to, not across, the dimension stroke on the same plane.
-  number.position.addScaledVector(normal, 0.18)
+  number.position.addScaledVector(normal, 0.38)
   number.position.y = GROUND_Y + 0.004
   group.add(number)
 }
