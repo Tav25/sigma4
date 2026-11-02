@@ -55,7 +55,9 @@ describe('S05.3: two-stud 45x145 corner and legacy JSON compatibility', () => {
     expect(updated.assembly.elements.some(e => e.sectionMm.width === 20)).toBe(false)
     const inside = updated.assembly.elements.find(e => e.elementId === 'warm-corner-stud')
     expect(inside?.sectionMm).toEqual({ width: 45, height: 145 })
-    expect(inside?.position.x).toBe(5932.5)
+    expect(inside?.position.x).toBe(5882.5)
+    expect(inside?.position.z).toBe(-50)
+    expect(inside?.orientation.roll).toBe(90)
     expect(updated.assembly.elements.find(e => e.elementId === 'stud-11')?.sectionMm).toEqual({
       width: 45, height: 145,
     })
@@ -76,6 +78,6 @@ describe('S05.3: two-stud 45x145 corner and legacy JSON compatibility', () => {
     expect(store.getSnapshot().building.walls[1].origin.x).toBeCloseTo(6427.5)
     expect(store.undo().success).toBe(true)
     expect(store.getSnapshot().building.walls[1].origin.x).toBeCloseTo(5927.5)
-    expect(store.getSnapshot().assembly.elements.find(e => e.elementId === 'warm-corner-stud')?.position.x).toBe(5932.5)
+    expect(store.getSnapshot().assembly.elements.find(e => e.elementId === 'warm-corner-stud')?.position.x).toBe(5882.5)
   })
 })

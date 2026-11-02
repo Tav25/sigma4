@@ -303,8 +303,13 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
     if (wall) {
       const halfW = el.sectionMm.width / 2
       const halfH = el.sectionMm.height / 2
-      let minX = el.position.x - halfW
-      let maxX = el.position.x + halfW
+      // A vertical California corner nailer is rolled about its long axis:
+      // its 145-mm dimension is now along the wall's local X axis.
+      const isRolledStud = el.orientation.mode === 'y' &&
+        Math.abs(Math.abs(el.orientation.roll % 180) - 90) < 0.001
+      const halfX = isRolledStud ? halfH : halfW
+      let minX = el.position.x - halfX
+      let maxX = el.position.x + halfX
       let minY = el.position.y
       let maxY = el.position.y + el.lengthMm
 
@@ -345,8 +350,11 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
 
       const halfW = el.sectionMm.width / 2
       const halfH = el.sectionMm.height / 2
-      let elMinX = el.position.x - halfW
-      let elMaxX = el.position.x + halfW
+      const isRolledStud = el.orientation.mode === 'y' &&
+        Math.abs(Math.abs(el.orientation.roll % 180) - 90) < 0.001
+      const halfX = isRolledStud ? halfH : halfW
+      let elMinX = el.position.x - halfX
+      let elMaxX = el.position.x + halfX
       let elMinY = el.position.y
       let elMaxY = el.position.y + el.lengthMm
 

@@ -67,13 +67,16 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(d.isEmpty() || Math.min(extents.x, extents.y, extents.z) < 1e-6).toBe(true)
   })
 
-  it('places the inner 45x145 stud flush against the other corner studs', () => {
+  it('turns the 45x145 inside stud 90 degrees and leaves a cavity', () => {
     const store = storeWithCorner()
     const doc = store.getSnapshot()
     const stud = doc.assembly.elements.find(e => e.elementId === 'warm-corner-stud')
     expect(stud).toBeDefined()
     expect(stud?.role).toBe('corner-backing')
     expect(stud?.sectionMm).toEqual({ width: 45, height: 145 })
+    expect(stud?.orientation).toEqual({ mode: 'y', angle: 0, roll: 90 })
+    expect(stud?.position.x).toBe(5882.5)
+    expect(stud?.position.z).toBe(-50)
     expect(doc.building.walls.map(w => w.thicknessMm)).toEqual([145, 145])
 
     const inside = bbox(store, 'warm-corner-stud')
@@ -81,20 +84,22 @@ describe('S05.2: warm Canadian right corner', () => {
     const side = bbox(store, 'wall-002:stud-01')
 
     // Actual world-space footprint in metres for the 6000mm facade.
-    expect(inside.min.x).toBeCloseTo(5.910, 6)
+    expect(inside.min.x).toBeCloseTo(5.810, 6)
     expect(inside.max.x).toBeCloseTo(5.955, 6)
     expect(outside.min.x).toBeCloseTo(5.955, 6)
     expect(outside.max.x).toBeCloseTo(6, 6)
     expect(inside.min.z).toBeCloseTo(-0.0725, 6)
-    expect(inside.max.z).toBeCloseTo(0.0725, 6)
+    expect(inside.max.z).toBeCloseTo(-0.0275, 6)
     expect(side.min.z).toBeCloseTo(-0.1175, 6)
     expect(side.max.z).toBeCloseTo(-0.0725, 6)
     expect(inside.min.y).toBeCloseTo(0.045, 6)
     expect(inside.max.y).toBeCloseTo(2.610, 6)
 
-    // The facade studs meet along the X face, with zero gap and no
-    // intersecting volume. Insulation belongs in the next stud bay.
+    // Both corner joints touch at faces, not inside their volumes.
+    // The rotated nailer uses only 45 mm of wall depth: the remaining
+    // 100 mm from z=-27.5 to +72.5 is available for insulation.
     expect(outside.min.x - inside.max.x).toBeCloseTo(0, 6)
+    expect(outside.max.z - inside.max.z).toBeCloseTo(0.100, 6)
     for (const [a, b] of [[inside, outside], [inside, side], [outside, side]]) {
       const extents = a.clone().intersect(b).getSize(new THREE.Vector3())
       expect(Math.min(extents.x, extents.y, extents.z)).toBeCloseTo(0, 6)
@@ -112,7 +117,7 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(store.dispatch({
       type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 6500 },
     }).success).toBe(true)
-    expect(bbox(store, 'warm-corner-stud').min.x).toBeCloseTo(6.410, 6)
+    expect(bbox(store, 'warm-corner-stud').min.x).toBeCloseTo(6.310, 6)
     expect(store.dispatch({
       type: 'SET_WALL_HEIGHT', payload: { wallId: 'wall-001', heightMm: 3000 },
     }).success).toBe(true)

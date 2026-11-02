@@ -89,10 +89,13 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
     if (front) {
       const top = assembly.elements.find(el => el.id === 'plate-top-2')
       if (top) top.length -= wall.sectionMm.height
-      // The Canadian warm corner needs an inner nailer/support stud as well:
-      // two 45-mm facade uprights joined edge-to-edge, backed
-      // by the perpendicular wall's start stud. The next bay stays insulated.
-      // Unlike the old 20-mm cleat, this is a real 45x145 framing member.
+      // APA insulated three-stud (California) outside corner.
+      // The third stud lies FLAT against the interior face of the facade,
+      // with its 145-mm face running ALONG the wall (local Y roll = 90°).
+      // Its 45-mm depth occupies only the inner portion of the 145-mm
+      // wall, leaving 100 mm of accessible insulation cavity behind it.
+      // It touches the facade end stud and the side wall starter, without
+      // penetrating either. All positions are derived from wall section.
       assembly.elements.push({
         id: 'warm-corner-stud',
         role: 'corner-backing',
@@ -100,11 +103,11 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
         width: wall.sectionMm.width,
         height: wall.sectionMm.height,
         position: {
-          x: wall.lengthMm - wall.sectionMm.width * 2 + wall.sectionMm.width / 2,
+          x: wall.lengthMm - wall.sectionMm.width - wall.sectionMm.height / 2,
           y: wall.sectionMm.width,
-          z: -wall.sectionMm.height / 2,
+          z: -wall.sectionMm.height / 2 + wall.sectionMm.width / 2,
         },
-        orientation: { mode: 'y', angle: 0, roll: 0 },
+        orientation: { mode: 'y', angle: 0, roll: 90 },
       })
     }
     if (right) {
@@ -146,8 +149,8 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
     }
     const insideStud = allElements.find(e => e.wallId === front.wallId && e.elementId === 'warm-corner-stud')
     if (insideStud && rightStart && firstEnd) {
-      // All three physically meet at their faces; the inner stud must not
-      // stand separately in the preceding stud bay.
+      // The rotated backing stud contacts the front end and side starter
+      // studs on different faces, while opening up the insulation pocket.
       insideStud.connectionIds = [firstEnd.elementId, rightStart.elementId]
       firstEnd.connectionIds.push(insideStud.elementId)
       rightStart.connectionIds.push(insideStud.elementId)
