@@ -36,7 +36,10 @@ describe('S06.5 coordinates and real dimensions', () => {
       orientation: 'z', origin: rightCornerOrigin(front, front), openings: [],
     })
     const rebuilt = buildProjectSnapshot(doc)
-    const layout = buildDimensionLayout(rebuilt.building.walls, projectToScene(rebuilt).elements)
+    const projection = projectToScene(rebuilt)
+    expect(projection.elements.filter(element => element.wallId === 'wall-001').length).toBeGreaterThan(5)
+    expect(projection.elements.filter(element => element.wallId === 'wall-002').length).toBeGreaterThan(5)
+    const layout = buildDimensionLayout(rebuilt.building.walls, projection.elements)
     const facade = layout.lines[0]
     const side = layout.lines[1]
     const totalX = layout.lines[2]

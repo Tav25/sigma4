@@ -32,6 +32,7 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
   return {
     elements: document.assembly.elements.map(element => ({
       id: element.elementId,
+      wallId: element.wallId,
       role: element.role,
       length: element.lengthMm,
       width: element.sectionMm.width,

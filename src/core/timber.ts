@@ -22,6 +22,8 @@ export interface TimberElement {
   position: Vec3
   orientation: Orientation
   material: string
+  /** Scene-only ownership from canonical assembly; never stored redundantly. */
+  wallId?: string
   // Derived from a wall in the scene; the saved assembly keeps local positions.
   wallTransform?: { origin: Vec3; orientation: 'x' | 'z' }
 }
