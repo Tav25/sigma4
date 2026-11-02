@@ -90,8 +90,8 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
       const top = assembly.elements.find(el => el.id === 'plate-top-2')
       if (top) top.length -= wall.sectionMm.height
       // The Canadian warm corner needs an inner nailer/support stud as well:
-      // two 45-mm facade uprights separated by an insulated cavity, joined
-      // along their back faces by the perpendicular wall's start stud.
+      // two 45-mm facade uprights joined edge-to-edge, backed
+      // by the perpendicular wall's start stud. The next bay stays insulated.
       // Unlike the old 20-mm cleat, this is a real 45x145 framing member.
       assembly.elements.push({
         id: 'warm-corner-stud',
@@ -100,7 +100,7 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
         width: wall.sectionMm.width,
         height: wall.sectionMm.height,
         position: {
-          x: wall.lengthMm - wall.sectionMm.height + wall.sectionMm.width / 2,
+          x: wall.lengthMm - wall.sectionMm.width * 2 + wall.sectionMm.width / 2,
           y: wall.sectionMm.width,
           z: -wall.sectionMm.height / 2,
         },
@@ -145,8 +145,11 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
       rightStart.connectionIds = [firstEnd.elementId]
     }
     const insideStud = allElements.find(e => e.wallId === front.wallId && e.elementId === 'warm-corner-stud')
-    if (insideStud && rightStart) {
-      insideStud.connectionIds = [rightStart.elementId]
+    if (insideStud && rightStart && firstEnd) {
+      // All three physically meet at their faces; the inner stud must not
+      // stand separately in the preceding stud bay.
+      insideStud.connectionIds = [firstEnd.elementId, rightStart.elementId]
+      firstEnd.connectionIds.push(insideStud.elementId)
       rightStart.connectionIds.push(insideStud.elementId)
     }
     const frontUpper = allElements.find(e => e.wallId === front.wallId && e.elementId === 'plate-top-2')

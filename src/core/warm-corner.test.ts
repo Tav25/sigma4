@@ -67,7 +67,7 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(d.isEmpty() || Math.min(extents.x, extents.y, extents.z) < 1e-6).toBe(true)
   })
 
-  it('has the missing 45x145 inner stud and an open pocket for insulation', () => {
+  it('places the inner 45x145 stud flush against the other corner studs', () => {
     const store = storeWithCorner()
     const doc = store.getSnapshot()
     const stud = doc.assembly.elements.find(e => e.elementId === 'warm-corner-stud')
@@ -81,8 +81,8 @@ describe('S05.2: warm Canadian right corner', () => {
     const side = bbox(store, 'wall-002:stud-01')
 
     // Actual world-space footprint in metres for the 6000mm facade.
-    expect(inside.min.x).toBeCloseTo(5.855, 6)
-    expect(inside.max.x).toBeCloseTo(5.900, 6)
+    expect(inside.min.x).toBeCloseTo(5.910, 6)
+    expect(inside.max.x).toBeCloseTo(5.955, 6)
     expect(outside.min.x).toBeCloseTo(5.955, 6)
     expect(outside.max.x).toBeCloseTo(6, 6)
     expect(inside.min.z).toBeCloseTo(-0.0725, 6)
@@ -92,14 +92,17 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(inside.min.y).toBeCloseTo(0.045, 6)
     expect(inside.max.y).toBeCloseTo(2.610, 6)
 
-    // 55mm open cavity between facade studs; no volumes intersect.
-    expect(outside.min.x - inside.max.x).toBeCloseTo(0.055, 6)
+    // The facade studs meet along the X face, with zero gap and no
+    // intersecting volume. Insulation belongs in the next stud bay.
+    expect(outside.min.x - inside.max.x).toBeCloseTo(0, 6)
     for (const [a, b] of [[inside, outside], [inside, side], [outside, side]]) {
       const extents = a.clone().intersect(b).getSize(new THREE.Vector3())
       expect(Math.min(extents.x, extents.y, extents.z)).toBeCloseTo(0, 6)
     }
 
     expect(stud?.connectionIds).toContain('wall-002:stud-01')
+    expect(stud?.connectionIds).toContain('stud-11')
+    expect(doc.assembly.elements.find(e => e.elementId === 'stud-11')?.connectionIds).toContain('warm-corner-stud')
     const sideStud = doc.assembly.elements.find(e => e.elementId === 'wall-002:stud-01')
     expect(sideStud?.connectionIds).toContain('warm-corner-stud')
   })
@@ -109,7 +112,7 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(store.dispatch({
       type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 6500 },
     }).success).toBe(true)
-    expect(bbox(store, 'warm-corner-stud').min.x).toBeCloseTo(6.355, 6)
+    expect(bbox(store, 'warm-corner-stud').min.x).toBeCloseTo(6.410, 6)
     expect(store.dispatch({
       type: 'SET_WALL_HEIGHT', payload: { wallId: 'wall-001', heightMm: 3000 },
     }).success).toBe(true)
