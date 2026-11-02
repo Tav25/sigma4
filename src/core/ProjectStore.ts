@@ -48,7 +48,7 @@ export class ProjectStore {
   private revision: number = 0
   private history: HistoryEntry[] = []
   private historyIndex: number = 0
-  private maxHistorySize: number = 100
+  private maxHistorySize: number = 101
   private subscribers: Set<Subscriber> = new Set()
   private transaction: TransactionState | null = null
 
@@ -98,7 +98,7 @@ export class ProjectStore {
 
   private notifySubscribers(): void {
     for (const subscriber of this.subscribers) {
-      subscriber(this.document, this.revision)
+      subscriber(this.deepClone(this.document), this.revision)
     }
   }
 
@@ -128,25 +128,31 @@ export class ProjectStore {
   }
 
   undo(): CommandResult {
+    if (this.transaction) {
+      return { success: false, revision: this.revision, errorCode: 'TRANSACTION_IN_PROGRESS', messageRu: 'Завершите текущую транзакцию' }
+    }
     if (!this.canUndo()) {
       return { success: false, revision: this.revision, errorCode: 'UNDO_NOT_AVAILABLE', messageRu: 'Отмена недоступна' }
     }
     this.historyIndex--
     const entry = this.history[this.historyIndex]
     this.document = this.deepFreeze(this.deepClone(entry.document))
-    this.revision = entry.revision
+    this.revision++
     this.notifySubscribers()
     return { success: true, revision: this.revision }
   }
 
   redo(): CommandResult {
+    if (this.transaction) {
+      return { success: false, revision: this.revision, errorCode: 'TRANSACTION_IN_PROGRESS', messageRu: 'Завершите текущую транзакцию' }
+    }
     if (!this.canRedo()) {
       return { success: false, revision: this.revision, errorCode: 'REDO_NOT_AVAILABLE', messageRu: 'Повтор недоступен' }
     }
     this.historyIndex++
     const entry = this.history[this.historyIndex]
     this.document = this.deepFreeze(this.deepClone(entry.document))
-    this.revision = entry.revision
+    this.revision++
     this.notifySubscribers()
     return { success: true, revision: this.revision }
   }
@@ -193,7 +199,7 @@ export class ProjectStore {
       return { success: false, revision: this.revision, errorCode: candidate.errorCode, messageRu: candidate.messageRu, validation: candidate.validation }
     }
 
-    this.document = candidate.document!
+    this.document = this.deepFreeze(this.deepClone(candidate.document!))
     this.addToHistory(this.document, { type: 'REPLACE_PROJECT', payload: { document: this.deepClone(this.document) } })
     this.transaction = null
     this.notifySubscribers()
@@ -218,7 +224,7 @@ export class ProjectStore {
       return { success: false, revision: this.revision, errorCode: candidate.errorCode, messageRu: candidate.messageRu, validation: candidate.validation }
     }
 
-    this.document = candidate.document!
+    this.document = this.deepFreeze(this.deepClone(candidate.document!))
     this.addToHistory(this.document, command)
     this.notifySubscribers()
     return { success: true, revision: this.revision, changedIds: candidate.changedIds, validation: candidate.validation }

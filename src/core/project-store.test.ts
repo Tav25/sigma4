@@ -328,4 +328,58 @@ describe('S02 - ProjectStore', () => {
     store.commitTransaction()
     expect(store.getSnapshot().building.openings[0].positionUmm).toBe(1200)
   })
+
+  // S02.4 regressions: revisions, defensive snapshots and history boundaries.
+  it('S02.4: revisions increase after undo and redo', () => {
+    const first = store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 7000 } })
+    expect(first.success).toBe(true)
+    const afterEdit = store.getRevision()
+    expect(store.undo().success).toBe(true)
+    expect(store.getSnapshot().building.walls[0].lengthMm).toBe(6000)
+    expect(store.getRevision()).toBeGreaterThan(afterEdit)
+    const afterUndo = store.getRevision()
+    expect(store.redo().success).toBe(true)
+    expect(store.getSnapshot().building.walls[0].lengthMm).toBe(7000)
+    expect(store.getRevision()).toBeGreaterThan(afterUndo)
+  })
+
+  it('S02.4: subscriber cannot modify stored data', () => {
+    let notified = false
+    const unsubscribe = store.subscribe((snapshot) => {
+      notified = true
+      snapshot.project.projectName = 'Modified outside of Store'
+      snapshot.building.walls[0].lengthMm = 1
+    })
+    const result = store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 7000 } })
+    unsubscribe()
+    expect(result.success).toBe(true)
+    expect(notified).toBe(true)
+    expect(store.getSnapshot().building.walls[0].lengthMm).toBe(7000)
+    expect(store.getSnapshot().project.projectName).toBe('Test Project')
+  })
+
+  it('S02.4: exactly 100 recent actions can be undone', () => {
+    for (let i = 1; i <= 105; i++) {
+      expect(store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 6000 + i } }).success).toBe(true)
+    }
+    let count = 0
+    while (store.canUndo()) {
+      expect(store.undo().success).toBe(true)
+      count++
+    }
+    expect(count).toBe(100)
+    expect(store.getSnapshot().building.walls[0].lengthMm).toBe(6005)
+  })
+
+  it('S02.4: undo and redo cannot interrupt a transaction', () => {
+    expect(store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 7000 } }).success).toBe(true)
+    expect(store.beginTransaction()).toBe(true)
+    expect(store.undo().errorCode).toBe('TRANSACTION_IN_PROGRESS')
+    expect(store.redo().errorCode).toBe('TRANSACTION_IN_PROGRESS')
+    expect(store.getSnapshot().building.walls[0].lengthMm).toBe(7000)
+    expect(store.rollbackTransaction().success).toBe(true)
+    expect(store.undo().success).toBe(true)
+    expect(store.getSnapshot().building.walls[0].lengthMm).toBe(6000)
+  })
+
 })
