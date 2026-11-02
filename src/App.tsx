@@ -5,7 +5,7 @@ import { SafeNumberInput } from './components/SafeNumberInput'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { validateWallLength, validateInt } from './core/validation'
 import type { WindowOpening } from './core/window'
-import type { TimberElement, Opening } from './core/project'
+import { projectToScene } from './scene/project-to-scene'
 import { createProjectFromCurrentState } from './core/project-store'
 import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 
@@ -22,30 +22,6 @@ function findFreePosition(openings: WindowOpening[], wallLength: number, newW: n
     if (ok) return x
   }
   return null
-}
-
-function convertToCoreTimber(el: TimberElement): CoreTimberElement {
-  return {
-    id: el.elementId,
-    role: el.role,
-    length: el.lengthMm,
-    width: el.sectionMm.width,
-    height: el.sectionMm.height,
-    position: el.position,
-    orientation: el.orientation,
-    material: 'wood',
-  }
-}
-
-function convertOpeningsToWindow(openings: Opening[]): WindowOpening[] {
-  return openings.map(o => ({
-    id: o.id,
-    positionXmm: o.positionUmm,
-    widthMm: o.widthMm,
-    heightMm: o.heightMm,
-    sillHeightMm: o.sillHeightMm,
-    type: o.type,
-  }))
 }
 
 const initialDoc = createProjectFromCurrentState({
@@ -80,8 +56,8 @@ export default function App() {
   }, [])
 
   const wall = snapshot.building.walls[0]
-  const allOpenings = convertOpeningsToWindow(snapshot.building.openings)
-  const elements = snapshot.assembly.elements.map(convertToCoreTimber)
+  // Three.js reads a projection of ProjectDocument; it does not own geometry.
+  const { openings: allOpenings, elements } = projectToScene(snapshot)
   const selectedOpening = allOpenings.find((o) => o.id === selectedOpeningId) ?? null
   const selected = elements.find((e) => e.id === selectedId) ?? null
   const validation = snapshot.validation
