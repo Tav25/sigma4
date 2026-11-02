@@ -15,8 +15,8 @@ import { ProjectTree } from './components/ProjectTree'
 import { GARAGE_DOOR_PRESETS, defaultGarageDoorSpec } from './core/garage-door'
 import packageInfo from '../package.json'
 
-function findFreePosition(openings: WindowOpening[], wallLength: number, newW: number): number | null {
-  for (let x = 135; x + newW + 90 <= wallLength; x += 50) {
+function findFreePosition(openings: WindowOpening[], wallLength: number, newW: number, minX = 135): number | null {
+  for (let x = minX; x + newW + 90 <= wallLength; x += 50) {
     const fMin = x - 90
     const fMax = x + newW + 90
     let ok = true
@@ -131,7 +131,7 @@ export default function App() {
       wallLinks.some(link => link.fromWallId === wall.wallId && link.type === 'california-right')
     const availableLength = wall.lengthMm - (isCornerFacade ? wall.sectionMm.height : 0)
     const width = type === 'garage-door' ? GARAGE_DOOR_PRESETS[0].widthMm : type === 'door' ? 900 : 450
-    const pos = findFreePosition(onThisWall, availableLength, width)
+    const pos = findFreePosition(onThisWall, availableLength, width, type === 'garage-door' ? 180 : 135)
     if (pos === null) {
       alert('Недостаточно места для нового проёма. Увеличьте длину стены или измените размеры существующих проёмов.')
       return

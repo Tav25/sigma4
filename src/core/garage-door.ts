@@ -66,6 +66,11 @@ export function validateGarageOpening(opening: Opening): ValidationIssue[] {
   if (!Number.isInteger(spec.jackStudsPerSide) || spec.jackStudsPerSide < 1 || spec.jackStudsPerSide > 4) {
     fail('GARAGE_SUPPORT_STUDS_INVALID', 'Число опорных стоек с каждой стороны должно быть от 1 до 4')
   }
+  if (Number.isInteger(spec.jackStudsPerSide) &&
+    opening.positionUmm < (spec.jackStudsPerSide + 2) * 45) {
+    fail('GARAGE_EDGE_STUD_CLEARANCE',
+      'Проём слишком близко к краю стены: необходимо сохранить угловую/крайнюю стойку')
+  }
   if (spec.jackStudsPerSide < 2 && opening.widthMm > 3000) {
     fail('GARAGE_WIDE_OPENING_NEEDS_SUPPORT_STUDS',
       'Для пролёта более 3 м необходимо предусмотреть минимум две опорные стойки на сторону (конкретный расчёт отдельно)')

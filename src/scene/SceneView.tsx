@@ -142,6 +142,12 @@ export function SceneView({
       const result = getWindowPositionBounds(win.wallLengthMm, {
         positionXmm: x, widthMm: width,
       }, others)
+      if (win.type === 'garage-door') {
+        const margin = ((win.garage?.jackStudsPerSide ?? 2) + 2) * 45
+        const minX = Math.max(result.minX, margin)
+        const maxX = Math.min(result.maxX, win.wallLengthMm - width - margin)
+        return Math.max(minX, Math.min(maxX, x))
+      }
       return Math.max(result.minX, Math.min(result.maxX, x))
     }
 

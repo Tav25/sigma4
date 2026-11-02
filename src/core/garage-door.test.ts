@@ -9,7 +9,7 @@ const make = (length = 6000) => createProjectStore(createProjectFromCurrentState
   projectId: 'garage-na-ca', length, height: 2700, spacing: 600, openings: [],
 }))
 function addGarage(store: ReturnType<typeof make>, wallId: string,
-  widthMm: number = GARAGE_DOOR_PRESETS[0].widthMm, positionXmm = 135) {
+  widthMm: number = GARAGE_DOOR_PRESETS[0].widthMm, positionXmm = 180) {
   return store.dispatch({ type: 'ADD_OPENING', payload: { wallId,
     opening: { id: 'G01', type: 'garage-door', positionXmm,
       widthMm, heightMm: 2134, sillHeightMm: 0,
@@ -50,7 +50,7 @@ describe('S06.4: North American garage openings in modular walls', () => {
     expect(store.getSnapshot().validation.valid).toBe(true)
     expect(store.getSnapshot().assembly.elements.some(e => e.elementId === 'G01-header-1')).toBe(true)
     const short = make(3000)
-    const result = addGarage(short, 'wall-001', 4877, 135)
+    const result = addGarage(short, 'wall-001', 4877, 180)
     expect(result.success).toBe(false)
     expect(short.getSnapshot().building.openings).toHaveLength(0)
   })
@@ -68,9 +68,23 @@ describe('S06.4: North American garage openings in modular walls', () => {
     expect(op.wallOrientation).toBe('z')
     expect(op.garage?.minHeadRoomMm).toBe(305)
     expect(projectToScene(snap).markers.find(m => m.openingId === 'G01')?.position.z)
-      .toBeCloseTo(second.origin.z - 135 - 2438 / 2)
+      .toBeCloseTo(second.origin.z - 180 - 2438 / 2)
     expect(snap.assembly.elements.some(e => e.elementId === 'wall-002:G01-header-1' &&
       e.role === 'garage-lintel-preview')).toBe(true)
+  })
+  it('protects a California corner terminal stud from a garage opening', () => {
+    const store = make()
+    const front = store.getSnapshot().building.walls[0]
+    const second = { ...front, wallId: 'wall-002', lengthMm: 3000,
+      orientation: 'z' as const, origin: rightCornerOrigin(front, front), openings: [] }
+    expect(store.dispatch({ type: 'ADD_WALL', payload: { wall: second } }).success).toBe(true)
+    const before = store.exportJson()
+    expect(addGarage(store, 'wall-002', 2438, 135).success).toBe(false)
+    expect(store.exportJson()).toBe(before)
+    expect(addGarage(store, 'wall-002', 2438, 180).success).toBe(true)
+    const rightBoards = store.getSnapshot().assembly.elements.filter(e => e.wallId === 'wall-002')
+    expect(rightBoards.some(e => e.role === 'stud' && e.position.x === 22.5)).toBe(true)
+    expect(store.getSnapshot().validation.valid).toBe(true)
   })
   it('rejects invalid garage specification before writing JSON, including a misplaced sill', () => {
     const store = make()

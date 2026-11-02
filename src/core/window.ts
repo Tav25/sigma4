@@ -263,8 +263,11 @@ export function applyDoorOpening(elements: TimberElement[], door: WindowOpening)
     framingRanges.push([ox - (i + 1) * SW, ox - i * SW])
     framingRanges.push([openingRight + i * SW, openingRight + (i + 1) * SW])
   }
-  if (ox < (studsPerSide + 1) * SW || openingRight > wallLength - (studsPerSide + 1) * SW) {
-    throw new Error('Garage support studs outside wall')
+  // Leave one terminal stud intact beyond the garage support/king package.
+  const garageEdgeClearance = (studsPerSide + 2) * SW
+  if (garage && (ox < garageEdgeClearance ||
+      openingRight > wallLength - garageEdgeClearance)) {
+    throw new Error('Garage opening too close to end stud or structural corner')
   }
 
   const removedOpeningStuds: number[] = []
