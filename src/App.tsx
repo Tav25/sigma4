@@ -10,6 +10,7 @@ import { buildDimensionLayout } from './scene/dimension-model'
 import { createProjectFromCurrentState } from './core/project-store'
 import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 import { rightCornerOrigin } from './core/corner'
+import { firstWallExteriorLowerLeft } from './core/world-origin'
 import { wallEnd, effectiveConnections } from './core/wall-topology'
 import type { Wall } from './core/project'
 import { ProjectTree } from './components/ProjectTree'
@@ -72,6 +73,12 @@ export default function App() {
   }, [])
 
   const wall = snapshot.building.walls.find(w => w.wallId === selectedWallId) ?? snapshot.building.walls[0]
+  const firstWall = snapshot.building.walls[0]
+  const firstExteriorCorner = firstWall.orientation === 'x'
+    ? firstWallExteriorLowerLeft(firstWall) : firstWall.origin
+  const exteriorZeroAligned = firstWall.orientation === 'x' &&
+    [firstExteriorCorner.x, firstExteriorCorner.y, firstExteriorCorner.z]
+      .every(value => Math.abs(value) < 1e-6)
   const mainWall = snapshot.building.walls[0]
   const hasSecondWall = snapshot.building.walls.length > 1
   const wallLinks = effectiveConnections(snapshot)
@@ -478,6 +485,19 @@ export default function App() {
           )}
 
           <h2 className="panel-title" style={{ marginTop: 16 }}>Проект</h2>
+          <div className="param-group" style={{ fontSize: 12 }} data-testid="first-wall-exterior-corner">
+            Нижний левый наружный угол стены 1:
+            X={firstExteriorCorner.x}, Y={firstExteriorCorner.y}, Z={firstExteriorCorner.z} мм
+          </div>
+          {!exteriorZeroAligned && (
+            <div className="param-group">
+              <button type="button" data-testid="anchor-first-wall-to-zero"
+                className="param-input" style={{ cursor: 'pointer' }}
+                onClick={() => dispatch({ type: 'ANCHOR_FIRST_WALL_AT_ZERO', payload: {} })}>
+                Установить угол стены 1 в (0, 0, 0)
+              </button>
+            </div>
+          )}
           <div className="param-group">
             <button type="button" className="param-input" onClick={exportJson} style={{ cursor: 'pointer' }}>Экспорт JSON</button>
           </div>

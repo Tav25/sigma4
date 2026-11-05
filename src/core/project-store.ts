@@ -101,7 +101,9 @@ export function createProjectFromCurrentState(params: {
     studSpacingMm: params.spacing,
     sectionMm: { width: SW, height: SH },
     orientation: 'x',
-    origin: { x: 0, y: 0, z: 0 },
+    // Exterior lower-left corner is physical world zero; local panel
+    // geometry spans +/- half depth around its nominal wall midplane.
+    origin: { x: 0, y: 0, z: -SH / 2 },
     openings: params.openings.map(o => o.id),
   }
 

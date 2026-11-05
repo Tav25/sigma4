@@ -8,6 +8,7 @@ import type {
 import { validateProjectSnapshot, validateSourceParameters } from './frame-validator'
 import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
+import { translateWallsToExteriorZero } from './world-origin'
 import { effectiveConnections, reflowConnections } from './wall-topology'
 
 export type ProjectCommand =
@@ -24,6 +25,7 @@ export type ProjectCommand =
   | { type: 'REMOVE_OPENING'; payload: { openingId: string } }
   | { type: 'ADD_WALL'; payload: { wall: Wall; connection?: WallConnection } }
   | { type: 'SET_WALL_ORIGIN'; payload: { wallId: string; origin: Vector3 } }
+  | { type: 'ANCHOR_FIRST_WALL_AT_ZERO'; payload: Record<string, never> }
   | { type: 'SET_WALL_AXIS'; payload: { wallId: string; orientation: 'x' | 'z' } }
   | { type: 'REMOVE_WALL'; payload: { wallId: string } }
   | { type: 'REPLACE_PROJECT'; payload: { document: ProjectDocument } }
@@ -283,6 +285,17 @@ export class ProjectStore {
           }
           wall.orientation = orientation
           changedIds.push('building.walls[' + wallId + '].orientation')
+          break
+        }
+        case 'ANCHOR_FIRST_WALL_AT_ZERO': {
+          if (!candidate.building.walls.length || candidate.building.walls[0].orientation !== 'x') {
+            return { success: false, errorCode: 'FIRST_WALL_AXIS_UNSUPPORTED',
+              messageRu: 'Для привязки начала координат первая стена должна идти по +X' }
+          }
+          const wallIds = translateWallsToExteriorZero(candidate.building.walls)
+          changedIds.push(...wallIds.map(id => 'building.walls[' + id + '].origin'))
+          // Every wall uses the same rigid translation; the existing wall
+          // connections and door/window positions remain unchanged.
           break
         }
         case 'SET_WALL_ORIGIN': {

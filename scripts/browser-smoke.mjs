@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.25')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.26')
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -55,9 +55,9 @@ try {
   assert.equal(await viewport.getAttribute('data-dimensions-visible'), 'false')
   await dimensionsControl.check()
   assert.equal(await viewport.getAttribute('data-dimensions-visible'), 'true')
-  await page.getByRole('button', { name: 'Вид сверху' }).click()
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(400)
-  await page.screenshot({ path: dir + '/01-top.png' })
+  await page.screenshot({ path: dir + '/01-iso.png' })
   await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(400)
   await page.screenshot({ path: dir + '/02-isometric.png' })
@@ -74,10 +74,10 @@ try {
   // S06.5.5: per-wall dimensions must remain adjacent to the real front
   // and perpendicular side walls, rather than the global opposite boundary.
   await page.screenshot({ path: dir + '/13-dimensions-near-walls-iso.png' })
-  await page.getByRole('button', { name: 'Вид сверху' }).click()
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(350)
-  await page.screenshot({ path: dir + '/11-fixed-dimensions-top.png' })
-  await page.screenshot({ path: dir + '/14-dimensions-near-walls-top.png' })
+  await page.screenshot({ path: dir + '/11-fixed-dimensions-iso.png' })
+  await page.screenshot({ path: dir + '/14-dimensions-near-walls-iso.png' })
   await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(200)
 
@@ -158,7 +158,7 @@ try {
   assert.ok(finalProject.assembly.elements.some(e =>
     e.wallId === 'wall-009' && e.elementId.includes('D02')))
   assert.equal(finalProject.building.markers.some(m => m.openingId === 'D02'), true)
-  await page.getByRole('button', { name: 'Вид сверху' }).click()
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(350)
   await page.screenshot({ path: dir + '/04-nine-walls-with-openings.png' })
   const beforeMove = nine.building.walls[8].origin.z
@@ -259,6 +259,8 @@ try {
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const single = JSON.parse(await readFile(await (await blankDownload).path(), 'utf8'))
   single.building.walls[0].lengthMm = 4000
+  // Simulate an imported *legacy* project whose wall centre plane,
+  // rather than its physical exterior lower-left corner, was at world zero.
   single.building.walls[0].origin = { x: 0, y: 0, z: 0 }
   single.building.walls[0].openings = []
   single.building.openings = []
@@ -273,9 +275,24 @@ try {
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const four = JSON.parse(await readFile(await (await fourDownload).path(), 'utf8'))
   assert.deepEqual(four.building.walls[0].origin, { x: 0, y: 0, z: 0 })
+  assert.match(await page.getByTestId('first-wall-exterior-corner').textContent(), /Z=72\.5/)
+  const snapButton = page.getByTestId('anchor-first-wall-to-zero')
+  await snapButton.click()
+  await snapButton.waitFor({ state: 'hidden' })
+  assert.match(await page.getByTestId('first-wall-exterior-corner').textContent(), /X=0, Y=0, Z=0/)
+  const alignedDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const aligned = JSON.parse(await readFile(await (await alignedDownload).path(), 'utf8'))
+  assert.deepEqual(aligned.building.walls[0].origin, { x: 0, y: 0, z: -72.5 })
+  assert.equal(aligned.building.walls[0].lengthMm, 4000)
+  assert.equal(aligned.building.openings.length, 0)
+  assert.equal(aligned.validation.valid, true)
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: dir + '/15-physical-corner-at-world-zero-iso.png' })
   assert.equal(four.building.walls[0].lengthMm, 4000)
   assert.equal(four.assembly.elements.find(e => e.elementId === 'plate-bottom-1').position.x, 0)
-  await page.getByRole('button', { name: 'Вид сверху' }).click()
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(300)
   await page.screenshot({ path: dir + '/08-first-wall-4000mm.png' })
   const wallLengthInput = page.getByText('Длина (мм)', { exact: true }).locator('..').locator('input')
@@ -283,7 +300,7 @@ try {
   await wallLengthInput.press('Tab')
   await page.locator('.viewport[data-dimension-total-x="5000"]').waitFor()
   assert.equal(errors.length, 0, 'Unexpected browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.0.25 each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
+  console.log('SIGMA4 BROWSER PASS: v0.0.26 physical outside lower-left corner at world zero; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()
