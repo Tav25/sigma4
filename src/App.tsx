@@ -381,7 +381,7 @@ export default function App() {
               <button type="button" data-testid="reopen-wall-chain" className="param-input"
                 style={{ cursor: 'pointer', marginTop: 6 }}
                 onClick={() => dispatch({ type: 'REOPEN_CHAIN', payload: {} })}>
-                Разомкнуть контур
+                Разомкнуть и убрать замыкающую стену
               </button>
             ) : (
               <>

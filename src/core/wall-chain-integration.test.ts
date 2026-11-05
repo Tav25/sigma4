@@ -100,7 +100,9 @@ describe('S07 option 1: sequential, exact, physically nonintersecting closed wal
     expect(store.exportJson()).toBe(saved)
     expect(store.dispatch({type:'REOPEN_CHAIN',payload:{}}).success).toBe(true)
     expect(store.getSnapshot().building.closure).toBeUndefined()
-    expect(store.dispatch({type:'REMOVE_WALL',payload:{wallId:'wall-004'}}).success).toBe(true)
+    expect(store.getSnapshot().building.walls).toHaveLength(3)
+    expect(store.undo().success).toBe(true)
+    expect(store.getSnapshot().building.closure?.fromWallId).toBe('wall-004')
   })
   it('works with independent windows on -X and +Z after closing',()=>{
     const store=closeRect()

@@ -470,8 +470,21 @@ export class ProjectStore {
         case 'REOPEN_CHAIN': {
           if (!candidate.building.closure) return { success: false,
             errorCode: 'CHAIN_NOT_CLOSED', messageRu: 'Контур ещё не замкнут' }
+          const lastId = candidate.building.closure.fromWallId
+          if (candidate.building.openings.some(o => o.wallId === lastId)) {
+            return { success: false, errorCode: 'CLOSING_WALL_HAS_OPENINGS',
+              messageRu: 'Сначала удалите проёмы замыкающей стены' }
+          }
+          // A closed closing panel is cropped at both ends. Merely
+          // clearing closure would restore its end studs INSIDE the
+          // first wall. Remove the auto-created final segment and its
+          // parent edge in the SAME validated Undo/Redo transaction.
+          candidate.building.walls = candidate.building.walls.filter(w => w.wallId !== lastId)
+          candidate.building.connections =
+            (candidate.building.connections ?? []).filter(c => c.toWallId !== lastId)
           delete candidate.building.closure
-          changedIds.push('building.closure')
+          changedIds.push('building.closure', 'building.walls[' + lastId + ']',
+            'building.connections')
           break
         }
         case 'REMOVE_WALL': {
