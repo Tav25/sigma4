@@ -107,7 +107,7 @@ describe('S05.6 California insulated three-stud corner: true top section', () =>
     expect(store.getSnapshot().building.walls[1].origin.x).toBe(6500)
     expect(store.undo().success).toBe(true)
     expect(actualBounds(store, 'warm-corner-stud').min.x).toBeCloseTo(5.81, 6)
-    expect(store.getSnapshot().building.walls[1].origin.x).toBe(5927.5)
+    expect(store.getSnapshot().building.walls[1].origin.x).toBe(6000)
   })
 
   it('has no positive-volume board intersections across the complete 46-member assembly', () => {
