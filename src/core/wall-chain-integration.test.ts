@@ -13,7 +13,7 @@ function starter() {
   return createProjectStore(doc)
 }
 function add(store:ReturnType<typeof starter>,turn:'right'|'straight'|'left',len:number) {
-  const doc=store.getSnapshot(),parent=doc.building.walls.at(-1)!
+  const doc=store.getSnapshot(),parent=doc.building.walls[doc.building.walls.length-1]
   const direction=rotatedDirection(parent.orientation as 'x'|'z'|'-x'|'+z',turn)
   const wallId='wall-'+String(doc.building.walls.length+1).padStart(3,'0')
   const draft:Wall={...parent,wallId,orientation:direction,lengthMm:len,

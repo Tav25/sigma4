@@ -11,7 +11,7 @@ import { createProjectFromCurrentState } from './core/project-store'
 import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 import { rightCornerOrigin } from './core/corner'
 import { firstWallExteriorLowerLeft } from './core/world-origin'
-import { wallEnd, effectiveConnections } from './core/wall-topology'
+import { effectiveConnections } from './core/wall-topology'
 import { chainJointOrigin, previewChainClosure, rotatedDirection, isPlanDirection,
   type ChainTurn } from './core/wall-chain'
 import type { Wall, WallConnection } from './core/project'

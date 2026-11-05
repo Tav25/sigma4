@@ -29,7 +29,7 @@ export type ProjectCommand =
   | { type: 'REOPEN_CHAIN'; payload: Record<string, never> }
   | { type: 'SET_WALL_ORIGIN'; payload: { wallId: string; origin: Vector3 } }
   | { type: 'ANCHOR_FIRST_WALL_AT_ZERO'; payload: Record<string, never> }
-  | { type: 'SET_WALL_AXIS'; payload: { wallId: string; orientation: 'x' | 'z' } }
+  | { type: 'SET_WALL_AXIS'; payload: { wallId: string; orientation: 'x' | 'z' | '-x' | '+z' } }
   | { type: 'REMOVE_WALL'; payload: { wallId: string } }
   | { type: 'REPLACE_PROJECT'; payload: { document: ProjectDocument } }
 
@@ -278,8 +278,8 @@ export class ProjectStore {
           const { wallId, orientation } = command.payload
           const wall = candidate.building.walls.find(w => w.wallId === wallId)
           if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: 'Стена не найдена' }
-          if (orientation !== 'x' && orientation !== 'z') {
-            return { success: false, errorCode: 'UNSUPPORTED_WALL_AXIS', messageRu: 'Поддерживаются направления X и -Z' }
+          if (!['x', 'z', '-x', '+z'].includes(orientation)) {
+            return { success: false, errorCode: 'UNSUPPORTED_WALL_AXIS', messageRu: 'Поддерживаются X, −Z, −X и +Z' }
           }
           const links = effectiveConnections(candidate)
           if (links.some(link => link.fromWallId === wallId || link.toWallId === wallId)) {
