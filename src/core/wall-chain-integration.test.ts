@@ -85,9 +85,9 @@ describe('S07 option 1: sequential, exact, physically nonintersecting closed wal
     const elements=projectToScene(store.getSnapshot()).elements
     const rear=calculateWorldBounds(elements.filter(e=>e.wallId==='wall-003'))
     const left=calculateWorldBounds(elements.filter(e=>e.wallId==='wall-004'))
-    expect([rear.min.x,rear.max.x,rear.min.z,rear.max.z].map(x=>Math.round(x*1000)))
+    expect([rear.min.x,rear.max.x,rear.min.z,rear.max.z].map(x=>Math.round(x*1000) || 0))
       .toEqual([0,5855,-3145,-3000])
-    expect([left.min.x,left.max.x,left.min.z,left.max.z].map(x=>Math.round(x*1000)))
+    expect([left.min.x,left.max.x,left.min.z,left.max.z].map(x=>Math.round(x*1000) || 0))
       .toEqual([0,145,-3000,-145])
     // These actual 3D board volumes meet, never occupy the same 3D volume.
     const overlapX=Math.min(rear.max.x,left.max.x)-Math.max(rear.min.x,left.min.x)
@@ -106,7 +106,7 @@ describe('S07 option 1: sequential, exact, physically nonintersecting closed wal
     expect(doc.validation.valid).toBe(true)
     const scene=projectToScene(doc)
     const wall=calculateWorldBounds(scene.elements.filter(e=>e.wallId==='wall-003'))
-    expect([wall.min.x,wall.max.x,wall.min.z,wall.max.z].map(x=>Math.round(x*1000)))
+    expect([wall.min.x,wall.max.x,wall.min.z,wall.max.z].map(x=>Math.round(x*1000) || 0))
       .toEqual([5855,8255,-3290,-3145])
   })
 
