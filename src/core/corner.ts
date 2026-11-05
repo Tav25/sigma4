@@ -4,7 +4,7 @@ import type { Wall } from './project'
  * Its outer face is flush with the right end of the front wall, and its
  * near end butts against the inside face of the front wall.
  */
-export function rightCornerOrigin(front: Wall, side: Pick<Wall, 'sectionMm'>) {
+export function rightCornerOrigin(front: Wall, _side: Pick<Wall, 'sectionMm'>) {
   return {
     // Both wall origins reference OUTSIDE faces, not stud midplanes.
     x: front.origin.x + front.lengthMm,
