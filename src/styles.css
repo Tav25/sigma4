@@ -244,3 +244,15 @@ body,
 .plan-bottom-right{margin-left:auto;color:#8a9dad}
 @media (max-width:1000px){.plan-workspace{grid-template-columns:260px minmax(0,1fr)}.plan-measure-panel{right:12px}.plan-measure-panel>div{min-width:95px;padding:8px}.plan-canvas-hint{font-size:10px}}
 @media (max-width:700px){.plan-workspace{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.plan-controls{max-height:38vh;min-height:0;border-right:none;border-bottom:1px solid #d4dde7;padding:16px}.plan-step-secondary,.plan-divider{display:none}.plan-toolbar{gap:6px;padding:0 8px}.plan-mode-mark{font-size:9px}.plan-grid-select{font-size:0}.plan-measure-panel>div{min-width:76px;padding:7px}.plan-measure-panel strong{font-size:12px}.workspace-tabs{margin-left:7px}.workspace-tabs button{padding:6px 9px;font-size:11px}.plan-canvas-hint{display:none}.plan-bottom{gap:12px;padding:0 10px}.plan-bottom-right{display:none}}
+
+/* SIGMA4 0.1.1: inner-wall drafting and selection tools. */
+.plan-section-title {display:block;color:#26465a;font-size:13px;margin:0 0 10px}
+.plan-mode-buttons {display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}
+.plan-mode-buttons button {min-height:37px;border:1px solid #c8d9e7;border-radius:7px;background:#f4f8fc;color:#275a75;font:650 12px system-ui;cursor:pointer}
+.plan-mode-buttons button.plan-mode-active {background:#21698e;border-color:#21698e;color:#fff}
+.plan-mode-buttons button:focus-visible {outline:2px solid #1da88f;outline-offset:2px}
+.plan-anchor-info {padding:10px;border:1px solid #b6dfd2;border-radius:8px;background:#ecfbf5;color:#196e58;font-size:12px;margin:12px 0;line-height:1.5}
+.plan-anchor-info button {display:block;background:transparent;border:0;color:#176982;text-decoration:underline;cursor:pointer;padding:7px 0 0;font:650 11px system-ui}
+.plan-interior-hit {cursor:crosshair}
+.plan-interior-hit:hover {stroke:rgba(231,160,79,.15)}
+.plan-inner-label {font:700 12px system-ui,-apple-system,'Segoe UI',sans-serif;fill:#9b602a;paint-order:stroke;stroke:#fff;stroke-width:4}

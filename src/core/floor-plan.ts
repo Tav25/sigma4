@@ -155,18 +155,7 @@ export function validateFloorPlan(raw: unknown): string[] {
   if (plan.closed && nodes.length >= 4 && planAreaM2(plan as FloorPlan) < 1) {
     errors.push('Площадь замкнутого контура должна быть не меньше 1 м²')
   }
-  // Retained now for future T-junction topology: reject corrupt imports,
-  // without pretending that interior wall editing already exists in V1.
-  for (const [i, item] of plan.interiorWalls.entries()) {
-    if (!item || typeof item.id !== 'string' || !item.id ||
-      !item.start || !item.end ||
-      !Number.isInteger(item.start.xMm) || !Number.isInteger(item.start.zMm) ||
-      !Number.isInteger(item.end.xMm) || !Number.isInteger(item.end.zMm) ||
-      !Number.isFinite(item.thicknessMm) || item.thicknessMm <= 0) {
-      errors.push('Некорректная внутренняя стена ' + (i + 1))
-    }
-  }
-  if (!plan.closed && plan.interiorWalls.length) errors.push('Внутренние стены требуют замкнутого контура')
+  errors.push(...validateInteriorPlan(plan as FloorPlan))
   return Array.from(new Set(errors))
 }
 
@@ -175,4 +164,152 @@ export function withPlanPoint(plan: FloorPlan, point: PlanPoint): FloorPlan {
 }
 export function withPlanClosure(plan: FloorPlan): FloorPlan {
   return { ...plan, closed: true }
+}
+
+
+/** Wall centrelines and their derived junctions; the canonical JSON owns the segments. */
+export interface PlanSegment { id: string; start: PlanPoint; end: PlanPoint; exterior: boolean }
+export function planSegments(plan: FloorPlan): PlanSegment[] {
+  const result: PlanSegment[] = []
+  for (let i = 1; i < plan.exterior.length; i++) result.push({
+    id: 'E' + i, start: plan.exterior[i - 1], end: plan.exterior[i], exterior: true,
+  })
+  if (plan.closed && plan.exterior.length > 2) result.push({
+    id: 'E' + plan.exterior.length, start: plan.exterior[plan.exterior.length - 1],
+    end: plan.exterior[0], exterior: true,
+  })
+  for (const w of plan.interiorWalls) result.push({
+    id: w.id, start: w.start, end: w.end, exterior: false,
+  })
+  return result
+}
+export const pointOnPlanSegment = (p: PlanPoint, a: PlanPoint, b: PlanPoint): boolean =>
+  onSegment(a, b, p)
+
+/** Axis-aligned intersection point; returns null for collinear segments. */
+export function planAxisIntersection(a: PlanPoint, b: PlanPoint, c: PlanPoint, d: PlanPoint): PlanPoint | null {
+  const verticalAB = a.xMm === b.xMm
+  const verticalCD = c.xMm === d.xMm
+  if (verticalAB === verticalCD) return null
+  const p = verticalAB ? { xMm: a.xMm, zMm: c.zMm } : { xMm: c.xMm, zMm: a.zMm }
+  return onSegment(a, b, p) && onSegment(c, d, p) ? p : null
+}
+function overlappingCollinear(a: PlanPoint, b: PlanPoint, c: PlanPoint, d: PlanPoint): boolean {
+  if (a.xMm === b.xMm && c.xMm === d.xMm && a.xMm === c.xMm)
+    return Math.min(Math.max(a.zMm, b.zMm), Math.max(c.zMm, d.zMm)) >
+      Math.max(Math.min(a.zMm, b.zMm), Math.min(c.zMm, d.zMm))
+  if (a.zMm === b.zMm && c.zMm === d.zMm && a.zMm === c.zMm)
+    return Math.min(Math.max(a.xMm, b.xMm), Math.max(c.xMm, d.xMm)) >
+      Math.max(Math.min(a.xMm, b.xMm), Math.min(c.xMm, d.xMm))
+  return false
+}
+function planPointInside(p: PlanPoint, polygon: PlanPoint[]): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i], b = polygon[j]
+    if (onSegment(a, b, p)) return true
+    if ((a.zMm > p.zMm) !== (b.zMm > p.zMm) &&
+        p.xMm < (b.xMm - a.xMm) * (p.zMm - a.zMm) / (b.zMm - a.zMm) + a.xMm) inside = !inside
+  }
+  return inside
+}
+
+/** Snaps to real wall segments. The optional start enforces an orthogonal second endpoint. */
+export function snapPlanAnchor(
+  plan: FloorPlan, raw: PlanPoint, toleranceMm: number, stepMm = 250, start?: PlanPoint,
+): PlanPoint | null {
+  let best: PlanPoint | null = null
+  let distance = toleranceMm
+  for (const seg of planSegments(plan)) {
+    const a = seg.start, b = seg.end
+    const clamp = (value: number, left: number, right: number) =>
+      Math.max(Math.min(left, right), Math.min(Math.max(left, right), value))
+    let proposed: PlanPoint
+    if (a.xMm === b.xMm) {
+      const target = start && start.xMm !== a.xMm ? start.zMm
+        : Math.round(raw.zMm / stepMm) * stepMm
+      proposed = { xMm: a.xMm, zMm: clamp(target, a.zMm, b.zMm) }
+    } else {
+      const target = start && start.zMm !== a.zMm ? start.xMm
+        : Math.round(raw.xMm / stepMm) * stepMm
+      proposed = { xMm: clamp(target, a.xMm, b.xMm), zMm: a.zMm }
+    }
+    if (start && !planIsOrthogonal(start, proposed)) continue
+    const d = planDistanceMm(raw, proposed)
+    if (d <= distance) { distance = d; best = proposed }
+  }
+  return best
+}
+
+/** Crossings are logical joints, not duplicate authored walls. */
+export function planInteriorJunctions(plan: FloorPlan): PlanPoint[] {
+  const seen = new Map<string, PlanPoint>()
+  const segs = plan.interiorWalls
+  for (let i = 0; i < segs.length; i++) {
+    for (let j = i + 1; j < segs.length; j++) {
+      const p = planAxisIntersection(segs[i].start, segs[i].end, segs[j].start, segs[j].end)
+      if (p) seen.set(p.xMm + ':' + p.zMm, p)
+    }
+  }
+  return [...seen.values()]
+}
+export function nextInteriorWallId(plan: FloorPlan): string {
+  const ids = new Set(plan.interiorWalls.map(w => w.id))
+  let n = 1
+  while (ids.has('I' + String(n).padStart(3, '0'))) n++
+  return 'I' + String(n).padStart(3, '0')
+}
+
+function validateInteriorPlan(plan: FloorPlan): string[] {
+  const issues: string[] = []
+  if (!plan.interiorWalls.length) return issues
+  if (!plan.closed || plan.exterior.length < 4) return ['Внутренние стены требуют замкнутого периметра']
+  if (plan.interiorWalls.length > 100) issues.push('Слишком много внутренних стен (максимум 100)')
+  const ids = new Set<string>()
+  const boundary = planSegments({ ...plan, interiorWalls: [] })
+  for (const [index, wall] of plan.interiorWalls.entries()) {
+    const label = 'Внутренняя стена ' + (index + 1)
+    if (!wall || typeof wall.id !== 'string' || !wall.id.trim() ||
+      !wall.start || !wall.end ||
+      ![wall.start.xMm, wall.start.zMm, wall.end.xMm, wall.end.zMm].every(
+        x => Number.isInteger(x) && Math.abs(x) <= PLAN_LIMIT_MM) ||
+      !Number.isInteger(wall.thicknessMm) || wall.thicknessMm < 50 || wall.thicknessMm > 500) {
+      issues.push(label + ': неправильный ID, координаты или толщина (50–500 мм)')
+      continue
+    }
+    if (ids.has(wall.id)) issues.push('Повторяющийся ID внутренней стены: ' + wall.id)
+    ids.add(wall.id)
+    if (!planIsOrthogonal(wall.start, wall.end)) {
+      issues.push(label + ': только горизонтальные и вертикальные стены')
+      continue
+    }
+    if (planDistanceMm(wall.start, wall.end) < MIN_PLAN_EDGE_MM) {
+      issues.push(label + ': длина меньше 0,30 м')
+      continue
+    }
+    const midpoint = { xMm: (wall.start.xMm + wall.end.xMm) / 2,
+      zMm: (wall.start.zMm + wall.end.zMm) / 2 }
+    if (!planPointInside(midpoint, plan.exterior)) issues.push(label + ': стена вне периметра')
+    for (const outer of boundary) {
+      if (overlappingCollinear(wall.start, wall.end, outer.start, outer.end))
+        issues.push(label + ': совпадает с наружной стеной')
+      const crossPoint = planAxisIntersection(wall.start, wall.end, outer.start, outer.end)
+      if (crossPoint && !samePlanPoint(crossPoint, wall.start) &&
+        !samePlanPoint(crossPoint, wall.end))
+        issues.push(label + ': пересекает наружный периметр')
+    }
+    for (const other of plan.interiorWalls) {
+      if (other === wall || !other?.start || !other?.end) continue
+      if (overlappingCollinear(wall.start, wall.end, other.start, other.end))
+        issues.push(label + ': перекрывает другую внутреннюю стену')
+    }
+    for (const endpoint of [wall.start, wall.end]) {
+      const connected = boundary.some(seg => onSegment(seg.start, seg.end, endpoint)) ||
+        plan.interiorWalls.some(other => other !== wall && other?.start && other?.end &&
+          planIsOrthogonal(other.start, other.end) &&
+          onSegment(other.start, other.end, endpoint))
+      if (!connected) issues.push(label + ': конец стены не привязан к другой стене')
+    }
+  }
+  return [...new Set(issues)]
 }

@@ -10,7 +10,7 @@ import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
 import { translateWallsToExteriorZero, migrateLegacyWallOrigins } from './world-origin'
 import { effectiveConnections, reflowConnections } from './wall-topology'
-import { emptyFloorPlan, validateFloorPlan, type PlanPoint } from './floor-plan'
+import { emptyFloorPlan, validateFloorPlan, type PlanPoint, type PlanInteriorWall } from './floor-plan'
 
 export type ProjectCommand =
   | { type: 'SET_PROJECT_NAME'; payload: { projectName: string } }
@@ -20,6 +20,9 @@ export type ProjectCommand =
   | { type: 'PLAN_REOPEN'; payload: Record<string, never> }
   | { type: 'PLAN_REMOVE_LAST'; payload: Record<string, never> }
   | { type: 'PLAN_CLEAR'; payload: Record<string, never> }
+  | { type: 'PLAN_ADD_INTERIOR_WALL'; payload: { wall: PlanInteriorWall } }
+  | { type: 'PLAN_UPDATE_INTERIOR_WALL'; payload: { id: string; start: PlanPoint; end: PlanPoint; thicknessMm: number } }
+  | { type: 'PLAN_REMOVE_INTERIOR_WALL'; payload: { id: string } }
   | { type: 'SET_WALL_LENGTH'; payload: { wallId: string; lengthMm: number } }
   | { type: 'SET_WALL_HEIGHT'; payload: { wallId: string; heightMm: number } }
   | { type: 'SET_STUD_SPACING'; payload: { wallId: string; studSpacingMm: number } }
@@ -320,6 +323,43 @@ export class ProjectStore {
             messageRu: 'Нельзя удалить план с внутренними стенами' }
           candidate.building.floorPlan = emptyFloorPlan()
           changedIds.push('building.floorPlan')
+          break
+        }
+
+        case 'PLAN_ADD_INTERIOR_WALL': {
+          const plan = candidate.building.floorPlan
+          if (!plan?.closed) return { success: false, errorCode: 'PLAN_NOT_CLOSED',
+            messageRu: 'Сначала замкните наружный периметр' }
+          plan.interiorWalls.push({ ...command.payload.wall,
+            start: { ...command.payload.wall.start }, end: { ...command.payload.wall.end } })
+          const errors = validateFloorPlan(plan)
+          if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_WALL', messageRu: errors[0] }
+          changedIds.push('building.floorPlan.interiorWalls')
+          break
+        }
+        case 'PLAN_UPDATE_INTERIOR_WALL': {
+          const plan = candidate.building.floorPlan
+          const wall = plan?.interiorWalls.find(w => w.id === command.payload.id)
+          if (!wall) return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
+            messageRu: 'Внутренняя стена не найдена' }
+          wall.start = { ...command.payload.start }
+          wall.end = { ...command.payload.end }
+          wall.thicknessMm = command.payload.thicknessMm
+          const errors = validateFloorPlan(plan!)
+          if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_WALL', messageRu: errors[0] }
+          changedIds.push('building.floorPlan.interiorWalls[' + wall.id + ']')
+          break
+        }
+        case 'PLAN_REMOVE_INTERIOR_WALL': {
+          const plan = candidate.building.floorPlan
+          if (!plan?.interiorWalls.some(w => w.id === command.payload.id))
+            return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
+              messageRu: 'Внутренняя стена не найдена' }
+          plan.interiorWalls = plan.interiorWalls.filter(w => w.id !== command.payload.id)
+          const errors = validateFloorPlan(plan)
+          if (errors.length) return { success: false, errorCode: 'DEPENDENT_INTERIOR_WALL',
+            messageRu: errors[0] }
+          changedIds.push('building.floorPlan.interiorWalls')
           break
         }
         case 'SET_PROJECT_NAME': {

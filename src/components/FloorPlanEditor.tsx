@@ -2,7 +2,8 @@ import { useMemo, useRef, useState, type MouseEvent, type PointerEvent, type Whe
 import {
   emptyFloorPlan, meters, planAreaM2, planBounds, planDistanceMm,
   planPerimeterMm, validateFloorPlan, decimalMetersToMm,
-  type FloorPlan, type PlanPoint,
+  snapPlanAnchor, nextInteriorWallId, planInteriorJunctions,
+  type FloorPlan, type PlanPoint, type PlanInteriorWall,
 } from '../core/floor-plan'
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
 
@@ -37,11 +38,19 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
   const [hover, setHover] = useState<PlanPoint | null>(null)
   const [localError, setLocalError] = useState('')
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [tool, setTool] = useState<'outline' | 'interior' | 'select'>('outline')
+  const [interiorStart, setInteriorStart] = useState<PlanPoint | null>(null)
+  const [interiorHover, setInteriorHover] = useState<PlanPoint | null>(null)
+  const [interiorThickness, setInteriorThickness] = useState('100')
+  const [selectedInteriorId, setSelectedInteriorId] = useState<string | null>(null)
+  const [interiorEdit, setInteriorEdit] = useState({ sx: '', sz: '', ex: '', ez: '', thickness: '100' })
   const [pointX, setPointX] = useState('')
   const [pointZ, setPointZ] = useState('')
   const drag = useRef<PanDrag | null>(null)
   const ignoreClick = useRef(false)
   const points = plan.exterior
+  const selectedInterior = plan.interiorWalls.find(w => w.id === selectedInteriorId)
+  const innerJunctions = planInteriorJunctions(plan)
   const px = zoom * BASE_PX_PER_METRE
   const originX = OFFSET_X + pan.x
   const originY = OFFSET_Y + pan.y
@@ -71,6 +80,61 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
     const result = onCommand(command)
     setLocalError(result.success ? '' : result.messageRu || 'Операция недоступна')
     return result.success
+  }
+  const toSignedMm = (value: string): number | null => {
+    const normalized = value.trim().replace(',', '.')
+    return /^-?\d+(?:\.\d{1,3})?$/.test(normalized)
+      ? Math.round(Number(normalized) * 1000) : null
+  }
+  const canvasWorldPoint = (location: { x: number; y: number }): PlanPoint => ({
+    xMm: Math.round((location.x - originX) / px * 1000),
+    zMm: Math.round((location.y - originY) / px * 1000),
+  })
+  const addInteriorAnchor = (point: PlanPoint) => {
+    if (!plan.closed) return
+    if (!interiorStart) {
+      setInteriorStart(point)
+      setSelectedInteriorId(null)
+      setLocalError('')
+      return
+    }
+    const thickness = Number(interiorThickness)
+    if (!Number.isInteger(thickness) || thickness < 50 || thickness > 500) {
+      setLocalError('Толщина внутренней стены должна быть 50–500 мм')
+      return
+    }
+    const wall: PlanInteriorWall = {
+      id: nextInteriorWallId(plan),
+      start: interiorStart, end: point, thicknessMm: thickness,
+    }
+    if (apply({ type: 'PLAN_ADD_INTERIOR_WALL', payload: { wall } })) {
+      setInteriorStart(null)
+      setInteriorHover(null)
+    }
+  }
+  const selectInteriorWall = (wall: PlanInteriorWall) => {
+    setSelectedInteriorId(wall.id)
+    setSelectedIndex(null)
+    setInteriorEdit({
+      sx: meters(wall.start.xMm), sz: meters(wall.start.zMm),
+      ex: meters(wall.end.xMm), ez: meters(wall.end.zMm),
+      thickness: String(wall.thicknessMm),
+    })
+  }
+  const updateInteriorWall = () => {
+    if (!selectedInterior) return
+    const sx = toSignedMm(interiorEdit.sx), sz = toSignedMm(interiorEdit.sz)
+    const ex = toSignedMm(interiorEdit.ex), ez = toSignedMm(interiorEdit.ez)
+    const thicknessMm = Number(interiorEdit.thickness)
+    if ([sx, sz, ex, ez].some(value => value === null) || !Number.isInteger(thicknessMm)) {
+      setLocalError('Неверные координаты или толщина: метры до 1 мм, толщина в мм')
+      return
+    }
+    apply({ type: 'PLAN_UPDATE_INTERIOR_WALL', payload: {
+      id: selectedInterior.id,
+      start: { xMm: sx!, zMm: sz! }, end: { xMm: ex!, zMm: ez! },
+      thicknessMm,
+    } })
   }
   const suggestClose = useMemo(() => {
     if (plan.closed || points.length < 4) return { valid: false, error: '' }
@@ -103,6 +167,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
       return
     }
     if (apply({ type: 'PLAN_CLOSE', payload: {} })) {
+      setTool('interior')
       setHover(null)
       setSelectedIndex(null)
       fitView()
@@ -145,7 +210,19 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
   }
   const onCanvasClick = (event: MouseEvent<SVGSVGElement>) => {
     if (ignoreClick.current) { ignoreClick.current = false; return }
-    if (event.shiftKey || plan.closed) return
+    if (event.shiftKey) return
+    if (plan.closed) {
+      if (tool !== 'interior') return
+      const position = canvasWorldPoint(svgFromEvent(event))
+      const snapped = snapPlanAnchor(plan, position,
+        Math.min(1200, 18 * 1000 / px), snapMm, interiorStart ?? undefined)
+      if (!snapped) {
+        setLocalError('Наведите курсор на существующую стену (привязка до 18 пикселей)')
+        return
+      }
+      addInteriorAnchor(snapped)
+      return
+    }
     if (!points.length) {
       addExact()
       return
@@ -160,6 +237,12 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
     apply({ type: 'PLAN_ADD_POINT', payload: { point: candidate } })
   }
   const selectPoint = (index: number) => {
+    if (plan.closed && tool === 'interior') {
+      const snapped = snapPlanAnchor(plan, points[index], 1, snapMm, interiorStart ?? undefined)
+      if (snapped) addInteriorAnchor(snapped)
+      else setLocalError('Точка не образует прямой угол с предыдущей привязкой')
+      return
+    }
     if (!plan.closed && index === 0 && points.length >= 4) { close(); return }
     const point = points[index]
     setSelectedIndex(index)
@@ -200,6 +283,12 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
       setPan({ x: data.panX + loc.x - data.initialX,
         y: data.panY + loc.y - data.initialY })
       ignoreClick.current = true
+      return
+    }
+    if (plan.closed && tool === 'interior') {
+      const snapped = snapPlanAnchor(plan, canvasWorldPoint(loc),
+        Math.min(1200, 18 * 1000 / px), snapMm, interiorStart ?? undefined)
+      setInteriorHover(snapped)
       return
     }
     if (!points.length || plan.closed) return
@@ -253,12 +342,71 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
             )}
           </div>
         )}
-        {plan.closed && <div className="plan-complete" data-testid="plan-closed-status">
-          <strong>Контур замкнут</strong>
-          <span>Все участки образуют единую границу, пересечений нет.</span>
-          <button className="plan-button plan-secondary" type="button" data-testid="plan-reopen"
-            onClick={() => apply({ type: 'PLAN_REOPEN', payload: {} })}>Разомкнуть для продолжения</button>
-        </div>}
+        {plan.closed && <>
+          <div className="plan-complete" data-testid="plan-closed-status">
+            <strong>Контур замкнут</strong>
+            <span>Теперь можно чертить внутренние стены с привязкой к контуру и существующим перегородкам.</span>
+            <button className="plan-button plan-secondary" type="button" data-testid="plan-reopen"
+              onClick={() => {
+                if (apply({ type: 'PLAN_REOPEN', payload: {} })) {
+                  setTool('outline'); setInteriorStart(null); setSelectedInteriorId(null)
+                }
+              }}>Разомкнуть для продолжения</button>
+          </div>
+          <div className="plan-tool-section" data-testid="plan-interior-controls">
+            <strong className="plan-section-title">02 · Внутренние стены</strong>
+            <p className="plan-muted">Переключитесь на «Чертить». Нажмите начало на существующей стене, затем конец на другой. Пересечения станут узлами автоматически.</p>
+            <label htmlFor="plan-interior-thickness">Толщина стены, мм</label>
+            <input id="plan-interior-thickness" data-testid="plan-wall-thickness"
+              type="number" min="50" max="500" step="1"
+              value={interiorThickness} onChange={e => setInteriorThickness(e.target.value)} />
+            <div className="plan-mode-buttons">
+              <button type="button" data-testid="plan-tool-interior"
+                className={tool === 'interior' ? 'plan-mode-active' : ''}
+                onClick={() => { setTool('interior'); setSelectedInteriorId(null); setSelectedIndex(null) }}>
+                + Чертить
+              </button>
+              <button type="button" data-testid="plan-tool-select"
+                className={tool === 'select' ? 'plan-mode-active' : ''}
+                onClick={() => { setTool('select'); setInteriorStart(null); setInteriorHover(null) }}>
+                Выбрать
+              </button>
+            </div>
+            {interiorStart && <div className="plan-anchor-info" data-testid="plan-anchor-info">
+              Начало: X {meters(interiorStart.xMm)} · Z {meters(interiorStart.zMm)} м
+              <button type="button" onClick={() => { setInteriorStart(null); setInteriorHover(null) }}>
+                Отменить начало
+              </button>
+            </div>}
+            <p className="plan-guidance">Построено стен: <strong data-testid="plan-wall-count">{plan.interiorWalls.length}</strong></p>
+          </div>
+          {selectedInterior && tool === 'select' && (
+            <div className="plan-tool-section" data-testid="plan-selected-interior">
+              <strong className="plan-section-title">Стена {selectedInterior.id}</strong>
+              <p className="plan-muted">Координаты оси в метрах. Меняйте поля и нажимайте «Применить»; связанные соединения проверяются.</p>
+              {([
+                ['sx', 'Начало X, м'], ['sz', 'Начало Z, м'],
+                ['ex', 'Конец X, м'], ['ez', 'Конец Z, м'],
+                ['thickness', 'Толщина, мм'],
+              ] as const).map(([key,label]) =>
+                <label key={key}>{label}
+                  <input data-testid={'plan-edit-' + key} type="text" value={interiorEdit[key]}
+                    onChange={e => setInteriorEdit(prev => ({...prev, [key]: e.target.value}))} />
+                </label>
+              )}
+              <p className="plan-guidance">Длина: {meters(planDistanceMm(selectedInterior.start, selectedInterior.end))} м</p>
+              <button className="plan-button plan-primary" data-testid="plan-save-interior"
+                type="button" onClick={updateInteriorWall}>Применить координаты</button>
+              <button className="plan-button plan-text" data-testid="plan-remove-interior"
+                type="button" onClick={() => {
+                  if (window.confirm('Удалить внутреннюю стену ' + selectedInterior.id + '?')) {
+                    if (apply({ type: 'PLAN_REMOVE_INTERIOR_WALL', payload: { id: selectedInterior.id } }))
+                      setSelectedInteriorId(null)
+                  }
+                }}>Удалить стену</button>
+            </div>
+          )}
+        </>}
         <div className="plan-tool-section plan-actions">
           {!plan.closed && <button type="button" className="plan-button plan-secondary"
             data-testid="plan-remove-last" disabled={!points.length}
@@ -294,17 +442,17 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
         )}
         {localError && <div className="plan-error" role="alert" data-testid="plan-error">{localError}</div>}
         <div className="plan-divider" />
-        <div className="plan-step plan-step-secondary">
+        {!plan.closed && <div className="plan-step plan-step-secondary">
           <span className="plan-step-count">02</span>
-          <div><strong>Внутренние стены</strong><small>Следующий этап: привязка перегородок к наружным сегментам и друг к другу.</small></div>
-        </div>
+          <div><strong>Внутренние стены</strong><small>Доступны после замыкания наружного периметра.</small></div>
+        </div>}
         <button type="button" className="plan-button plan-export" onClick={onExport}
           data-testid="plan-export">Экспортировать план в JSON</button>
         <button type="button" className="plan-button plan-text" onClick={onImport}>Импортировать JSON</button>
       </aside>
       <main className="plan-drawing">
         <div className="plan-toolbar">
-          <div className="plan-mode-mark"><span className="plan-dot" /> ПЛАН / НАРУЖНЫЙ КОНТУР</div>
+          <div className="plan-mode-mark"><span className="plan-dot" /> ПЛАН / {plan.closed ? tool === 'interior' ? 'ЧЕРЧЕНИЕ ПЕРЕГОРОДОК' : 'ВЫБОР СТЕН' : 'НАРУЖНЫЙ КОНТУР'}</div>
           <label className="plan-grid-select">Шаг привязки
             <select data-testid="plan-grid-step" value={snapMm}
               onChange={event => setSnapMm(Number(event.target.value))}>
@@ -383,6 +531,44 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
                   fill="#0f6d65" fontSize={15}>{meters(planDistanceMm(current,proposal))} м</text>
               </g>
             )}
+            {plan.interiorWalls.map(w => {
+              const a = xy(w.start), b = xy(w.end)
+              const active = selectedInteriorId === w.id && tool === 'select'
+              const label = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+              return <g key={w.id} data-testid={'plan-internal-wall-' + w.id}
+                onClick={e => {
+                  if (tool === 'select') { e.stopPropagation(); selectInteriorWall(w) }
+                }}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  stroke={active ? '#db8c2d' : '#c27a2f'} strokeWidth={7}
+                  strokeLinecap="round" vectorEffect="non-scaling-stroke" pointerEvents="none"/>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  stroke="transparent" strokeWidth={18} pointerEvents="stroke"
+                  className="plan-interior-hit"/>
+                <text x={label.x + (a.x === b.x ? 18 : 0)}
+                  y={label.y + (a.y === b.y ? -15 : 0)}
+                  textAnchor="middle" className="plan-inner-label" pointerEvents="none">
+                  {meters(planDistanceMm(w.start,w.end))} м
+                </text>
+              </g>
+            })}
+            {innerJunctions.map((p,i) => {
+              const pos=xy(p)
+              return <circle key={i} cx={pos.x} cy={pos.y} r={6}
+                fill="#ffe0ae" stroke="#a86622" strokeWidth={2} pointerEvents="none"/>
+            })}
+            {plan.closed && tool === 'interior' && interiorStart && (
+              <g pointerEvents="none">
+                {interiorHover && <line x1={xy(interiorStart).x} y1={xy(interiorStart).y}
+                  x2={xy(interiorHover).x} y2={xy(interiorHover).y}
+                  stroke="#2e9d7d" strokeWidth={4} strokeDasharray="9 6"
+                  vectorEffect="non-scaling-stroke" />}
+                <circle cx={xy(interiorStart).x} cy={xy(interiorStart).y}
+                  r={8} fill="#1ebd9c" stroke="#fff" strokeWidth={3}/>
+                {interiorHover && <circle cx={xy(interiorHover).x} cy={xy(interiorHover).y}
+                  r={7} fill="#1ebd9c" stroke="#fff" strokeWidth={2}/>}
+              </g>
+            )}
             {points.map((point,i) => {
               const loc=xy(point)
               return <g key={i} data-testid={`plan-point-${i}`}
@@ -410,11 +596,15 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
             <div><span>{plan.closed?'Периметр':'Начерчено'}</span><strong data-testid="plan-perimeter">{meters(totalLength)} м</strong></div>
             <div><span>Площадь</span><strong data-testid="plan-area">{plan.closed?planAreaM2(plan).toLocaleString('ru-RU',{maximumFractionDigits:2}):'—'} м²</strong></div>
           </div>
-          <div className="plan-canvas-hint">ЛКМ — следующая точка · Shift + перетаскивание — сдвиг · Колесо — масштаб</div>
+          <div className="plan-canvas-hint">{plan.closed ? tool === 'interior'
+            ? 'ЛКМ — начало и конец на существующих стенах · Shift + перетаскивание — сдвиг'
+            : 'Нажмите на внутреннюю стену для редактирования · Shift + перетаскивание — сдвиг'
+            : 'ЛКМ — следующая точка · Shift + перетаскивание — сдвиг · Колесо — масштаб'}</div>
         </div>
         <div className="plan-bottom">
           <span><strong>Узлов:</strong> {points.length}</span>
           <span><strong>Участков:</strong> {edges.length}</span>
+          <span><strong>Внутренних стен:</strong> {plan.interiorWalls.length}</span>
           <span><strong>Статус:</strong> {plan.closed?'Замкнут':'Черновик'}</span>
           <span className="plan-bottom-right">План в мм · отображение в м · сохранение в JSON</span>
         </div>

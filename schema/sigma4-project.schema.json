@@ -282,7 +282,7 @@
         },
         "floorPlan": {
           "type": "object",
-          "description": "SIGMA4 0.1.0 authored two-dimensional floor plan in millimetres. Separate from the existing 3D framing assembly; future interior partitions share this canonical model.",
+          "description": "SIGMA4 0.1.1 authored two-dimensional floor plan in millimetres. Exterior and interior wall centreline segments share the canonical JSON model; physically generated 3D framing remains separate.",
           "additionalProperties": false,
           "required": [
             "exterior",

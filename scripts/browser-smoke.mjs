@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.0')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.1')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -353,6 +353,66 @@ try {
   })
   assert.equal(planSaved.validation.valid, true)
   assert.equal(planSaved.building.walls.length, 1) // existing 3D mode unchanged
+  // 0.1.1: draw inner walls with snapped endpoints, edit exact properties,
+  // reject an orphaning deletion, then remove in safe dependency order.
+  const clickPlanCoord = async (xMm, zMm) => {
+    const pos = await page.getByTestId('plan-canvas').evaluate((svg, p) => {
+      const node = n => svg.querySelector('[data-testid="plan-point-' + n + '"] circle')
+      const first = node(0), second = node(1), third = node(2)
+      if (!first || !second || !third) throw Error('Perimeter nodes not found')
+      const x0 = Number(first.getAttribute('cx'))
+      const y0 = Number(first.getAttribute('cy'))
+      const dx = Number(second.getAttribute('cx')) - x0
+      const dy = Number(third.getAttribute('cy')) - y0
+      const ctm = svg.getScreenCTM()
+      if (!ctm) throw Error('Plan CTM missing')
+      const point = new DOMPoint(x0 + dx * p.xMm / 6000,
+        y0 + dy * (-p.zMm) / 4000).matrixTransform(ctm)
+      return { x: point.x, y: point.y }
+    }, {xMm,zMm})
+    await page.mouse.click(pos.x, pos.y)
+  }
+  await page.getByTestId('plan-tool-interior').click()
+  await page.getByTestId('plan-wall-thickness').fill('150')
+  await clickPlanCoord(3000, 0)
+  await page.getByTestId('plan-anchor-info').waitFor()
+  await clickPlanCoord(3000, -4000)
+  await page.getByTestId('plan-internal-wall-I001').waitFor()
+  await page.getByTestId('plan-wall-thickness').fill('100')
+  await clickPlanCoord(0, -2000)
+  await clickPlanCoord(3000, -2000)
+  await page.getByTestId('plan-internal-wall-I002').waitFor()
+  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(), '2')
+  await page.screenshot({ path: dir + '/21-plan-two-inner-walls.png' })
+  const innerDownload = page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const innerSaved = JSON.parse(await readFile(await (await innerDownload).path(), 'utf8'))
+  assert.deepEqual(innerSaved.building.floorPlan.interiorWalls, [
+    { id:'I001', start:{xMm:3000,zMm:0},end:{xMm:3000,zMm:-4000},thicknessMm:150 },
+    { id:'I002', start:{xMm:0,zMm:-2000},end:{xMm:3000,zMm:-2000},thicknessMm:100 },
+  ])
+  assert.equal(innerSaved.validation.valid,true)
+  await page.getByTestId('plan-tool-select').click()
+  await clickPlanCoord(3000, -1000)
+  await page.getByTestId('plan-selected-interior').waitFor()
+  await page.once('dialog', d => d.accept())
+  await page.getByTestId('plan-remove-interior').click()
+  await page.getByTestId('plan-error').waitFor() // connected T-junction protects the other wall
+  await clickPlanCoord(1500, -2000)
+  await page.once('dialog', d => d.accept())
+  await page.getByTestId('plan-remove-interior').click()
+  await page.getByTestId('plan-internal-wall-I002').waitFor({ state: 'detached' })
+  await clickPlanCoord(3000, -1000)
+  await page.getByTestId('plan-edit-thickness').fill('120')
+  await page.getByTestId('plan-save-interior').click()
+  const editedDownload = page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const edited = JSON.parse(await readFile(await (await editedDownload).path(), 'utf8'))
+  assert.equal(edited.building.floorPlan.interiorWalls[0].thicknessMm, 120)
+  await page.once('dialog', d => d.accept())
+  await page.getByTestId('plan-remove-interior').click()
+  await page.getByTestId('plan-internal-wall-I001').waitFor({ state: 'detached' })
+  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(),'0')
   await page.getByTestId('plan-reopen').click()
   await page.getByTestId('plan-remove-last').click()
   await page.getByTestId('plan-point-3').waitFor({ state: 'detached' })
@@ -372,7 +432,7 @@ try {
   await page.getByTestId('plan-close').click()
   await page.getByTestId('plan-closed-status').waitFor()
   assert.deepEqual(errors, [], 'Plan editor browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.1.0 Plan 2D point drawing exact metres, closure, perimeter, JSON, Undo path; 3D legacy verified; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
+  console.log('SIGMA4 BROWSER PASS: v0.1.1 Plan 2D + inner walls, anchor joins, editing, dependency checks, exact metres, closure, perimeter, JSON, Undo path; 3D legacy verified; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()
