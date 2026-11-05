@@ -25,7 +25,15 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.26')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.27')
+  // New canonical project: its source origin and physical timber corner are zero.
+  const startDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const initial = JSON.parse(await readFile(await (await startDownload).path(), 'utf8'))
+  assert.equal(initial.project.schemaVersion, '1.1.0')
+  assert.deepEqual(initial.building.walls[0].origin, { x: 0, y: 0, z: 0 })
+  assert.match(await page.getByTestId('first-wall-exterior-corner').textContent(), /X=0, Y=0, Z=0/)
+  assert.equal(await page.getByTestId('anchor-first-wall-to-zero').count(), 0)
   const tree = page.getByRole('navigation', { name: 'Дерево проекта' })
   await tree.getByTestId('wall-node-wall-001').waitFor()
   await tree.getByTestId('tree-opening-W01').click()
@@ -259,6 +267,7 @@ try {
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const single = JSON.parse(await readFile(await (await blankDownload).path(), 'utf8'))
   single.building.walls[0].lengthMm = 4000
+  single.project.schemaVersion = '1.0.0'
   // Simulate an imported *legacy* project whose wall centre plane,
   // rather than its physical exterior lower-left corner, was at world zero.
   single.building.walls[0].origin = { x: 0, y: 0, z: 0 }
@@ -274,7 +283,8 @@ try {
   const fourDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const four = JSON.parse(await readFile(await (await fourDownload).path(), 'utf8'))
-  assert.deepEqual(four.building.walls[0].origin, { x: 0, y: 0, z: 0 })
+  assert.equal(four.project.schemaVersion, '1.1.0')
+  assert.deepEqual(four.building.walls[0].origin, { x: 0, y: 0, z: 72.5 })
   assert.match(await page.getByTestId('first-wall-exterior-corner').textContent(), /Z=72\.5/)
   const snapButton = page.getByTestId('anchor-first-wall-to-zero')
   await snapButton.click()
@@ -283,7 +293,7 @@ try {
   const alignedDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const aligned = JSON.parse(await readFile(await (await alignedDownload).path(), 'utf8'))
-  assert.deepEqual(aligned.building.walls[0].origin, { x: 0, y: 0, z: -72.5 })
+  assert.deepEqual(aligned.building.walls[0].origin, { x: 0, y: 0, z: 0 })
   assert.equal(aligned.building.walls[0].lengthMm, 4000)
   assert.equal(aligned.building.openings.length, 0)
   assert.equal(aligned.validation.valid, true)
@@ -300,7 +310,7 @@ try {
   await wallLengthInput.press('Tab')
   await page.locator('.viewport[data-dimension-total-x="5000"]').waitFor()
   assert.equal(errors.length, 0, 'Unexpected browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.0.26 physical outside lower-left corner at world zero; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
+  console.log('SIGMA4 BROWSER PASS: v0.0.27 canonical source origin zero; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()

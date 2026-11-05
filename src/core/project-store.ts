@@ -12,6 +12,7 @@ import { validateProject } from './frame-validator'
 import { generateWallModule } from './wall-module'
 import { connectRightCaliforniaCorner } from './corner-connection'
 import { effectiveConnections } from './wall-topology'
+import { CURRENT_COORDINATE_SCHEMA, migrateLegacyWallOrigins } from './world-origin'
 
 const SW = 45
 const SH = 145
@@ -61,7 +62,7 @@ export function createProjectDocument(params: {
 
   const doc: ProjectDocument = {
     project: {
-      schemaVersion: '1.0.0',
+      schemaVersion: CURRENT_COORDINATE_SCHEMA,
       projectId: params.projectId,
       projectName: params.projectName,
       units: 'mm',
@@ -101,9 +102,9 @@ export function createProjectFromCurrentState(params: {
     studSpacingMm: params.spacing,
     sectionMm: { width: SW, height: SH },
     orientation: 'x',
-    // Exterior lower-left corner is physical world zero; local panel
-    // geometry spans +/- half depth around its nominal wall midplane.
-    origin: { x: 0, y: 0, z: -SH / 2 },
+    // Authored origin IS the physical outer lower-left corner.
+    // Internal stud midplane offset is applied only during 3D projection.
+    origin: { x: 0, y: 0, z: 0 },
     openings: params.openings.map(o => o.id),
   }
 
@@ -130,13 +131,14 @@ export function serializeProject(doc: ProjectDocument): string {
 }
 
 export function parseProject(json: string): ProjectDocument {
-  const parsed = JSON.parse(json)
-  const validation = validateProject(parsed)
+  const parsed = migrateLegacyWallOrigins(JSON.parse(json) as ProjectDocument)
+  const rebuilt = buildProjectSnapshot(parsed)
+  const validation = validateProject(rebuilt)
   if (!validation.valid) {
     const errors = validation.issues.filter(i => i.severity === 'error')
     throw new Error(`Invalid project: ${errors.map(e => e.messageRu).join('; ')}`)
   }
-  return parsed as ProjectDocument
+  return rebuilt
 }
 
 export function validateProjectSnapshot(doc: ProjectDocument): ValidationResult {
@@ -144,15 +146,16 @@ export function validateProjectSnapshot(doc: ProjectDocument): ValidationResult 
 }
 
 export function buildProjectSnapshot(doc: ProjectDocument): ProjectDocument {
+  const source = migrateLegacyWallOrigins(doc)
   // Legacy SIGMA4 documents stored the 45mm stud face as wall thickness,
   // even though the physical wall depth (stud section height) is 145mm.
   // Correct it during a validated rebuild/import without changing the
   // stud dimensions, wall placement, openings or the original input.
   const newDoc: ProjectDocument = {
-    ...doc,
+    ...source,
     building: {
-      ...doc.building,
-      walls: doc.building.walls.map(wall => ({
+      ...source.building,
+      walls: source.building.walls.map(wall => ({
         ...wall,
         thicknessMm: wall.sectionMm.height,
       })),

@@ -7,8 +7,9 @@ import type {
 import { canFitCornerFraming, rightCornerOrigin } from './corner'
 import { effectiveConnections, validateWallTopology } from './wall-topology'
 import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
+import { wallMidplaneOrigin } from './world-origin'
 
-const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0']
+const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0', '1.1.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
 const SUPPORTED_GENERATOR_VERSIONS = ['1.0.0']
 
@@ -274,12 +275,14 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
     } else {
       // Rolled vertical member: local section height spans +X and the
       // 45mm section width is centred across Z. The right wall points to -Z.
-      const backingMinX = front.origin.x + backing.position.x
+      const frontMidplane = wallMidplaneOrigin(front)
+      const rightMidplane = wallMidplaneOrigin(right)
+      const backingMinX = frontMidplane.x + backing.position.x
       const backingMaxX = backingMinX + backing.sectionMm.height
-      const frontEndMinX = front.origin.x + endStud.position.x - endStud.sectionMm.width / 2
-      const backingMinZ = front.origin.z + backing.position.z - backing.sectionMm.width / 2
-      const sideStartMaxZ = right.origin.z - startStud.position.x + startStud.sectionMm.width / 2
-      const sideStartMinX = right.origin.x + startStud.position.z
+      const frontEndMinX = frontMidplane.x + endStud.position.x - endStud.sectionMm.width / 2
+      const backingMinZ = frontMidplane.z + backing.position.z - backing.sectionMm.width / 2
+      const sideStartMaxZ = rightMidplane.z - startStud.position.x + startStud.sectionMm.width / 2
+      const sideStartMinX = rightMidplane.x + startStud.position.z
       const sideStartMaxX = sideStartMinX + startStud.sectionMm.height
       const sideOverlapX = Math.min(backingMaxX, sideStartMaxX) -
         Math.max(backingMinX, sideStartMinX)

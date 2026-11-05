@@ -1,6 +1,7 @@
 import type { ProjectDocument } from '../core/project'
 import type { TimberElement as SceneTimberElement } from '../core/timber'
 import type { WindowOpening } from '../core/window'
+import { wallMidplaneOrigin } from '../core/world-origin'
 
 export interface SceneOpening3D extends WindowOpening {
   wallId: string
@@ -42,7 +43,7 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
       material: 'wood',
       wallTransform: (() => {
         const wall = walls.get(element.wallId)
-        return wall ? { origin: { ...wall.origin }, orientation: wall.orientation === 'z' ? 'z' as const : 'x' as const } : undefined
+        return wall ? { origin: wallMidplaneOrigin(wall), orientation: wall.orientation === 'z' ? 'z' as const : 'x' as const } : undefined
       })(),
     })),
     openings: document.building.openings.map(opening => ({
@@ -63,7 +64,9 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
         id: opening.id,
         wallId: wall.wallId,
         wallLengthMm: wall.lengthMm,
-        wallOrigin: { ...wall.origin },
+        // Only this derived 3D hit plane needs the wall midplane;
+        // the source building.walls[*].origin stays the exterior corner.
+        wallOrigin: wallMidplaneOrigin(wall),
         wallOrientation: wall.orientation === 'z' ? 'z' as const : 'x' as const,
         positionXmm: opening.positionUmm,
         widthMm: opening.widthMm,
@@ -83,12 +86,12 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
         openingId: marker.openingId,
         position: {
           x: wall.orientation === 'z'
-            ? wall.origin.x + wall.sectionMm.height / 2 + marker.outsideOffsetMm
+            ? wall.origin.x + marker.outsideOffsetMm
             : wall.origin.x + opening.positionUmm + horizontal,
           y: wall.origin.y + marker.elevationMm,
           z: wall.orientation === 'z'
             ? wall.origin.z - (opening.positionUmm + horizontal)
-            : wall.origin.z + wall.sectionMm.height / 2 + marker.outsideOffsetMm,
+            : wall.origin.z + marker.outsideOffsetMm,
         },
         visible: marker.visible,
         color: marker.color,

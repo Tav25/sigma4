@@ -42,12 +42,12 @@ export function reflowConnections(walls: Wall[], connections: readonly WallConne
 }
 
 export function wallFootprint(wall: Wall) {
-  const half = wall.sectionMm.height / 2
+  const depth = wall.sectionMm.height
   return wall.orientation === 'z'
-    ? { minX: wall.origin.x - half, maxX: wall.origin.x + half,
+    ? { minX: wall.origin.x - depth, maxX: wall.origin.x,
         minZ: wall.origin.z - wall.lengthMm, maxZ: wall.origin.z }
     : { minX: wall.origin.x, maxX: wall.origin.x + wall.lengthMm,
-        minZ: wall.origin.z - half, maxZ: wall.origin.z + half }
+        minZ: wall.origin.z - depth, maxZ: wall.origin.z }
 }
 
 /**

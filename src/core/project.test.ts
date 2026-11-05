@@ -33,7 +33,7 @@ describe('S01 - Project Document & Validation', () => {
   // ТЕСТ 1: Экспорт существующей модели 0.0.14 в JSON
   it('ТЕСТ 1: экспорт модели в JSON', () => {
     const json = serializeProject(baseDoc)
-    expect(json).toContain('"schemaVersion": "1.0.0"')
+    expect(json).toContain('"schemaVersion": "1.1.0"')
     expect(json).toContain('"projectId": "test-proj-001"')
     expect(json).toContain('"projectName": "Test Project"')
     expect(json).toContain('"units": "mm"')

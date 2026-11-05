@@ -15,7 +15,7 @@ describe('First wall lower-left exterior corner at world zero', () => {
   it('starts new walls at the REAL timber outside corner, not at wall mid-thickness', () => {
     const project = create()
     const first = project.building.walls[0]
-    expect(first.origin).toEqual({ x: 0, y: 0, z: -72.5 })
+    expect(first.origin).toEqual({ x: 0, y: 0, z: 0 })
     expect(firstWallExteriorLowerLeft(first)).toEqual({ x: 0, y: 0, z: 0 })
     const physicalBounds = calculateWorldBounds(projectToScene(project).elements)
     expect(physicalBounds.min.x * 1000).toBeCloseTo(0, 6)
@@ -49,7 +49,7 @@ describe('First wall lower-left exterior corner at world zero', () => {
       }],
     })
     const first = importedDoc.building.walls[0]
-    first.origin = { x: 1500, y: 0, z: 0 }
+    first.origin = { x: 1500, y: 0, z: 72.5 }
     const side = { ...first, wallId: 'wall-002', orientation: 'z' as const,
       lengthMm: 3000, origin: rightCornerOrigin(first, first), openings: [] }
     const independent = { ...first, wallId: 'wall-003', origin: { x: 13000, y: 0, z: -8000 }, openings: [] }
@@ -71,7 +71,7 @@ describe('First wall lower-left exterior corner at world zero', () => {
     expect(result.changedIds).toContain('building.walls[wall-002].origin')
     const after = store.getSnapshot()
     expect(firstWallExteriorLowerLeft(after.building.walls[0])).toEqual({ x: 0, y: 0, z: 0 })
-    expect(after.building.walls[0].origin).toEqual({ x: 0, y: 0, z: -72.5 })
+    expect(after.building.walls[0].origin).toEqual({ x: 0, y: 0, z: 0 })
     expect(after.building.walls[1].origin).toEqual({
       x: side.origin.x - 1500, y: 0, z: side.origin.z - 72.5,
     })

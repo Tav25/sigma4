@@ -128,10 +128,10 @@ describe('S06.5 coordinates and real dimensions', () => {
   it('anchors the first wall at x=0 and extends exactly to x=4000', () => {
     const doc = create()
     const layout = buildDimensionLayout(doc.building.walls, projectToScene(doc).elements)
-    expect(doc.building.walls[0].origin).toEqual({ x: 0, y: 0, z: -72.5 })
+    expect(doc.building.walls[0].origin).toEqual({ x: 0, y: 0, z: 0 })
     const wall = layout.lines.find(l => l.id === 'wall-dim-wall-001')!
-    expect(wall.from).toEqual({ x: 0, y: 0, z: -72.5 })
-    expect(wall.to).toEqual({ x: 4000, y: 0, z: -72.5 })
+    expect(wall.from).toEqual({ x: 0, y: 0, z: 0 })
+    expect(wall.to).toEqual({ x: 4000, y: 0, z: 0 })
     expect(wall.valueMm).toBe(4000)
     expect(layout.overallXmm).toBeCloseTo(4000, 6)
     expect(layout.bounds.minX).toBeCloseTo(0, 6)
@@ -153,7 +153,7 @@ describe('S06.5 coordinates and real dimensions', () => {
     const layout = buildDimensionLayout(rebuilt.building.walls, projectToScene(rebuilt).elements)
     const side = layout.lines.find(l => l.id === 'wall-dim-wall-002')!
     expect(side.valueMm).toBe(3000)
-    expect(side.from.x).toBe(5927.5)
+    expect(side.from.x).toBe(6000)
     expect(side.from.z).toBe(-145)
     expect(side.to.z).toBe(-3145)
     expect(layout.bounds.maxX).toBeCloseTo(6000, 6)

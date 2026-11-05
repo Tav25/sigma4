@@ -11,7 +11,7 @@
       "required": ["schemaVersion", "projectId", "projectName", "units", "rulesetId", "rulesetVersion", "generatorVersion"],
       "additionalProperties": false,
       "properties": {
-        "schemaVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "schemaVersion": { "type": "string", "enum": ["1.0.0", "1.1.0"], "description": "v1.1.0 wall origins denote outside lower corners; v1.0.0 is imported using midplane migration" },
         "projectId": { "type": "string", "minLength": 1 },
         "projectName": { "type": "string", "minLength": 1 },
         "units": { "const": "mm" },
@@ -64,6 +64,7 @@
               "orientation": { "enum": ["x", "y", "z"] },
               "origin": {
                 "type": "object",
+                "description": "Schema 1.1.0: lower outer corner in millimetres, X outside +Z face, Z outside +X face.",
                 "required": ["x", "y", "z"],
                 "additionalProperties": false,
                 "properties": {

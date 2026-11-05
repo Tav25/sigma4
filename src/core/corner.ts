@@ -6,9 +6,10 @@ import type { Wall } from './project'
  */
 export function rightCornerOrigin(front: Wall, side: Pick<Wall, 'sectionMm'>) {
   return {
-    x: front.origin.x + front.lengthMm - side.sectionMm.height / 2,
+    // Both wall origins reference OUTSIDE faces, not stud midplanes.
+    x: front.origin.x + front.lengthMm,
     y: front.origin.y,
-    z: front.origin.z - front.sectionMm.height / 2,
+    z: front.origin.z - front.sectionMm.height,
   }
 }
 

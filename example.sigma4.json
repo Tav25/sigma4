@@ -1,6 +1,6 @@
 {
   "project": {
-    "schemaVersion": "1.0.0",
+    "schemaVersion": "1.1.0",
     "projectId": "example-001",
     "projectName": "SIGMA4 Example Project",
     "units": "mm",
@@ -22,7 +22,7 @@
         "wallId": "wall-001",
         "lengthMm": 6000,
         "heightMm": 2700,
-        "thicknessMm": 45,
+        "thicknessMm": 145,
         "studSpacingMm": 600,
         "sectionMm": {
           "width": 45,

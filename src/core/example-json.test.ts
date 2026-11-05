@@ -19,7 +19,7 @@ describe('example.sigma4.json generation', () => {
     const json = serializeProject(doc)
     fs.writeFileSync('example.sigma4.json', json, 'utf8')
     
-    expect(json).toContain('"schemaVersion": "1.0.0"')
+    expect(json).toContain('"schemaVersion": "1.1.0"')
     expect(json).toContain('"projectId": "example-001"')
     expect(json).toContain('"projectName": "SIGMA4 Example Project"')
   })
@@ -42,7 +42,7 @@ describe('example.sigma4.json generation', () => {
     
     expect(reparsed.project.projectId).toBe('example-001')
     expect(reparsed.project.projectName).toBe('SIGMA4 Example Project')
-    expect(reparsed.project.schemaVersion).toBe('1.0.0')
+    expect(reparsed.project.schemaVersion).toBe('1.1.0')
     expect(reparsed.project.units).toBe('mm')
     expect(reparsed.building.walls.length).toBe(1)
     expect(reparsed.building.walls[0].wallId).toBe('wall-001')

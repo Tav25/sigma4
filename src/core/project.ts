@@ -35,6 +35,7 @@ export interface Wall {
   studSpacingMm: number
   sectionMm: { width: number; height: number }
   orientation: 'x' | 'y' | 'z'
+  /** Lower OUTSIDE corner in global millimetres; NOT the stud midplane. */
   origin: Vector3
   openings: string[]
 }

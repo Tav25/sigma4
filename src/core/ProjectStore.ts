@@ -8,7 +8,7 @@ import type {
 import { validateProjectSnapshot, validateSourceParameters } from './frame-validator'
 import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
-import { translateWallsToExteriorZero } from './world-origin'
+import { translateWallsToExteriorZero, migrateLegacyWallOrigins } from './world-origin'
 import { effectiveConnections, reflowConnections } from './wall-topology'
 
 export type ProjectCommand =
@@ -600,7 +600,7 @@ export class ProjectStore {
       }
       let rebuilt: ProjectDocument
       try {
-        rebuilt = buildProjectSnapshot(parsed as ProjectDocument)
+        rebuilt = buildProjectSnapshot(migrateLegacyWallOrigins(parsed as ProjectDocument))
       } catch (e) {
         const error = e instanceof Error ? e.message : String(e)
         return { success: false, revision: this.revision, errorCode: 'VALIDATION_FAILED', messageRu: `Ошибка генерации при импорте: ${error}`, validation: { valid: false, issues: [{ code: 'GENERATION_ERROR', severity: 'error', path: '', messageRu: error, affectedIds: [] }], engineeringStatus: 'not_evaluated' } }
