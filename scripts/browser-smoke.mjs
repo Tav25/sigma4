@@ -25,7 +25,12 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.27')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.0')
+  // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
+  await page.getByTestId('plan-workspace').waitFor()
+  await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
+  await page.getByTestId('tab-frame').click()
+  await page.locator('.viewport canvas').waitFor({ state: 'visible' })
   // New canonical project: its source origin and physical timber corner are zero.
   const startDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
@@ -199,6 +204,7 @@ try {
   assert.equal(errors.length, 0, 'Unexpected browser exception')
   // Focused real-3D visual check: one untouched facade, one garage wall.
   await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('tab-frame').click()
   await page.getByRole('button', { name: '+ Добавить вторую стену' }).click()
   await page.getByTestId('add-garage-door').click()
   await page.getByText('Свойства гаражных ворот (G01)').waitFor()
@@ -263,6 +269,7 @@ try {
   // S06.5: import a clean 4 m wall, prove the left end stays at X=0,
   // inspect the dimension readout and capture a real-world-axis screenshot.
   await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('tab-frame').click()
   const blankDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const single = JSON.parse(await readFile(await (await blankDownload).path(), 'utf8'))
@@ -310,7 +317,62 @@ try {
   await wallLengthInput.press('Tab')
   await page.locator('.viewport[data-dimension-total-x="5000"]').waitFor()
   assert.equal(errors.length, 0, 'Unexpected browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.0.27 canonical source origin zero; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
+
+  // 0.1.0: draw a real 6 × 4 m perimeter point-by-point using exact
+  // decimal-metre input, close it by clicking the first point, then
+  // verify dimensions, area, canonical JSON, reopening and mouse input.
+  await page.getByTestId('tab-plan').click()
+  await page.getByTestId('plan-workspace').waitFor()
+  await page.getByTestId('plan-add-exact').click()
+  await page.getByTestId('plan-point-0').waitFor()
+  assert.equal(await page.getByTestId('plan-close').isEnabled(), false)
+  await page.getByTestId('plan-add-exact').click() // +X 6 m
+  await page.getByTestId('plan-point-1').waitFor()
+  await page.getByTestId('plan-length-input').fill('4')
+  await page.getByTestId('plan-add-exact').click() // -Z 4 m
+  await page.getByTestId('plan-point-2').waitFor()
+  await page.getByTestId('plan-length-input').fill('6')
+  await page.getByTestId('plan-add-exact').click() // -X 6 m
+  await page.getByTestId('plan-point-3').waitFor()
+  assert.equal(await page.getByTestId('plan-close').isEnabled(), true)
+  await page.screenshot({ path: dir + '/19-plan-drawing-6x4-open.png' })
+  await page.getByTestId('plan-point-0').click() // snap and close
+  await page.getByTestId('plan-closed-status').waitFor()
+  assert.match(await page.getByTestId('plan-dimensions').textContent(), /6,00.*4,00/)
+  assert.match(await page.getByTestId('plan-perimeter').textContent(), /20,00/)
+  assert.match(await page.getByTestId('plan-area').textContent(), /24/)
+  await page.screenshot({ path: dir + '/20-plan-perimeter-6x4-closed.png' })
+  const planDownload = page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const planSaved = JSON.parse(await readFile(await (await planDownload).path(), 'utf8'))
+  assert.deepEqual(planSaved.building.floorPlan, {
+    exterior: [
+      {xMm:0,zMm:0},{xMm:6000,zMm:0},
+      {xMm:6000,zMm:-4000},{xMm:0,zMm:-4000},
+    ], closed:true, interiorWalls:[],
+  })
+  assert.equal(planSaved.validation.valid, true)
+  assert.equal(planSaved.building.walls.length, 1) // existing 3D mode unchanged
+  await page.getByTestId('plan-reopen').click()
+  await page.getByTestId('plan-remove-last').click()
+  await page.getByTestId('plan-point-3').waitFor({ state: 'detached' })
+  const pos = await page.getByTestId('plan-canvas').evaluate(svg => {
+    const origin = svg.querySelector('[data-testid="plan-point-0"] circle')
+    const lastCorner = svg.querySelector('[data-testid="plan-point-2"] circle')
+    if (!origin || !lastCorner) throw Error('Plan points missing')
+    const x = Number(origin.getAttribute('cx'))
+    const y = Number(lastCorner.getAttribute('cy'))
+    const ctm = svg.getScreenCTM()
+    if (!ctm) throw Error('Plan CTM missing')
+    const p = new DOMPoint(x, y).matrixTransform(ctm)
+    return {x:p.x,y:p.y}
+  })
+  await page.mouse.click(pos.x,pos.y)
+  await page.getByTestId('plan-point-3').waitFor()
+  await page.getByTestId('plan-close').click()
+  await page.getByTestId('plan-closed-status').waitFor()
+  assert.deepEqual(errors, [], 'Plan editor browser exceptions')
+  console.log('SIGMA4 BROWSER PASS: v0.1.0 Plan 2D point drawing exact metres, closure, perimeter, JSON, Undo path; 3D legacy verified; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()

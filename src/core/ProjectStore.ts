@@ -10,9 +10,16 @@ import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
 import { translateWallsToExteriorZero, migrateLegacyWallOrigins } from './world-origin'
 import { effectiveConnections, reflowConnections } from './wall-topology'
+import { emptyFloorPlan, validateFloorPlan, type PlanPoint } from './floor-plan'
 
 export type ProjectCommand =
   | { type: 'SET_PROJECT_NAME'; payload: { projectName: string } }
+  | { type: 'PLAN_ADD_POINT'; payload: { point: PlanPoint } }
+  | { type: 'PLAN_MOVE_POINT'; payload: { index: number; point: PlanPoint } }
+  | { type: 'PLAN_CLOSE'; payload: Record<string, never> }
+  | { type: 'PLAN_REOPEN'; payload: Record<string, never> }
+  | { type: 'PLAN_REMOVE_LAST'; payload: Record<string, never> }
+  | { type: 'PLAN_CLEAR'; payload: Record<string, never> }
   | { type: 'SET_WALL_LENGTH'; payload: { wallId: string; lengthMm: number } }
   | { type: 'SET_WALL_HEIGHT'; payload: { wallId: string; heightMm: number } }
   | { type: 'SET_STUD_SPACING'; payload: { wallId: string; studSpacingMm: number } }
@@ -252,6 +259,69 @@ export class ProjectStore {
 
     try {
       switch (command.type) {
+        case 'PLAN_ADD_POINT': {
+          const plan = candidate.building.floorPlan ?? emptyFloorPlan()
+          if (plan.closed) return { success: false, errorCode: 'PLAN_CLOSED',
+            messageRu: 'Чтобы продолжить, сначала разомкните контур' }
+          plan.exterior.push({ ...command.payload.point })
+          const errors = validateFloorPlan(plan)
+          if (errors.length) return { success: false, errorCode: 'INVALID_FLOOR_PLAN', messageRu: errors[0] }
+          candidate.building.floorPlan = plan
+          changedIds.push('building.floorPlan.exterior')
+          break
+        }
+        case 'PLAN_MOVE_POINT': {
+          const plan = candidate.building.floorPlan
+          const { index, point } = command.payload
+          if (!plan || !Number.isInteger(index) || index < 1 || index >= plan.exterior.length) {
+            return { success: false, errorCode: 'INVALID_PLAN_POINT',
+              messageRu: 'Первую точку (0,0) нельзя перемещать' }
+          }
+          plan.exterior[index] = { ...point }
+          const errors = validateFloorPlan(plan)
+          if (errors.length) return { success: false, errorCode: 'INVALID_FLOOR_PLAN', messageRu: errors[0] }
+          changedIds.push('building.floorPlan.exterior[' + index + ']')
+          break
+        }
+        case 'PLAN_CLOSE': {
+          const plan = candidate.building.floorPlan
+          if (!plan || plan.closed) return { success: false,
+            errorCode: 'PLAN_NOT_OPEN', messageRu: 'Незамкнутый контур отсутствует' }
+          plan.closed = true
+          const errors = validateFloorPlan(plan)
+          if (errors.length) return { success: false, errorCode: 'INVALID_FLOOR_PLAN',
+            messageRu: errors[0] }
+          changedIds.push('building.floorPlan.closed')
+          break
+        }
+        case 'PLAN_REOPEN': {
+          const plan = candidate.building.floorPlan
+          if (!plan?.closed) return { success: false, errorCode: 'PLAN_ALREADY_OPEN',
+            messageRu: 'Контур уже разомкнут' }
+          if (plan.interiorWalls.length) return { success: false,
+            errorCode: 'PLAN_HAS_INTERIOR', messageRu: 'Сначала удалите внутренние стены' }
+          plan.closed = false
+          changedIds.push('building.floorPlan.closed')
+          break
+        }
+        case 'PLAN_REMOVE_LAST': {
+          const plan = candidate.building.floorPlan
+          if (!plan || plan.closed || !plan.exterior.length) return {
+            success: false, errorCode: 'PLAN_NO_POINT',
+            messageRu: 'Нет доступных для удаления точек' }
+          plan.exterior.pop()
+          changedIds.push('building.floorPlan.exterior')
+          break
+        }
+        case 'PLAN_CLEAR': {
+          const plan = candidate.building.floorPlan
+          if (plan?.interiorWalls.length) return {
+            success: false, errorCode: 'PLAN_HAS_INTERIOR',
+            messageRu: 'Нельзя удалить план с внутренними стенами' }
+          candidate.building.floorPlan = emptyFloorPlan()
+          changedIds.push('building.floorPlan')
+          break
+        }
         case 'SET_PROJECT_NAME': {
           candidate.project.projectName = command.payload.projectName
           changedIds.push('project.projectName')

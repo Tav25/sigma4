@@ -8,6 +8,7 @@ import { canFitCornerFraming, rightCornerOrigin } from './corner'
 import { effectiveConnections, validateWallTopology } from './wall-topology'
 import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
 import { wallMidplaneOrigin } from './world-origin'
+import { validateFloorPlan } from './floor-plan'
 
 const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0', '1.1.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
@@ -86,6 +87,12 @@ export function validateStructure(doc: any): ValidationIssue[] {
     }
   }
 
+  if (doc.building?.floorPlan !== undefined) {
+    for (const message of validateFloorPlan(doc.building.floorPlan)) {
+      issues.push(createIssue('INVALID_FLOOR_PLAN', 'error',
+        'building.floorPlan', message, []))
+    }
+  }
   const wallIds = new Set<string>()
   const openingIds = new Set<string>()
 
@@ -532,6 +539,12 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
     }
   }
 
+  if (doc.building?.floorPlan !== undefined) {
+    for (const message of validateFloorPlan(doc.building.floorPlan)) {
+      issues.push(createIssue('INVALID_FLOOR_PLAN', 'error',
+        'building.floorPlan', message, []))
+    }
+  }
   const wallIds = new Set<string>()
   const openingIds = new Set<string>()
 

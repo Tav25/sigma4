@@ -1,3 +1,5 @@
+import type { FloorPlan } from './floor-plan'
+
 export interface ProjectMeta {
   schemaVersion: string
   projectId: string
@@ -115,6 +117,8 @@ export interface ProjectDocument {
     walls: Wall[]
     /** Optional for backward compatibility with legacy two-wall projects. */
     connections?: WallConnection[]
+    /** Independent authored 2D plan; derived 3D framing is a later phase. */
+    floorPlan?: FloorPlan
     openings: Opening[]
     markers: Marker[]
   }

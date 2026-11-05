@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { SceneView } from './scene/SceneView'
+import { FloorPlanEditor } from './components/FloorPlanEditor'
 import { timberVolumeM3, type TimberElement as CoreTimberElement } from './core/timber'
 import { SafeNumberInput } from './components/SafeNumberInput'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -52,6 +53,7 @@ export default function App() {
   const [selectedWallId, setSelectedWallId] = useState('wall-001')
   const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [workspace, setWorkspace] = useState<'plan' | 'frame'>('plan')
   const [showEdges, setShowEdges] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
   const [commandError, setCommandError] = useState<string | null>(null)
@@ -306,14 +308,38 @@ export default function App() {
       <header className="top-bar">
         <span className="app-title">SIGMA4</span>
         <span className="app-version">{packageInfo.version}</span>
+        <nav className="workspace-tabs" aria-label="Режим работы">
+          <button type="button" data-testid="tab-plan" role="tab"
+            aria-selected={workspace === 'plan'} onClick={() => setWorkspace('plan')}>
+            План 2D
+          </button>
+          <button type="button" data-testid="tab-frame" role="tab"
+            aria-selected={workspace === 'frame'} onClick={() => setWorkspace('frame')}>
+            Каркас 3D
+          </button>
+        </nav>
         <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <button onClick={undo} disabled={!canUndo} title="Отменить">↶</button>
           <button onClick={redo} disabled={!canRedo} title="Повторить">↷</button>
           <span style={{ fontSize: 12, color: '#666', paddingTop: 4 }}>Rev: {revision}</span>
         </div>
       </header>
+      <input type="file" accept=".sigma4.json,.json" onChange={handleImportJson}
+        style={{ display: 'none' }} id="import-file" />
+      {workspace === 'plan' ? (
+        <ErrorBoundary>
+          <FloorPlanEditor plan={snapshot.building.floorPlan}
+            onCommand={dispatch} onExport={exportJson}
+            onImport={() => document.getElementById('import-file')?.click()} />
+        </ErrorBoundary>
+      ) : (
       <div className="main">
         <aside className="left-panel">
+          <div style={{ fontSize: 11, padding: '8px 9px', border: '1px solid #d8e2ee',
+            borderRadius: 7, background: '#edf5fc', color: '#3c647f', marginBottom: 12 }}>
+            Существующий 3D-каркас. Чертёж плана пока хранится отдельно;
+            автоматическое создание каркаса по плану — следующий этап.
+          </div>
           <h2 className="panel-title">Дерево проекта</h2>
           <ProjectTree
             document={snapshot}
@@ -502,7 +528,6 @@ export default function App() {
             <button type="button" className="param-input" onClick={exportJson} style={{ cursor: 'pointer' }}>Экспорт JSON</button>
           </div>
           <div className="param-group">
-            <input type="file" accept=".sigma4.json,.json" onChange={handleImportJson} style={{ display: 'none' }} id="import-file" />
             <button type="button" className="param-input" onClick={() => document.getElementById('import-file')?.click()} style={{ cursor: 'pointer' }}>Импорт JSON</button>
           </div>
           {commandError && (
@@ -565,6 +590,7 @@ export default function App() {
           </ErrorBoundary>
         </main>
       </div>
+      )}
     </div>
   )
 }
