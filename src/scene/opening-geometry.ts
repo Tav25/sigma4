@@ -25,8 +25,8 @@ export function openingWorldToLocalU(
   const u = opening.wallOrientation === '-x' ? {x:-1,z:0}
     : opening.wallOrientation === '+z' ? {x:0,z:1}
       : opening.wallOrientation === 'z' ? {x:0,z:-1} : {x:1,z:0}
-  return (worldPointMeters.x * 1000 - opening.wallOrigin.x) * u.x +
-    (worldPointMeters.z * 1000 - opening.wallOrigin.z) * u.z
+  return ((worldPointMeters.x * 1000 - opening.wallOrigin.x) * u.x +
+    (worldPointMeters.z * 1000 - opening.wallOrigin.z) * u.z) / 1000
 }
 
 export function openingYaw(opening: SceneOpening3D): number {

@@ -235,7 +235,7 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
   const { building, assembly } = doc
   for (const opening of building.openings) issues.push(...garageEngineeringNotices(opening))
   const links = effectiveConnections(doc)
-  issues.push(...validateWallTopology(building.walls, links))
+  issues.push(...validateWallTopology(building.walls, links, building.closure))
   const california = links.find(link => link && link.type === 'california-right' &&
     building.walls.some(w => w.wallId === link.fromWallId) &&
     building.walls.some(w => w.wallId === link.toWallId))
@@ -659,7 +659,7 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
              toWallId: doc.building.walls[1].wallId,
              type: 'california-right' as const }]
         : [])
-    issues.push(...validateWallTopology(doc.building.walls, links))
+    issues.push(...validateWallTopology(doc.building.walls, links, doc.building.closure))
   }
   if (doc.building?.connections !== undefined && !Array.isArray(doc.building.connections)) {
     issues.push(createIssue('INVALID_CONNECTIONS_ARRAY', 'error', 'building.connections',
