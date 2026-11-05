@@ -10,7 +10,8 @@ import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
 import { translateWallsToExteriorZero, migrateLegacyWallOrigins } from './world-origin'
 import { effectiveConnections, reflowConnections } from './wall-topology'
-import { emptyFloorPlan, validateFloorPlan, type PlanPoint, type PlanInteriorWall } from './floor-plan'
+import { emptyFloorPlan, validateFloorPlan, moveInteriorWallWithDependents,
+  moveWallToClearance, type PlanPoint, type PlanInteriorWall } from './floor-plan'
 
 export type ProjectCommand =
   | { type: 'SET_PROJECT_NAME'; payload: { projectName: string } }
@@ -23,6 +24,9 @@ export type ProjectCommand =
   | { type: 'PLAN_ADD_INTERIOR_WALL'; payload: { wall: PlanInteriorWall } }
   | { type: 'PLAN_UPDATE_INTERIOR_WALL'; payload: { id: string; start: PlanPoint; end: PlanPoint; thicknessMm: number } }
   | { type: 'PLAN_REMOVE_INTERIOR_WALL'; payload: { id: string } }
+  | { type: 'PLAN_MOVE_INTERIOR_WALL'; payload: { id: string; offsetMm: number } }
+  | { type: 'PLAN_SET_INTERIOR_CLEARANCE'; payload: { id: string; side: 'negative' | 'positive'; distanceMm: number } }
+  | { type: 'PLAN_SET_EXTERIOR_THICKNESS'; payload: { thicknessMm: number } }
   | { type: 'SET_WALL_LENGTH'; payload: { wallId: string; lengthMm: number } }
   | { type: 'SET_WALL_HEIGHT'; payload: { wallId: string; heightMm: number } }
   | { type: 'SET_STUD_SPACING'; payload: { wallId: string; studSpacingMm: number } }
@@ -360,6 +364,35 @@ export class ProjectStore {
           if (errors.length) return { success: false, errorCode: 'DEPENDENT_INTERIOR_WALL',
             messageRu: errors[0] }
           changedIds.push('building.floorPlan.interiorWalls')
+          break
+        }
+
+        case 'PLAN_MOVE_INTERIOR_WALL':
+        case 'PLAN_SET_INTERIOR_CLEARANCE': {
+          const plan = candidate.building.floorPlan
+          if (!plan?.closed) return { success: false, errorCode: 'PLAN_NOT_CLOSED',
+            messageRu: 'Сначала замкните контур' }
+          const updated = command.type === 'PLAN_MOVE_INTERIOR_WALL'
+            ? moveInteriorWallWithDependents(plan, command.payload.id, command.payload.offsetMm)
+            : moveWallToClearance(plan, command.payload.id, command.payload.side, command.payload.distanceMm)
+          if (!updated) return { success: false, errorCode: 'INVALID_INTERIOR_MOVE',
+            messageRu: 'Не удалось вычислить новое положение стены' }
+          const errors = validateFloorPlan(updated)
+          if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_MOVE',
+            messageRu: errors[0] }
+          candidate.building.floorPlan = updated
+          changedIds.push('building.floorPlan.interiorWalls')
+          break
+        }
+        case 'PLAN_SET_EXTERIOR_THICKNESS': {
+          const plan = candidate.building.floorPlan
+          if (!plan?.closed) return { success: false, errorCode: 'PLAN_NOT_CLOSED',
+            messageRu: 'Сначала замкните наружный контур' }
+          plan.exteriorThicknessMm = command.payload.thicknessMm
+          const errors = validateFloorPlan(plan)
+          if (errors.length) return { success: false, errorCode: 'INVALID_EXTERIOR_THICKNESS',
+            messageRu: errors[0] }
+          changedIds.push('building.floorPlan.exteriorThicknessMm')
           break
         }
         case 'SET_PROJECT_NAME': {

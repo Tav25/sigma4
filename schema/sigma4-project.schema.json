@@ -282,7 +282,7 @@
         },
         "floorPlan": {
           "type": "object",
-          "description": "SIGMA4 0.1.1 authored two-dimensional floor plan in millimetres. Exterior and interior wall centreline segments share the canonical JSON model; physically generated 3D framing remains separate.",
+          "description": "SIGMA4 0.1.11 authored two-dimensional floor plan in millimetres. Exterior and interior wall centreline segments share the canonical JSON model; physically generated 3D framing remains separate.",
           "additionalProperties": false,
           "required": [
             "exterior",
@@ -290,6 +290,12 @@
             "interiorWalls"
           ],
           "properties": {
+            "exteriorThicknessMm": {
+              "type": "integer",
+              "minimum": 50,
+              "maximum": 500,
+              "description": "Optional outward envelope wall thickness, visually extruded inwards; 150 mm if absent"
+            },
             "exterior": {
               "type": "array",
               "maxItems": 32,

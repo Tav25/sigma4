@@ -1,8 +1,10 @@
-import { useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react'
 import {
   emptyFloorPlan, meters, planAreaM2, planBounds, planDistanceMm,
   planPerimeterMm, validateFloorPlan, decimalMetersToMm,
-  snapPlanAnchor, nextInteriorWallId, planInteriorJunctions,
+  snapPlanAnchor, nextInteriorWallId, planInteriorJunctions, planWallClearances,
+  moveInteriorWallWithDependents, moveWallToClearance, exteriorWallStrips,
+  DEFAULT_EXTERIOR_THICKNESS_MM,
   type FloorPlan, type PlanPoint, type PlanInteriorWall,
 } from '../core/floor-plan'
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
@@ -21,6 +23,8 @@ const directions = [
 
 type Direction = typeof directions[number]['value']
 type PanDrag = { pointerId: number; initialX: number; initialY: number; panX: number; panY: number }
+type WallPointerDrag = { id: string; pointerId: number; startX: number; startY: number;
+  offsetMm: number; moved: boolean; candidate: FloorPlan | null }
 
 export interface FloorPlanEditorProps {
   plan?: FloorPlan
@@ -44,13 +48,25 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
   const [interiorThickness, setInteriorThickness] = useState('100')
   const [selectedInteriorId, setSelectedInteriorId] = useState<string | null>(null)
   const [interiorEdit, setInteriorEdit] = useState({ sx: '', sz: '', ex: '', ez: '', thickness: '100' })
+  const [dimensionEdit, setDimensionEdit] = useState<{side:'negative'|'positive';value:string}|null>(null)
+  const [outerWidthDraft, setOuterWidthDraft] = useState(String(plan.exteriorThicknessMm ?? DEFAULT_EXTERIOR_THICKNESS_MM))
+  const [wallPreview, setWallPreview] = useState<FloorPlan | null>(null)
+  const wallPointer = useRef<WallPointerDrag | null>(null)
   const [pointX, setPointX] = useState('')
   const [pointZ, setPointZ] = useState('')
   const drag = useRef<PanDrag | null>(null)
   const ignoreClick = useRef(false)
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  useEffect(() => {
+    setOuterWidthDraft(String(plan.exteriorThicknessMm ?? DEFAULT_EXTERIOR_THICKNESS_MM))
+  }, [plan.exteriorThicknessMm])
   const points = plan.exterior
   const selectedInterior = plan.interiorWalls.find(w => w.id === selectedInteriorId)
-  const innerJunctions = planInteriorJunctions(plan)
+  const visiblePlan = wallPreview ?? plan
+  const visibleWalls = visiblePlan.interiorWalls
+  const innerJunctions = planInteriorJunctions(visiblePlan)
+  const clearances = selectedInterior && tool === 'select'
+    ? planWallClearances(visiblePlan, selectedInterior.id) : null
   const px = zoom * BASE_PX_PER_METRE
   const originX = OFFSET_X + pan.x
   const originY = OFFSET_Y + pan.y
@@ -114,12 +130,50 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
   }
   const selectInteriorWall = (wall: PlanInteriorWall) => {
     setSelectedInteriorId(wall.id)
+    setDimensionEdit(null)
     setSelectedIndex(null)
     setInteriorEdit({
       sx: meters(wall.start.xMm), sz: meters(wall.start.zMm),
       ex: meters(wall.end.xMm), ez: meters(wall.end.zMm),
       thickness: String(wall.thicknessMm),
     })
+  }
+  const setExteriorThickness = () => {
+    const thicknessMm = Number(outerWidthDraft)
+    if (!Number.isInteger(thicknessMm) || thicknessMm < 50 || thicknessMm > 500) {
+      setLocalError('Толщина наружной стены: целое число от 50 до 500 мм')
+      return
+    }
+    apply({type:'PLAN_SET_EXTERIOR_THICKNESS',payload:{thicknessMm}})
+  }
+  const saveDimension = () => {
+    if (!dimensionEdit || !selectedInterior) return
+    const desiredMm = decimalMetersToMm(dimensionEdit.value)
+    if (desiredMm === null) {
+      setLocalError('Расстояние должно быть от 0,30 до 100 м с точностью 1 мм')
+      return
+    }
+    const candidate=moveWallToClearance(plan, selectedInterior.id, dimensionEdit.side, desiredMm)
+    if (apply({ type:'PLAN_SET_INTERIOR_CLEARANCE',
+      payload:{id:selectedInterior.id,side:dimensionEdit.side,distanceMm:desiredMm} })) {
+      const wall=candidate?.interiorWalls.find(w=>w.id===selectedInterior.id)
+      if (wall) selectInteriorWall(wall)
+      setDimensionEdit(null)
+    }
+  }
+  const beginWallDrag = (event: PointerEvent<SVGLineElement>, wall: PlanInteriorWall) => {
+    if (tool !== 'select' || event.button !== 0 || event.shiftKey) return
+    event.preventDefault()
+    event.stopPropagation()
+    const root=svgRef.current
+    const screen=root?.getScreenCTM()
+    if (!root || !screen) return
+    const pos=new DOMPoint(event.clientX,event.clientY).matrixTransform(screen.inverse())
+    selectInteriorWall(wall)
+    setDimensionEdit(null)
+    wallPointer.current={id:wall.id,pointerId:event.pointerId,startX:pos.x,
+      startY:pos.y,offsetMm:0,moved:false,candidate:null}
+    root.setPointerCapture(event.pointerId)
   }
   const updateInteriorWall = () => {
     if (!selectedInterior) return
@@ -278,6 +332,32 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
   }
   const pointerMove = (event: PointerEvent<SVGSVGElement>) => {
     const loc = svgFromEvent(event)
+    const moving=wallPointer.current
+    if (moving && moving.pointerId === event.pointerId) {
+      const dx=loc.x-moving.startX, dy=loc.y-moving.startY
+      if (Math.hypot(dx,dy) > 4) moving.moved=true
+      if (!moving.moved) return
+      ignoreClick.current=true
+      const source=plan.interiorWalls.find(w=>w.id===moving.id)
+      if (!source) return
+      const vertical=source.start.xMm===source.end.xMm
+      const raw=(vertical ? dx : dy) / px * 1000
+      const offsetMm=Math.round(raw / snapMm) * snapMm
+      const candidate=moveInteriorWallWithDependents(plan,moving.id,offsetMm)
+      const errors=candidate ? validateFloorPlan(candidate) : ['Неверное перемещение']
+      if (!candidate || errors.length) {
+        moving.offsetMm=0
+        moving.candidate=null
+        setWallPreview(null)
+        setLocalError(errors[0])
+      } else {
+        moving.offsetMm=offsetMm
+        moving.candidate=candidate
+        setWallPreview(candidate)
+        setLocalError('')
+      }
+      return
+    }
     if (drag.current && drag.current.pointerId === event.pointerId) {
       const data = drag.current
       setPan({ x: data.panX + loc.x - data.initialX,
@@ -296,6 +376,22 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
     setHover(proposal)
   }
   const pointerUp = (event: PointerEvent<SVGSVGElement>) => {
+    if (wallPointer.current?.pointerId === event.pointerId) {
+      const completed=wallPointer.current
+      wallPointer.current=null
+      setWallPreview(null)
+      if (svgRef.current?.hasPointerCapture(event.pointerId))
+        svgRef.current.releasePointerCapture(event.pointerId)
+      if (completed.moved && completed.offsetMm !== 0 && event.type !== 'pointercancel') {
+        if (apply({type:'PLAN_MOVE_INTERIOR_WALL',payload:{
+          id:completed.id,offsetMm:completed.offsetMm,
+        }})) {
+          const selected=completed.candidate?.interiorWalls.find(w=>w.id===completed.id)
+          if (selected) selectInteriorWall(selected)
+        }
+      }
+      return
+    }
     if (drag.current?.pointerId === event.pointerId) {
       drag.current = null
       event.currentTarget.releasePointerCapture(event.pointerId)
@@ -353,6 +449,18 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
                 }
               }}>Разомкнуть для продолжения</button>
           </div>
+          <div className="plan-tool-section" data-testid="plan-outer-wall-width">
+            <strong className="plan-section-title">Толщина наружных стен</strong>
+            <label htmlFor="outer-wall-width">Толщина внутрь периметра, мм</label>
+            <input id="outer-wall-width" data-testid="plan-outer-thickness"
+              type="number" min="50" max="500" step="1"
+              value={outerWidthDraft} onChange={e=>setOuterWidthDraft(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter')setExteriorThickness()}} />
+            <button type="button" className="plan-button plan-secondary"
+              data-testid="plan-save-outer-thickness" onClick={setExteriorThickness}>
+              Применить толщину
+            </button>
+          </div>
           <div className="plan-tool-section" data-testid="plan-interior-controls">
             <strong className="plan-section-title">02 · Внутренние стены</strong>
             <p className="plan-muted">Переключитесь на «Чертить». Нажмите начало на существующей стене, затем конец на другой. Пересечения станут узлами автоматически.</p>
@@ -383,7 +491,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
           {selectedInterior && tool === 'select' && (
             <div className="plan-tool-section" data-testid="plan-selected-interior">
               <strong className="plan-section-title">Стена {selectedInterior.id}</strong>
-              <p className="plan-muted">Координаты оси в метрах. Меняйте поля и нажимайте «Применить»; связанные соединения проверяются.</p>
+              <p className="plan-muted">Перетаскивайте стену мышью или нажмите размер между стенами на плане. Точные координаты оси также доступны ниже.</p>
               {([
                 ['sx', 'Начало X, м'], ['sz', 'Начало Z, м'],
                 ['ex', 'Конец X, м'], ['ez', 'Конец Z, м'],
@@ -468,7 +576,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
           </div>
         </div>
         <div className="plan-canvas-wrap">
-          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="plan-canvas"
+          <svg ref={svgRef} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="plan-canvas"
             data-testid="plan-canvas" role="img" aria-label="Чертёж периметра здания, метры"
             onClick={onCanvasClick} onPointerDown={pointerDown} onPointerMove={pointerMove}
             onPointerUp={pointerUp} onPointerCancel={pointerUp} onPointerLeave={() => setHover(null)}
@@ -492,7 +600,12 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
               stroke="#b8cadd" strokeWidth="1.8" pointerEvents="none"/>
             <text x={WIDTH-32} y={originY-14} className="plan-axis-label" textAnchor="end">+X →</text>
             <text x={originX+14} y={22} className="plan-axis-label">−Z ↑</text>
-            {plan.closed && <polygon points={fill} fill="#d9eafa" fillOpacity=".56" stroke="none" pointerEvents="none"/>}
+            {plan.closed && <polygon points={fill} fill="#d9eafa" fillOpacity=".42" stroke="none" pointerEvents="none"/>}
+            {exteriorWallStrips(plan).map((strip,i)=>
+              <polygon key={'outer-strip-'+i} data-testid={'plan-exterior-strip-'+i}
+                points={strip.map(p=>{const q=xy(p);return q.x+','+q.y}).join(' ')}
+                fill="#567a91" fillOpacity=".56" stroke="none" pointerEvents="none"/>
+            )}
             {edges.map(edge => {
               const a=xy(edge.from),b=xy(edge.to)
               const dx=b.x-a.x,dy=b.y-a.y
@@ -509,7 +622,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
               const rotation=Math.abs(dx)<Math.abs(dy)?-90:0
               const label=meters(planDistanceMm(edge.from,edge.to))+' м'
               return <g key={edge.index} pointerEvents="none">
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="plan-wall-line" />
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="plan-wall-line" style={{strokeWidth:plan.closed?2.5:8}} />
                 <line x1={a.x+norm.x*17*side} y1={a.y+norm.y*17*side}
                   x2={b.x+norm.x*17*side} y2={b.y+norm.y*17*side} className="plan-dimension-line"/>
                 <g transform={`translate(${labelX} ${labelY}) rotate(${rotation})`}>
@@ -531,25 +644,82 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
                   fill="#0f6d65" fontSize={15}>{meters(planDistanceMm(current,proposal))} м</text>
               </g>
             )}
-            {plan.interiorWalls.map(w => {
+            {visibleWalls.map(w => {
               const a = xy(w.start), b = xy(w.end)
               const active = selectedInteriorId === w.id && tool === 'select'
               const label = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
               return <g key={w.id} data-testid={'plan-internal-wall-' + w.id}
                 onClick={e => {
-                  if (tool === 'select') { e.stopPropagation(); selectInteriorWall(w) }
+                  if (tool === 'select') { e.stopPropagation(); if(ignoreClick.current){ignoreClick.current=false;return} selectInteriorWall(w) }
                 }}>
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke={active ? '#db8c2d' : '#c27a2f'} strokeWidth={7}
-                  strokeLinecap="round" vectorEffect="non-scaling-stroke" pointerEvents="none"/>
+                  stroke={active ? '#d99138' : '#c27a2f'}
+                  strokeWidth={Math.max(2,w.thicknessMm * px / 1000)}
+                  strokeLinecap="butt" vectorEffect="non-scaling-stroke" pointerEvents="none"/>
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke="transparent" strokeWidth={18} pointerEvents="stroke"
+                  stroke="transparent" strokeWidth={Math.max(18,w.thicknessMm * px / 1000)}
+                  pointerEvents="stroke" onPointerDown={e=>beginWallDrag(e,w)}
                   className="plan-interior-hit"/>
                 <text x={label.x + (a.x === b.x ? 18 : 0)}
                   y={label.y + (a.y === b.y ? -15 : 0)}
                   textAnchor="middle" className="plan-inner-label" pointerEvents="none">
                   {meters(planDistanceMm(w.start,w.end))} м
                 </text>
+              </g>
+            })}
+            {clearances && (['negative','positive'] as const).map(side => {
+              const entry=clearances[side]
+              if (!entry) return null
+              const vertical=clearances.axis==='x'
+              const row=clearances.scanMm
+              const start=vertical
+                ? xy({xMm:entry.referenceMm,zMm:row})
+                : xy({xMm:row,zMm:entry.referenceMm})
+              const end=vertical
+                ? xy({xMm:clearances.coordinateMm,zMm:row})
+                : xy({xMm:row,zMm:clearances.coordinateMm})
+              const centerX=(start.x+end.x)/2
+              const centerY=(start.y+end.y)/2
+              const labelX=vertical?centerX:centerX+25
+              const labelY=vertical?centerY-22:centerY
+              const currentlyEditing=dimensionEdit?.side===side
+              return <g key={side} data-testid={'plan-clearance-'+side}>
+                <line x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+                  stroke="#1b97a6" strokeWidth={1.5} strokeDasharray="4 4" pointerEvents="none"/>
+                <circle cx={start.x} cy={start.y} r={3} fill="#1b97a6" pointerEvents="none"/>
+                <circle cx={end.x} cy={end.y} r={3} fill="#1b97a6" pointerEvents="none"/>
+                {!currentlyEditing && <g className="plan-click-dimension" role="button" tabIndex={0}
+                  onClick={event=>{
+                    event.stopPropagation()
+                    setDimensionEdit({side,value:meters(entry.distanceMm)})
+                  }}
+                  onKeyDown={event=>{
+                    if(event.key==='Enter' || event.key===' ') {
+                      event.preventDefault()
+                      setDimensionEdit({side,value:meters(entry.distanceMm)})
+                    }
+                  }}>
+                  <rect x={labelX-47} y={labelY-17} rx={6} width={94} height={30}
+                    fill="#fff" stroke="#72abb6" strokeWidth={1.5}/>
+                  <text x={labelX} y={labelY+3} textAnchor="middle"
+                    fill="#176f81" fontWeight={750} fontSize={13} pointerEvents="none">
+                    {meters(entry.distanceMm)} м
+                  </text>
+                </g>}
+                {currentlyEditing && dimensionEdit && <foreignObject x={labelX-60} y={labelY-18}
+                    width={120} height={40}>
+                    <div className="plan-inline-dimension">
+                      <input data-testid="plan-dimension-input" autoFocus
+                        aria-label="Новый размер, метры"
+                        type="text" inputMode="decimal" value={dimensionEdit.value}
+                        onClick={event=>event.stopPropagation()}
+                        onChange={event=>setDimensionEdit({...dimensionEdit,value:event.target.value})}
+                        onKeyDown={event=>{
+                          if(event.key==='Enter'){event.stopPropagation();saveDimension()}
+                          if(event.key==='Escape'){event.stopPropagation();setDimensionEdit(null)}
+                        }}/>
+                    </div>
+                  </foreignObject>}
               </g>
             })}
             {innerJunctions.map((p,i) => {
@@ -598,7 +768,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
           </div>
           <div className="plan-canvas-hint">{plan.closed ? tool === 'interior'
             ? 'ЛКМ — начало и конец на существующих стенах · Shift + перетаскивание — сдвиг'
-            : 'Нажмите на внутреннюю стену для редактирования · Shift + перетаскивание — сдвиг'
+            : 'Выберите стену · перетащите её · нажмите бирюзовый размер для точного ввода'
             : 'ЛКМ — следующая точка · Shift + перетаскивание — сдвиг · Колесо — масштаб'}</div>
         </div>
         <div className="plan-bottom">

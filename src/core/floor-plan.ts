@@ -12,6 +12,8 @@ export interface PlanInteriorWall {
   thicknessMm: number
 }
 export interface FloorPlan {
+  /** Thickness of external walls, measured inward from the exterior boundary. */
+  exteriorThicknessMm?: number
   exterior: PlanPoint[]
   closed: boolean
   interiorWalls: PlanInteriorWall[]
@@ -102,6 +104,9 @@ export function validateFloorPlan(raw: unknown): string[] {
   const plan = raw as Partial<FloorPlan>
   if (!Array.isArray(plan.exterior) || !Array.isArray(plan.interiorWalls) ||
     typeof plan.closed !== 'boolean') return ['Неверная структура плана']
+  if (plan.exteriorThicknessMm !== undefined &&
+    (!Number.isInteger(plan.exteriorThicknessMm) || plan.exteriorThicknessMm < 50 || plan.exteriorThicknessMm > 500))
+    errors.push('Толщина наружной стены должна быть целым числом от 50 до 500 мм')
   const nodes = plan.exterior
   if (nodes.length > MAX_PLAN_POINTS) errors.push('Слишком много точек наружного контура')
   for (let i = 0; i < nodes.length; i++) {
@@ -312,4 +317,119 @@ function validateInteriorPlan(plan: FloorPlan): string[] {
     }
   }
   return [...new Set(issues)]
+}
+
+
+/** Width of an interior wall is measured around its centreline. */
+export const DEFAULT_EXTERIOR_THICKNESS_MM = 150
+
+/** Signed area in mm²; negative polygons follow clockwise screen-space winding. */
+export function planSignedArea2(points: PlanPoint[]): number {
+  return points.reduce((sum, p, i) => {
+    const q = points[(i + 1) % points.length]
+    return sum + p.xMm * q.zMm - q.xMm * p.zMm
+  }, 0)
+}
+
+/** Visual outer-wall strips are generated inward from the immutable exterior boundary. */
+export function exteriorWallStrips(plan: FloorPlan): PlanPoint[][] {
+  if (!plan.closed || plan.exterior.length < 3) return []
+  const t = plan.exteriorThicknessMm ?? DEFAULT_EXTERIOR_THICKNESS_MM
+  const side = planSignedArea2(plan.exterior) < 0 ? 1 : -1
+  return plan.exterior.map((a, i) => {
+    const b = plan.exterior[(i + 1) % plan.exterior.length]
+    const length = planDistanceMm(a, b)
+    if (!length) return [a, b]
+    const dx = side * (b.zMm - a.zMm) * t / length
+    const dz = side * (a.xMm - b.xMm) * t / length
+    return [a, b, { xMm: b.xMm + dx, zMm: b.zMm + dz },
+      { xMm: a.xMm + dx, zMm: a.zMm + dz }]
+  })
+}
+
+export interface PlanClearance {
+  axis: 'x' | 'z'
+  scanMm: number
+  coordinateMm: number
+  negative: { referenceMm: number; distanceMm: number } | null
+  positive: { referenceMm: number; distanceMm: number } | null
+}
+
+/**
+ * Find real parallel segments intersecting the scanline through a selected
+ * wall. Thus dimension chains stop at the nearest wall, not at an arbitrary
+ * bounding rectangle (important for L-shaped footprints).
+ */
+export function planWallClearances(plan: FloorPlan, wallId: string): PlanClearance | null {
+  const wall = plan.interiorWalls.find(w => w.id === wallId)
+  if (!wall || !plan.closed || !planIsOrthogonal(wall.start, wall.end)) return null
+  const axis: 'x' | 'z' = wall.start.xMm === wall.end.xMm ? 'x' : 'z'
+  const parallel = axis === 'x'
+  const coordinateMm = parallel ? wall.start.xMm : wall.start.zMm
+  const scanMm = parallel ?
+    (wall.start.zMm + wall.end.zMm) / 2 :
+    (wall.start.xMm + wall.end.xMm) / 2
+  const references = planSegments(plan).filter(seg => seg.id !== wallId)
+    .filter(seg => parallel
+      ? seg.start.xMm === seg.end.xMm &&
+        scanMm >= Math.min(seg.start.zMm, seg.end.zMm) &&
+        scanMm <= Math.max(seg.start.zMm, seg.end.zMm)
+      : seg.start.zMm === seg.end.zMm &&
+        scanMm >= Math.min(seg.start.xMm, seg.end.xMm) &&
+        scanMm <= Math.max(seg.start.xMm, seg.end.xMm))
+    .map(seg => parallel ? seg.start.xMm : seg.start.zMm)
+  const smaller = references.filter(n => n < coordinateMm)
+  const larger = references.filter(n => n > coordinateMm)
+  const minus = smaller.length ? Math.max(...smaller) : null
+  const plus = larger.length ? Math.min(...larger) : null
+  return {
+    axis, scanMm, coordinateMm,
+    negative: minus === null ? null :
+      { referenceMm: minus, distanceMm: coordinateMm - minus },
+    positive: plus === null ? null :
+      { referenceMm: plus, distanceMm: plus - coordinateMm },
+  }
+}
+
+/**
+ * Atomically move a wall along its perpendicular, carrying endpoints
+ * attached to its former centreline. The returned plan is a candidate only:
+ * callers MUST validate the complete geometry before committing to JSON.
+ * Adjacent end points are moved, not whole perpendicular walls.
+ */
+export function moveInteriorWallWithDependents(
+  plan: FloorPlan, wallId: string, offsetMm: number,
+): FloorPlan | null {
+  const target = plan.interiorWalls.find(w => w.id === wallId)
+  if (!target || !Number.isInteger(offsetMm) || !planIsOrthogonal(target.start, target.end)) return null
+  const vertical = target.start.xMm === target.end.xMm
+  const moved = plan.interiorWalls.map(w => ({
+    ...w, start: { ...w.start }, end: { ...w.end },
+  }))
+  const shifted = moved.find(w => w.id === wallId)!
+  const update = (p: PlanPoint) => vertical
+    ? { ...p, xMm: p.xMm + offsetMm }
+    : { ...p, zMm: p.zMm + offsetMm }
+  shifted.start = update(shifted.start)
+  shifted.end = update(shifted.end)
+  for (const wall of moved) {
+    if (wall.id === wallId) continue
+    if (pointOnPlanSegment(wall.start, target.start, target.end)) wall.start = update(wall.start)
+    if (pointOnPlanSegment(wall.end, target.start, target.end)) wall.end = update(wall.end)
+  }
+  return { ...plan, interiorWalls: moved }
+}
+
+/** A dimension of the neighbouring bay edits the selected wall's position. */
+export function moveWallToClearance(
+  plan: FloorPlan, wallId: string, side: 'negative' | 'positive', desiredMm: number,
+): FloorPlan | null {
+  if (!Number.isInteger(desiredMm) || desiredMm < MIN_PLAN_EDGE_MM) return null
+  const c = planWallClearances(plan, wallId)
+  const reference = c?.[side]
+  if (!c || !reference) return null
+  const nextPosition = side === 'negative'
+    ? reference.referenceMm + desiredMm
+    : reference.referenceMm - desiredMm
+  return moveInteriorWallWithDependents(plan, wallId, nextPosition - c.coordinateMm)
 }
