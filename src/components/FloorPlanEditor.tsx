@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react'
 import {
   emptyFloorPlan, meters, planAreaM2, planBounds, planDistanceMm,
-  planIsOrthogonal, planPerimeterMm, validateFloorPlan, decimalMetersToMm,
+  planPerimeterMm, validateFloorPlan, decimalMetersToMm,
   type FloorPlan, type PlanPoint,
 } from '../core/floor-plan'
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
@@ -211,12 +211,6 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
       drag.current = null
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-  }
-  const axisLabel = (a: PlanPoint, b: PlanPoint) => {
-    if (b.xMm > a.xMm) return '+X'
-    if (b.xMm < a.xMm) return '−X'
-    if (b.zMm < a.zMm) return '−Z'
-    return '+Z'
   }
 
   return (
