@@ -107,7 +107,7 @@ export function validateStructure(doc: any): ValidationIssue[] {
           checkPositive(w.sectionMm.width, 'sectionMm.width', 'Ширина сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
           checkPositive(w.sectionMm.height, 'sectionMm.height', 'Высота сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
         }
-        if (!['x', 'y', 'z'].includes(w.orientation)) {
+        if (!['x', 'y', 'z', '-x', '+z'].includes(w.orientation)) {
           issues.push(createIssue('INVALID_WALL_ORIENTATION', 'error', `${path}.orientation`, 'Недопустимая ориентация стены', w.wallId ? [w.wallId] : []))
         }
         if (w.origin) {
@@ -553,7 +553,7 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
           checkPositive(w.sectionMm.width, 'sectionMm.width', 'Ширина сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
           checkPositive(w.sectionMm.height, 'sectionMm.height', 'Высота сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
         }
-        if (!['x', 'y', 'z'].includes(w.orientation)) {
+        if (!['x', 'y', 'z', '-x', '+z'].includes(w.orientation)) {
           issues.push(createIssue('INVALID_WALL_ORIENTATION', 'error', `${path}.orientation`, 'Недопустимая ориентация стены', w.wallId ? [w.wallId] : []))
         }
         if (w.origin) {

@@ -12,7 +12,9 @@ import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 import { rightCornerOrigin } from './core/corner'
 import { firstWallExteriorLowerLeft } from './core/world-origin'
 import { wallEnd, effectiveConnections } from './core/wall-topology'
-import type { Wall } from './core/project'
+import { chainJointOrigin, previewChainClosure, rotatedDirection, isPlanDirection,
+  type ChainTurn } from './core/wall-chain'
+import type { Wall, WallConnection } from './core/project'
 import { ProjectTree } from './components/ProjectTree'
 import { GARAGE_DOOR_PRESETS, defaultGarageDoorSpec } from './core/garage-door'
 import packageInfo from '../package.json'
@@ -54,6 +56,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showEdges, setShowEdges] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
+  const [nextTurn, setNextTurn] = useState<ChainTurn>('right')
+  const [nextWallLength, setNextWallLength] = useState(3000)
   const [commandError, setCommandError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -82,6 +86,7 @@ export default function App() {
   const mainWall = snapshot.building.walls[0]
   const hasSecondWall = snapshot.building.walls.length > 1
   const wallLinks = effectiveConnections(snapshot)
+  const closurePreview = previewChainClosure(snapshot)
   const wallHasParent = wallLinks.some(link => link.toWallId === wall.wallId)
   // Three.js reads a projection of ProjectDocument; it does not own geometry.
   const { openings: allOpenings, sceneOpenings, elements, markers } =
@@ -202,36 +207,48 @@ export default function App() {
   const addWall = (attached = true) => {
     const all = snapshot.building.walls
     const parent = all[all.length - 1]
-    const nextNumber = Math.max(0, ...all.map(w => Number(w.wallId.match(/^wall-(\d+)$/)?.[1] ?? 0))) + 1
+    const nextNumber = Math.max(0, ...all.map(w => Number(w.wallId.split('-')[1] ?? 0))) + 1
     const wallId = 'wall-' + String(nextNumber).padStart(3, '0')
-    let wall: Wall
-    let connection: { fromWallId: string; toWallId: string; type: 'california-right' | 'end-to-end' } | undefined
-    if (all.length === 1 && attached) {
-      wall = {
-        ...parent, wallId, lengthMm: 3000,
-        origin: rightCornerOrigin(parent, parent),
-        orientation: 'z', sectionMm: { ...parent.sectionMm }, openings: [],
+    const turn: ChainTurn = all.length === 1 && attached ? 'right' : nextTurn
+    if (!isPlanDirection(parent.orientation)) {
+      setCommandError('Неизвестное направление последней стены')
+      return
+    }
+    const direction = attached ? rotatedDirection(parent.orientation, turn) : parent.orientation
+    const candidate: Wall = {
+      ...parent, wallId, orientation: direction, lengthMm: nextWallLength,
+      sectionMm: { ...parent.sectionMm }, openings: [],
+      origin: { ...parent.origin },
+    }
+    let connection: WallConnection | undefined
+    if (attached) {
+      if (all.length === 1 && parent.orientation === 'x') {
+        candidate.origin = rightCornerOrigin(parent, candidate)
+        connection = { fromWallId: parent.wallId, toWallId: wallId, type: 'california-right' }
+      } else {
+        candidate.origin = chainJointOrigin(parent, candidate, turn)
+        connection = { fromWallId: parent.wallId, toWallId: wallId,
+          type: turn === 'right' ? 'chain-turn-right'
+            : turn === 'left' ? 'chain-turn-left' : 'end-to-end' }
       }
-      connection = { fromWallId: parent.wallId, toWallId: wallId, type: 'california-right' }
     } else {
-      // A chain of straight end-to-end joints can be extended to any number
-      // of walls. Isolated walls are positioned with a clearance from the
-      // existing model and can subsequently be moved by coordinates.
-      const start = attached ? wallEnd(parent) : {
-        x: Math.max(...all.map(item => item.origin.x + item.lengthMm)) + 1000,
-        y: parent.origin.y,
-        z: parent.origin.z,
-      }
-      wall = {
-        ...parent, wallId, lengthMm: 3000, origin: start,
-        sectionMm: { ...parent.sectionMm }, openings: [],
-      }
-      if (attached) {
-        connection = { fromWallId: parent.wallId, toWallId: wallId, type: 'end-to-end' }
+      candidate.origin = {
+        x: Math.max(...all.map(w => w.origin.x + w.lengthMm)) + 1000,
+        y: parent.origin.y, z: parent.origin.z,
       }
     }
-    if (dispatch({ type: 'ADD_WALL', payload: { wall, connection } }).success) {
+    if (dispatch({ type: 'ADD_WALL', payload: { wall: candidate, connection } }).success) {
       setSelectedWallId(wallId)
+      setSelectedOpeningId(null)
+      setSelectedId(null)
+      setNextTurn('straight')
+    }
+  }
+
+  const closeWallChain = () => {
+    if (dispatch({ type: 'CLOSE_CHAIN', payload: {} }).success) {
+      const last = store.getSnapshot().building.walls
+      setSelectedWallId(last[last.length - 1].wallId)
       setSelectedOpeningId(null)
       setSelectedId(null)
     }
@@ -336,24 +353,64 @@ export default function App() {
               setSelectedOpeningId(null)
             }}
           />
-          <h2 className="panel-title" style={{ marginTop: 16 }}>Стены</h2>
+          <h2 className="panel-title" style={{ marginTop: 16 }}>Стены · цепочка</h2>
           <div className="param-group">
-            <button type="button" className="param-input" style={{ cursor: 'pointer' }}
-              onClick={() => addWall(true)}>
-              {hasSecondWall ? '+ Продолжить стену' : '+ Добавить вторую стену'}
-            </button>
-            <button type="button" className="param-input"
+            {snapshot.building.closure
+              ? <div style={{ color: '#176b45', fontWeight: 650 }} data-testid="chain-closed">
+                  Контур замкнут — {snapshot.building.walls.length} стен
+                </div>
+              : <>
+                  <label className="param-label" htmlFor="chain-turn">Поворот следующей стены</label>
+                  <select id="chain-turn" data-testid="chain-turn" className="param-input"
+                    value={snapshot.building.walls.length === 1 ? 'right' : nextTurn}
+                    disabled={snapshot.building.walls.length === 1}
+                    onChange={event => setNextTurn(event.target.value as ChainTurn)}>
+                    <option value="straight">Прямо</option>
+                    <option value="right">Направо 90°</option>
+                    <option value="left">Налево 90°</option>
+                  </select>
+                  <SafeNumberInput label="Длина новой стены (мм)" value={nextWallLength}
+                    onChange={setNextWallLength} validate={v => validateWallLength(v)} />
+                  <button type="button" data-testid="add-chain-wall" className="param-input"
+                    style={{ cursor: 'pointer', marginTop: 6 }} onClick={() => addWall(true)}>
+                    {hasSecondWall ? '+ Продолжить стену' : '+ Добавить вторую стену'}
+                  </button>
+                </>
+            }
+            {snapshot.building.closure ? (
+              <button type="button" data-testid="reopen-wall-chain" className="param-input"
+                style={{ cursor: 'pointer', marginTop: 6 }}
+                onClick={() => dispatch({ type: 'REOPEN_CHAIN', payload: {} })}>
+                Разомкнуть контур
+              </button>
+            ) : (
+              <>
+                <button type="button" data-testid="close-wall-chain" className="param-input"
+                  style={{ cursor: closurePreview.valid ? 'pointer' : 'not-allowed', marginTop: 6 }}
+                  disabled={!closurePreview.valid} onClick={closeWallChain}>
+                  {closurePreview.valid ? 'Замкнуть контур — ' + closurePreview.lengthMm + ' мм'
+                    : 'Замкнуть контур'}
+                </button>
+                {!closurePreview.valid && <div data-testid="chain-closure-hint"
+                  style={{ fontSize: 12, color: '#666', marginTop: 5 }}>
+                  {closurePreview.reason}
+                </div>}
+              </>
+            )}
+            <button type="button" data-testid="add-free-wall" className="param-input"
+              disabled={!!snapshot.building.closure}
               style={{ cursor: 'pointer', marginTop: 5 }}
               onClick={() => addWall(false)}>+ Свободная стена</button>
             {hasSecondWall && (
               <button type="button" className="param-input" style={{ cursor: 'pointer', marginTop: 5 }}
+                disabled={!!snapshot.building.closure}
                 onClick={removeLastWall}>
                 Удалить {snapshot.building.walls.length === 2 ? 'вторую стену' : 'последнюю стену'}
               </button>
             )}
           </div>
           {hasSecondWall && <div style={{ marginTop: 8, fontSize: 12, color: '#555' }}>
-            Калифорнийский угол первой пары стен сохранён. Остальные связи — прямой стык.
+            Первая пара стен сохраняет калифорнийский угол; последующие — стыковые.
           </div>}
           <h2 className="panel-title" style={{ marginTop: 14 }}>
             Стена {snapshot.building.walls.findIndex(w => w.wallId === wall.wallId) + 1} — параметры
@@ -368,16 +425,18 @@ export default function App() {
             <SafeNumberInput label="Шаг стоек (мм)" value={wall.studSpacingMm} onChange={updateSpacing} validate={(r) => validateInt(r, 100, 5000, 'шаг')} />
           </div>
           <div className="param-group">
-            <div>Направление: {wall.orientation === 'z' ? '−Z' : '+X'}</div>
+            <div>Направление: {{ x: '+X', z: '−Z', '-x': '−X', '+z': '+Z', y: 'Y' }[wall.orientation]}</div>
             <label className="param-label" htmlFor="wall-axis">Ось стены</label>
             <select id="wall-axis" className="param-input" value={wall.orientation}
               disabled={wallLinks.some(link => link.fromWallId === wall.wallId ||
                 link.toWallId === wall.wallId)}
               onChange={event => dispatch({ type: 'SET_WALL_AXIS', payload: {
-                wallId: wall.wallId, orientation: event.target.value as 'x' | 'z',
+                wallId: wall.wallId, orientation: event.target.value as 'x' | 'z' | '-x' | '+z',
               } })}>
               <option value="x">Вдоль +X</option>
               <option value="z">Вдоль −Z</option>
+              <option value="-x">Вдоль −X</option>
+              <option value="+z">Вдоль +Z</option>
             </select>
             <div>Координаты начала: X={wall.origin.x}, Y={wall.origin.y}, Z={wall.origin.z} мм</div>
             {wallHasParent

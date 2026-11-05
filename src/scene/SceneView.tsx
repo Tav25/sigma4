@@ -138,7 +138,10 @@ export function SceneView({
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
       raycaster.setFromCamera(pointer, cam)
       const normal = opening.wallOrientation === 'z'
-        ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1)
+        ? new THREE.Vector3(1, 0, 0)
+        : opening.wallOrientation === '-x' ? new THREE.Vector3(0, 0, -1)
+          : opening.wallOrientation === '+z' ? new THREE.Vector3(-1, 0, 0)
+            : new THREE.Vector3(0, 0, 1)
       const planePoint = opening.wallOrigin
       const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, new THREE.Vector3(
         mmToMeters(planePoint.x), mmToMeters(planePoint.y), mmToMeters(planePoint.z),

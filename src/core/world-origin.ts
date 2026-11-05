@@ -9,11 +9,13 @@ export const CURRENT_COORDINATE_SCHEMA = '1.1.0'
 
 export function wallMidplaneOrigin(wall: Pick<Wall, 'origin' | 'orientation' | 'sectionMm'>): Vector3 {
   const half = wall.sectionMm.height / 2
-  return wall.orientation === 'z'
-    ? { ...wall.origin, x: wall.origin.x - half }
-    : wall.orientation === 'x'
-      ? { ...wall.origin, z: wall.origin.z - half }
-      : { ...wall.origin }
+  switch (wall.orientation) {
+    case 'z': return { ...wall.origin, x: wall.origin.x - half }
+    case '+z': return { ...wall.origin, x: wall.origin.x + half }
+    case '-x': return { ...wall.origin, z: wall.origin.z + half }
+    case 'x': return { ...wall.origin, z: wall.origin.z - half }
+    default: return { ...wall.origin }
+  }
 }
 
 /** World-space physical outside lower-left corner of the first +X wall. */

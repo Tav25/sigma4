@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.27')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.0.28')
   // New canonical project: its source origin and physical timber corner are zero.
   const startDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
@@ -310,7 +310,44 @@ try {
   await wallLengthInput.press('Tab')
   await page.locator('.viewport[data-dimension-total-x="5000"]').waitFor()
   assert.equal(errors.length, 0, 'Unexpected browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.0.27 canonical source origin zero; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
+  // S07: first wall 6000 + California 3000, then right turn 6000.
+  // The closure button must append the exact 3145-mm fourth wall and
+  // preserve real 3D boards + the authored canonical source chain.
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('add-chain-wall').click()
+  await tree.getByTestId('wall-node-wall-002').waitFor()
+  await page.getByTestId('chain-turn').selectOption('right')
+  const nextWallLength = page.getByText('Длина новой стены (мм)', { exact: true })
+    .locator('..').locator('input')
+  await nextWallLength.fill('6000')
+  await nextWallLength.press('Tab')
+  await page.getByTestId('add-chain-wall').click()
+  await tree.getByTestId('wall-node-wall-003').waitFor()
+  const closeButton = page.getByTestId('close-wall-chain')
+  assert.equal(await closeButton.isEnabled(), true)
+  assert.match(await closeButton.textContent(), /3145/)
+  await closeButton.click()
+  await tree.getByTestId('wall-node-wall-004').waitFor()
+  await page.getByTestId('chain-closed').waitFor()
+  await page.getByText('Валидация: OK').waitFor()
+  const closedDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Экспорт JSON' }).click()
+  const closed = JSON.parse(await readFile(await (await closedDownload).path(), 'utf8'))
+  assert.deepEqual(closed.building.walls.map(w => [w.orientation,w.lengthMm,w.origin.x,w.origin.z]), [
+    ['x',6000,0,0],['z',3000,6000,-145],
+    ['-x',6000,6000,-3145],['+z',3145,0,-3145],
+  ])
+  assert.deepEqual(closed.building.closure, {
+    fromWallId:'wall-004',toWallId:'wall-001',type:'butt-right',
+  })
+  assert.equal(new Set(closed.assembly.elements.map(e => e.elementId)).size, closed.assembly.elements.length)
+  await page.getByRole('button', { name: 'Сбросить вид' }).click()
+  await page.waitForTimeout(450)
+  await page.screenshot({ path: dir + '/16-closed-4-wall-chain-isometric.png' })
+  await page.getByTestId('reopen-wall-chain').click()
+  await page.getByTestId('add-chain-wall').waitFor()
+  assert.equal(errors.length, 0, 'Closed chain browser exceptions')
+  console.log('SIGMA4 BROWSER PASS: v0.0.28 chained walls turn/closure and 3D; canonical source origin zero; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()

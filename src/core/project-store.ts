@@ -12,6 +12,7 @@ import { validateProject } from './frame-validator'
 import { generateWallModule } from './wall-module'
 import { connectRightCaliforniaCorner } from './corner-connection'
 import { effectiveConnections } from './wall-topology'
+import { wallFrameInsets } from './wall-chain'
 import { CURRENT_COORDINATE_SCHEMA, migrateLegacyWallOrigins } from './world-origin'
 
 const SW = 45
@@ -20,8 +21,12 @@ const SH = 145
 export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
   // This generator knows nothing about wall numbers. Every instance uses the
   // same module; wallId ownership is preserved in each generated board.
-  const elements = doc.building.walls.flatMap((wall, index) =>
-    generateWallModule(wall, doc.building.openings, { unprefixedIds: index === 0 }))
+  const elements = doc.building.walls.flatMap((wall, index) => {
+    const { startMm, endMm } = wallFrameInsets(doc, wall.wallId)
+    return generateWallModule(wall, doc.building.openings, {
+      unprefixedIds: index === 0, startInsetMm: startMm, endInsetMm: endMm,
+    })
+  })
   // Physical joinery is independent of each individual wall's framing.
   const links = effectiveConnections(doc)
   for (const link of links) {
