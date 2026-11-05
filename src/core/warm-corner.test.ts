@@ -132,12 +132,12 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(store.dispatch({
       type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 6500 },
     }).success).toBe(true)
-    expect(store.getSnapshot().building.walls[1].origin.x).toBe(6427.5)
+    expect(store.getSnapshot().building.walls[1].origin.x).toBe(6500)
     expect(bbox(store, 'wall-002:plate-bottom-1').max.x).toBeCloseTo(6.5, 6)
     expect(store.undo().success).toBe(true)
     expect(store.getSnapshot().building.walls[1].origin).toEqual(before.building.walls[1].origin)
     expect(store.redo().success).toBe(true)
-    expect(store.getSnapshot().building.walls[1].origin.x).toBe(6427.5)
+    expect(store.getSnapshot().building.walls[1].origin.x).toBe(6500)
   })
 
   it('the connected walls share a top height when either wall is edited', () => {

@@ -305,7 +305,7 @@ describe('S02 - ProjectStore', () => {
 
   // ТЕСТ 32: Все прежние 120 тестов S01 проходят (проверяется через общий прогон)
   it('ТЕСТ 32: проверка совместимости с S01', () => {
-    expect(store.getSnapshot().project.schemaVersion).toBe('1.0.0')
+    expect(store.getSnapshot().project.schemaVersion).toBe('1.1.0')
     expect(store.getSnapshot().project.units).toBe('mm')
   })
 

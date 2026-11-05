@@ -104,7 +104,7 @@ describe('S05.6 California insulated three-stud corner: true top section', () =>
       type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 6500 },
     }).success).toBe(true)
     expect(actualBounds(store, 'warm-corner-stud').min.x).toBeCloseTo(6.31, 6)
-    expect(store.getSnapshot().building.walls[1].origin.x).toBe(6427.5)
+    expect(store.getSnapshot().building.walls[1].origin.x).toBe(6500)
     expect(store.undo().success).toBe(true)
     expect(actualBounds(store, 'warm-corner-stud').min.x).toBeCloseTo(5.81, 6)
     expect(store.getSnapshot().building.walls[1].origin.x).toBe(5927.5)

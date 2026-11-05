@@ -4,6 +4,7 @@ import { createProjectFromCurrentState } from '../core/project-store'
 import { createProjectStore } from '../core/ProjectStore'
 import { rightCornerOrigin } from '../core/corner'
 import { wallEnd } from '../core/wall-topology'
+import { wallMidplaneOrigin } from '../core/world-origin'
 import { projectToScene } from './project-to-scene'
 import { openingLocalToWorld, openingWorldToLocalU, openingYaw } from './opening-geometry'
 
@@ -68,7 +69,7 @@ describe('S06.3: any wall owns its openings and physical framing', () => {
     const w = scene.sceneOpenings.find(o => o.id === 'W03')!
     expect(w.wallId).toBe('wall-002')
     expect(w.wallOrientation).toBe('z')
-    expect(w.wallOrigin).toEqual(doc.building.walls[1].origin)
+    expect(w.wallOrigin).toEqual(wallMidplaneOrigin(doc.building.walls[1]))
     expect(openingLocalToWorld(w, 1500, 1500)).toEqual({
       x: 5927.5, y: 1500, z: -1645,
     })
@@ -120,7 +121,7 @@ describe('S06.3: any wall owns its openings and physical framing', () => {
     expect(store.dispatch({ type: 'ADD_OPENING', payload: { wallId: 'wall-002', opening: sideWindow } }).success).toBe(true)
     const original = projectToScene(store.getSnapshot()).markers.find(m => m.openingId === 'W03')!.position
     expect(store.dispatch({ type: 'SET_WALL_ORIGIN', payload: {
-      wallId: 'wall-001', origin: { x: 400, y: 0, z: 127.5 },
+      wallId: 'wall-001', origin: { x: 400, y: 0, z: 200 },
     } }).success).toBe(true)
     const changed = projectToScene(store.getSnapshot()).markers.find(m => m.openingId === 'W03')!.position
     expect(changed.x).toBe(original.x + 400)

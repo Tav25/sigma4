@@ -589,7 +589,7 @@ export class ProjectStore {
 
   importJson(json: string): CommandResult {
     try {
-      const parsed = JSON.parse(json)
+      const parsed = migrateLegacyWallOrigins(JSON.parse(json) as ProjectDocument)
       // A saved generated assembly may be stale (including old California
       // corner coordinates). Validate author-controlled source first; then
       // regenerate and validate the actual resulting assembly.

@@ -75,9 +75,9 @@ describe('S05.3: two-stud 45x145 corner and legacy JSON compatibility', () => {
         origin: rightCornerOrigin(front, front), orientation: 'z', openings: [] } },
     }).success).toBe(true)
     expect(store.dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: 'wall-001', lengthMm: 6500 } }).success).toBe(true)
-    expect(store.getSnapshot().building.walls[1].origin.x).toBeCloseTo(6427.5)
+    expect(store.getSnapshot().building.walls[1].origin.x).toBeCloseTo(6500)
     expect(store.undo().success).toBe(true)
-    expect(store.getSnapshot().building.walls[1].origin.x).toBeCloseTo(5927.5)
+    expect(store.getSnapshot().building.walls[1].origin.x).toBeCloseTo(6000)
     expect(store.getSnapshot().assembly.elements.find(e => e.elementId === 'warm-corner-stud')?.position.x).toBe(5810)
   })
 })
