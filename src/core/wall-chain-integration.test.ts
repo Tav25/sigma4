@@ -79,6 +79,37 @@ describe('S07 option 1: sequential, exact, physically nonintersecting closed wal
     expect(store.redo().success).toBe(true)
     expect(store.getSnapshot().building.closure?.fromWallId).toBe('wall-004')
   })
+  it('verifies actual timber Box3 geometry at the two new right-hand butt corners',()=>{
+    const store=closeRect()
+    expect(store.dispatch({type:'CLOSE_CHAIN',payload:{}}).success).toBe(true)
+    const elements=projectToScene(store.getSnapshot()).elements
+    const rear=calculateWorldBounds(elements.filter(e=>e.wallId==='wall-003'))
+    const left=calculateWorldBounds(elements.filter(e=>e.wallId==='wall-004'))
+    expect([rear.min.x,rear.max.x,rear.min.z,rear.max.z].map(x=>Math.round(x*1000)))
+      .toEqual([0,5855,-3145,-3000])
+    expect([left.min.x,left.max.x,left.min.z,left.max.z].map(x=>Math.round(x*1000)))
+      .toEqual([0,145,-3000,-145])
+    // These actual 3D board volumes meet, never occupy the same 3D volume.
+    const overlapX=Math.min(rear.max.x,left.max.x)-Math.max(rear.min.x,left.min.x)
+    const overlapZ=Math.min(rear.max.z,left.max.z)-Math.max(rear.min.z,left.min.z)
+    expect(overlapX>0.0001&&overlapZ>0.0001).toBe(false)
+  })
+
+  it('adds a left 90° turn from the second wall with a valid physical butt joint',()=>{
+    const store=starter()
+    add(store,'right',3000)
+    add(store,'left',2400)
+    const doc=store.getSnapshot()
+    expect(doc.building.walls[2].orientation).toBe('x')
+    expect(doc.building.walls[2].origin).toEqual({x:5855,y:0,z:-3145})
+    expect(doc.building.connections?.[1].type).toBe('chain-turn-left')
+    expect(doc.validation.valid).toBe(true)
+    const scene=projectToScene(doc)
+    const wall=calculateWorldBounds(scene.elements.filter(e=>e.wallId==='wall-003'))
+    expect([wall.min.x,wall.max.x,wall.min.z,wall.max.z].map(x=>Math.round(x*1000)))
+      .toEqual([5855,8255,-3290,-3145])
+  })
+
   it('prevents early/misaligned closure and corrupted closed JSON',()=>{
     const store=starter()
     expect(previewChainClosure(store.getSnapshot()).valid).toBe(false)

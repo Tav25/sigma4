@@ -344,6 +344,8 @@ try {
   await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(450)
   await page.screenshot({ path: dir + '/16-closed-4-wall-chain-isometric.png' })
+  await page.getByTestId('chain-closed').scrollIntoViewIfNeeded()
+  await page.screenshot({ path: dir + '/17-closed-chain-controls-isometric.png' })
   await page.getByTestId('reopen-wall-chain').click()
   await page.getByTestId('add-chain-wall').waitFor()
   assert.equal(errors.length, 0, 'Closed chain browser exceptions')
