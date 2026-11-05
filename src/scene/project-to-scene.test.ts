@@ -61,8 +61,8 @@ describe('S03: physical boards from canonical JSON', () => {
     expect(bottom.max.x).toBeCloseTo(6, 6)
     expect(bottom.min.y).toBeCloseTo(0, 6)
     expect(bottom.max.y).toBeCloseTo(0.045, 6)
-    expect(bottom.min.z).toBeCloseTo(-0.0725, 6)
-    expect(bottom.max.z).toBeCloseTo(0.0725, 6)
+    expect(bottom.min.z).toBeCloseTo(-0.145, 6)
+    expect(bottom.max.z).toBeCloseTo(0, 6)
     const top1 = worldBounds(all.find(e => e.id === 'plate-top-1')!)
     const top2 = worldBounds(all.find(e => e.id === 'plate-top-2')!)
     expect(top1.min.y).toBeCloseTo(2.61, 6)
@@ -74,8 +74,8 @@ describe('S03: physical boards from canonical JSON', () => {
     expect(stud.max.x).toBeCloseTo(0.045, 6)
     expect(stud.min.y).toBeCloseTo(0.045, 6)
     expect(stud.max.y).toBeCloseTo(2.61, 6)
-    expect(stud.min.z).toBeCloseTo(-0.0725, 6)
-    expect(stud.max.z).toBeCloseTo(0.0725, 6)
+    expect(stud.min.z).toBeCloseTo(-0.145, 6)
+    expect(stud.max.z).toBeCloseTo(0, 6)
   })
 
   it('door physically splits the bottom plate and has a correctly located header', () => {

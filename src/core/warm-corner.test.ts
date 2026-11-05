@@ -44,11 +44,11 @@ describe('S05.2: warm Canadian right corner', () => {
     const front = bbox(store, 'plate-bottom-1')
     const side = bbox(store, 'wall-002:plate-bottom-1')
     expect(front.max.x).toBeCloseTo(6, 6)
-    expect(front.min.z).toBeCloseTo(-0.0725, 6)
+    expect(front.min.z).toBeCloseTo(-0.145, 6)
     expect(side.min.x).toBeCloseTo(5.855, 6)
     expect(side.max.x).toBeCloseTo(6, 6)
-    expect(side.min.z).toBeCloseTo(-3.0725, 6)
-    expect(side.max.z).toBeCloseTo(-0.0725, 6)
+    expect(side.min.z).toBeCloseTo(-3.145, 6)
+    expect(side.max.z).toBeCloseTo(-0.145, 6)
   })
 
   it('ties upper plates over the corner without two boards in the same volume', () => {
@@ -58,7 +58,7 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(frontTop.max.x).toBeCloseTo(5.855, 6)
     expect(sideTop.min.x).toBeCloseTo(5.855, 6)
     expect(sideTop.max.x).toBeCloseTo(6, 6)
-    expect(sideTop.max.z).toBeCloseTo(0.0725, 6)
+    expect(sideTop.max.z).toBeCloseTo(0, 6)
     expect(frontTop.min.y).toBeCloseTo(2.655, 6)
     expect(sideTop.min.y).toBeCloseTo(2.655, 6)
     const d = frontTop.clone().intersect(sideTop)
@@ -88,16 +88,16 @@ describe('S05.2: warm Canadian right corner', () => {
     expect(inside.max.x).toBeCloseTo(5.955, 6)
     expect(outside.min.x).toBeCloseTo(5.955, 6)
     expect(outside.max.x).toBeCloseTo(6, 6)
-    expect(inside.min.z).toBeCloseTo(-0.0725, 6)
-    expect(inside.max.z).toBeCloseTo(-0.0275, 6)
-    expect(side.min.z).toBeCloseTo(-0.1175, 6)
-    expect(side.max.z).toBeCloseTo(-0.0725, 6)
+    expect(inside.min.z).toBeCloseTo(-0.145, 6)
+    expect(inside.max.z).toBeCloseTo(-0.100, 6)
+    expect(side.min.z).toBeCloseTo(-0.190, 6)
+    expect(side.max.z).toBeCloseTo(-0.145, 6)
     expect(inside.min.y).toBeCloseTo(0.045, 6)
     expect(inside.max.y).toBeCloseTo(2.610, 6)
 
     // Both corner joints touch at faces, not inside their volumes.
     // The rotated nailer uses only 45 mm of wall depth: the remaining
-    // 100 mm from z=-27.5 to +72.5 is available for insulation.
+    // 100 mm from z=-100 to 0 is available for insulation.
     expect(outside.min.x - inside.max.x).toBeCloseTo(0, 6)
     expect(outside.max.z - inside.max.z).toBeCloseTo(0.100, 6)
     for (const [a, b] of [[inside, outside], [inside, side], [outside, side]]) {

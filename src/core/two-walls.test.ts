@@ -19,7 +19,7 @@ function wallTwo() {
   return {
     wallId: 'wall-002', lengthMm: 3000, heightMm: 2700, thicknessMm: 145, studSpacingMm: 600,
     sectionMm: { width: 45, height: 145 }, orientation: 'z' as const,
-    origin: { x: 5927.5, y: 0, z: -72.5 }, openings: [],
+    origin: { x: 5927.5, y: 0, z: -145 }, openings: [],
   }
 }
 
@@ -62,8 +62,8 @@ describe('S05.1: a perpendicular second wall', () => {
     expect(first.max.x).toBeCloseTo(6, 5)
     expect(second.min.x).toBeCloseTo(5.855, 5)
     expect(second.max.x).toBeCloseTo(6, 5)
-    expect(second.min.z).toBeCloseTo(-3.0725, 5)
-    expect(second.max.z).toBeCloseTo(-0.0725, 5)
+    expect(second.min.z).toBeCloseTo(-3.145, 5)
+    expect(second.max.z).toBeCloseTo(-0.145, 5)
     expect(first.max.y).toBeCloseTo(2.655, 5)
     expect(second.max.y).toBeCloseTo(2.655, 5)
   })
@@ -84,7 +84,7 @@ describe('S05.1: a perpendicular second wall', () => {
     const walls = store.getSnapshot().building.walls
     expect(walls[0].lengthMm).toBe(6000)
     expect(walls[1].lengthMm).toBe(3500)
-    expect(boxAt('wall-002:plate-bottom-1', store).min.z).toBeCloseTo(-3.5725, 5)
+    expect(boxAt('wall-002:plate-bottom-1', store).min.z).toBeCloseTo(-3.645, 5)
   })
 
   it('removes the second wall and preserves all original openings', () => {

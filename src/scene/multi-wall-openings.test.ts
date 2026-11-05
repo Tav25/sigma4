@@ -70,10 +70,10 @@ describe('S06.3: any wall owns its openings and physical framing', () => {
     expect(w.wallOrientation).toBe('z')
     expect(w.wallOrigin).toEqual(doc.building.walls[1].origin)
     expect(openingLocalToWorld(w, 1500, 1500)).toEqual({
-      x: 5927.5, y: 1500, z: -1572.5,
+      x: 5927.5, y: 1500, z: -1645,
     })
     expect(scene.markers.find(m => m.openingId === 'W03')?.position).toEqual({
-      x: 6050, y: 1500, z: -1572.5,
+      x: 6050, y: 1500, z: -1645,
     })
     expect(openingYaw(w)).toBeCloseTo(Math.PI / 2)
     const center = openingLocalToWorld(w, 1500, 1500)
@@ -94,7 +94,7 @@ describe('S06.3: any wall owns its openings and physical framing', () => {
     plane.geometry.dispose()
     const original = scene.sceneOpenings.find(o => o.id === 'W01')!
     expect(openingYaw(original)).toBe(0)
-    expect(openingLocalToWorld(original, 1500, 1500)).toEqual({ x: 1500, y: 1500, z: 0 })
+    expect(openingLocalToWorld(original, 1500, 1500)).toEqual({ x: 1500, y: 1500, z: -72.5 })
     expect(openingWorldToLocalU(original, { x: 1.5, z: 0 })).toBe(1.5)
   })
 
@@ -107,7 +107,7 @@ describe('S06.3: any wall owns its openings and physical framing', () => {
     } })
     expect(result.success).toBe(true)
     expect(projectToScene(store.getSnapshot()).markers.find(m => m.openingId === 'W03')?.position.z)
-      .toBe(-1872.5)
+      .toBe(-1945)
     expect(store.getSnapshot().building.openings.find(o => o.id === 'W01')?.positionUmm).toBe(900)
     expect(store.undo().success).toBe(true)
     expect(store.exportJson()).toBe(before)
@@ -120,7 +120,7 @@ describe('S06.3: any wall owns its openings and physical framing', () => {
     expect(store.dispatch({ type: 'ADD_OPENING', payload: { wallId: 'wall-002', opening: sideWindow } }).success).toBe(true)
     const original = projectToScene(store.getSnapshot()).markers.find(m => m.openingId === 'W03')!.position
     expect(store.dispatch({ type: 'SET_WALL_ORIGIN', payload: {
-      wallId: 'wall-001', origin: { x: 400, y: 0, z: 200 },
+      wallId: 'wall-001', origin: { x: 400, y: 0, z: 127.5 },
     } }).success).toBe(true)
     const changed = projectToScene(store.getSnapshot()).markers.find(m => m.openingId === 'W03')!.position
     expect(changed.x).toBe(original.x + 400)
@@ -153,7 +153,7 @@ describe('S06.3: any wall owns its openings and physical framing', () => {
     expect(copy.importJson(store.exportJson()).success).toBe(true)
     expect(copy.exportJson()).toBe(store.exportJson())
     expect(projectToScene(copy.getSnapshot()).markers.find(m => m.openingId === 'D01')?.position)
-      .toEqual({ x: 6090, y: 1050, z: -4272.5 })
+      .toEqual({ x: 6090, y: 1050, z: -4345 })
     expect(copy.dispatch({ type: 'REMOVE_OPENING', payload: { openingId: 'W03' } }).success).toBe(true)
     expect(projectToScene(copy.getSnapshot()).markers.some(m => m.openingId === 'W03')).toBe(false)
     expect(copy.getSnapshot().assembly.elements.some(e => e.elementId.includes('W03'))).toBe(false)

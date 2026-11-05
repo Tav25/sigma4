@@ -45,7 +45,7 @@ describe('S05.8 actual mesh bounds and top camera', () => {
       expect(actual.max[axis]).toBeCloseTo(expected.max[axis], 6)
     }
     expect(actual.max.x).toBeCloseTo(6, 6)
-    expect(actual.min.z).toBeCloseTo(-3.0725, 6)
+    expect(actual.min.z).toBeCloseTo(-3.145, 6)
     expect(actual.max.y).toBeCloseTo(2.7, 6)
   })
 

@@ -29,7 +29,7 @@ describe('S06.2 connected modular walls', () => {
     const store = create()
     const front = store.getSnapshot().building.walls[0]
     const right: Wall = { ...front, wallId:'wall-002', lengthMm:3000, orientation:'z',
-      origin:{ x: 5927.5, y:0, z:-72.5 }, openings:[] }
+      origin:{ x: 5927.5, y:0, z:-145 }, openings:[] }
     expect(store.dispatch({type:'ADD_WALL',payload:{wall:right}}).success).toBe(true)
     for (let i=3;i<=9;i++) expect(append(store,i).success).toBe(true)
     const doc = store.getSnapshot()
@@ -98,11 +98,11 @@ describe('S06.2 connected modular walls', () => {
     const store=create(),doc=store.getSnapshot()
     const front=doc.building.walls[0]
     const second:Wall={...front,wallId:'wall-002',lengthMm:3000,orientation:'z',
-      origin:{x:5927.5,y:0,z:-72.5},openings:[]}
+      origin:{x:5927.5,y:0,z:-145},openings:[]}
     expect(store.dispatch({type:'ADD_WALL',payload:{wall:second}}).success).toBe(true)
     expect(store.getSnapshot().assembly.elements.find(e=>e.elementId==='warm-corner-stud')?.position.x).toBe(5810)
     const footprint=wallFootprint(second)
     expect(footprint.maxX).toBe(6000)
-    expect(footprint.minZ).toBe(-3072.5)
+    expect(footprint.minZ).toBe(-3145)
   })
 })

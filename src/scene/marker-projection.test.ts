@@ -21,7 +21,7 @@ describe('S04.1: opening markers follow their real openings', () => {
     expect(scene.markers).toHaveLength(2)
     expect(scene.markers.find(m => m.openingId === 'W01')).toEqual({
       openingId: 'W01',
-      position: { x: 1500, y: 1500, z: 122.5 },
+      position: { x: 1500, y: 1500, z: 50 },
       visible: true,
       color: '#0066ff',
     })
@@ -73,7 +73,7 @@ describe('S04.1: opening markers follow their real openings', () => {
       payload: { wallId: 'wall-001', opening: { id: 'D01', type: 'door', positionXmm: 2700, widthMm: 900, heightMm: 2100, sillHeightMm: 0 } },
     }).success).toBe(true)
     expect(projectToScene(store.getSnapshot()).markers.find(m => m.openingId === 'D01')?.position).toEqual({
-      x: 3150, y: 1050, z: 122.5,
+      x: 3150, y: 1050, z: 50,
     })
     expect(store.dispatch({ type: 'REMOVE_OPENING', payload: { openingId: 'D01' } }).success).toBe(true)
     expect(projectToScene(store.getSnapshot()).markers.some(m => m.openingId === 'D01')).toBe(false)

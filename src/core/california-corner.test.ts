@@ -48,8 +48,8 @@ describe('S05.6 California insulated three-stud corner: true top section', () =>
     const box = actualBounds(store, 'warm-corner-stud')
     expect(box.min.x).toBeCloseTo(5.810, 6)
     expect(box.max.x).toBeCloseTo(5.955, 6)
-    expect(box.min.z).toBeCloseTo(-0.0725, 6)
-    expect(box.max.z).toBeCloseTo(-0.0275, 6)
+    expect(box.min.z).toBeCloseTo(-0.145, 6)
+    expect(box.max.z).toBeCloseTo(-0.100, 6)
     expect(box.min.y).toBeCloseTo(0.045, 6)
     expect(box.max.y).toBeCloseTo(2.610, 6)
   })
@@ -67,7 +67,7 @@ describe('S05.6 California insulated three-stud corner: true top section', () =>
       expect(bb.isEmpty() || Math.min(dimension.x, dimension.y, dimension.z) < 0.000001).toBe(true)
     }
     // An arbitrary physical point in the 100mm-deep corner pocket is free.
-    const pocket = new THREE.Vector3(5.890, 1.2, 0.020)
+    const pocket = new THREE.Vector3(5.890, 1.2, -0.0525)
     for (const b of [inside,facade,side]) expect(b.containsPoint(pocket)).toBe(false)
     expect(facade.max.z - inside.max.z).toBeCloseTo(0.1, 6)
   })
