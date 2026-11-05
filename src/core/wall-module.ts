@@ -9,10 +9,10 @@ import type { Wall, Opening, TimberElement } from './project'
 export function generateWallModule(
   wall: Wall,
   openings: readonly Opening[],
-  options: { unprefixedIds?: boolean; startInsetMm?: number; endInsetMm?: number } = {},
+  options: { unprefixedIds?: boolean } = {},
 ): TimberElement[] {
   const params: WallPanelParams = {
-    length: wall.lengthMm - (options.startInsetMm ?? 0) - (options.endInsetMm ?? 0),
+    length: wall.lengthMm,
     height: wall.heightMm,
     sectionWidth: wall.sectionMm.width,
     sectionHeight: wall.sectionMm.height,
@@ -23,7 +23,7 @@ export function generateWallModule(
     .filter(opening => opening.wallId === wall.wallId)
     .map(opening => ({
       id: opening.id,
-      positionXmm: opening.positionUmm - (options.startInsetMm ?? 0),
+      positionXmm: opening.positionUmm,
       widthMm: opening.widthMm,
       heightMm: opening.heightMm,
       sillHeightMm: opening.sillHeightMm,
@@ -42,7 +42,7 @@ export function generateWallModule(
     role: element.role,
     sectionMm: { width: element.width, height: element.height },
     lengthMm: element.length,
-    position: { ...element.position, x: element.position.x + (options.startInsetMm ?? 0) },
+    position: { ...element.position },
     orientation: { ...element.orientation },
     connectionIds: [],
     generated: true,

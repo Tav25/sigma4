@@ -7,7 +7,7 @@ export interface SceneOpening3D extends WindowOpening {
   wallId: string
   wallLengthMm: number
   wallOrigin: { x: number; y: number; z: number }
-  wallOrientation: 'x' | 'z' | '-x' | '+z'
+  wallOrientation: 'x' | 'z'
 }
 
 export interface OpeningMarker {
@@ -43,7 +43,7 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
       material: 'wood',
       wallTransform: (() => {
         const wall = walls.get(element.wallId)
-        return wall ? { origin: wallMidplaneOrigin(wall), orientation: wall.orientation === 'z' || wall.orientation === '-x' || wall.orientation === '+z' ? wall.orientation : 'x' as const } : undefined
+        return wall ? { origin: wallMidplaneOrigin(wall), orientation: wall.orientation === 'z' ? 'z' as const : 'x' as const } : undefined
       })(),
     })),
     openings: document.building.openings.map(opening => ({
@@ -67,7 +67,7 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
         // Only this derived 3D hit plane needs the wall midplane;
         // the source building.walls[*].origin stays the exterior corner.
         wallOrigin: wallMidplaneOrigin(wall),
-        wallOrientation: wall.orientation === 'z' || wall.orientation === '-x' || wall.orientation === '+z' ? wall.orientation : 'x',
+        wallOrientation: wall.orientation === 'z' ? 'z' as const : 'x' as const,
         positionXmm: opening.positionUmm,
         widthMm: opening.widthMm,
         heightMm: opening.heightMm,
@@ -82,18 +82,16 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
       const wall = opening ? walls.get(opening.wallId) : undefined
       if (!opening || !wall) return []
       const horizontal = marker.anchor === 'left' ? 0 : marker.anchor === 'right' ? opening.widthMm : opening.widthMm / 2
-      const { x: dx, z: dz } = wall.orientation === '-x'
-        ? { x: -1, z: 0 } : wall.orientation === '+z'
-          ? { x: 0, z: 1 } : wall.orientation === 'z'
-            ? { x: 0, z: -1 } : { x: 1, z: 0 }
-      const outward = { x: -dz, z: dx }
-      const along = opening.positionUmm + horizontal
       return [{
         openingId: marker.openingId,
         position: {
-          x: wall.origin.x + dx * along + outward.x * marker.outsideOffsetMm,
+          x: wall.orientation === 'z'
+            ? wall.origin.x + marker.outsideOffsetMm
+            : wall.origin.x + opening.positionUmm + horizontal,
           y: wall.origin.y + marker.elevationMm,
-          z: wall.origin.z + dz * along + outward.z * marker.outsideOffsetMm,
+          z: wall.orientation === 'z'
+            ? wall.origin.z - (opening.positionUmm + horizontal)
+            : wall.origin.z + marker.outsideOffsetMm,
         },
         visible: marker.visible,
         color: marker.color,

@@ -1,13 +1,13 @@
 import type { Wall, WallConnection, ValidationIssue, ProjectDocument, Vector3 } from './project'
 import { rightCornerOrigin } from './corner'
-import { chainJointOrigin, connectionTurn, isPlanDirection, planOutside, planUnit,
-  rotatedDirection, wallEndPosition, wallFrameInsets } from './wall-chain'
 
 const EPS = 0.01
 const validNumber = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n)
 
 export function wallEnd(wall: Wall): Vector3 {
-  return wallEndPosition(wall)
+  return wall.orientation === 'z'
+    ? { x: wall.origin.x, y: wall.origin.y, z: wall.origin.z - wall.lengthMm }
+    : { x: wall.origin.x + wall.lengthMm, y: wall.origin.y, z: wall.origin.z }
 }
 
 /** Read legacy two-wall California joint without silently rewriting old JSON. */
@@ -19,9 +19,7 @@ export function effectiveConnections(doc: ProjectDocument): WallConnection[] {
 }
 
 export function jointOrigin(parent: Wall, child: Wall, type: WallConnection['type']): Vector3 {
-  if (type === 'california-right') return rightCornerOrigin(parent, child)
-  const turn = connectionTurn({ fromWallId: parent.wallId, toWallId: child.wallId, type })
-  return turn ? chainJointOrigin(parent, child, turn) : wallEnd(parent)
+  return type === 'california-right' ? rightCornerOrigin(parent, child) : wallEnd(parent)
 }
 
 /** Re-anchor all descendants when their parent changes; independent walls stay put. */
@@ -43,29 +41,13 @@ export function reflowConnections(walls: Wall[], connections: readonly WallConne
   }
 }
 
-export function wallFootprint(wall: Wall, inset: { startMm: number; endMm: number } = {
-  startMm: 0, endMm: 0,
-}) {
-  if (!isPlanDirection(wall.orientation)) {
-    return { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }
-  }
-  const d = planUnit(wall.orientation)
-  const n = planOutside(wall.orientation)
-  const a = {
-    x: wall.origin.x + d.x * inset.startMm,
-    z: wall.origin.z + d.z * inset.startMm,
-  }
-  const b = {
-    x: wall.origin.x + d.x * (wall.lengthMm - inset.endMm),
-    z: wall.origin.z + d.z * (wall.lengthMm - inset.endMm),
-  }
+export function wallFootprint(wall: Wall) {
   const depth = wall.sectionMm.height
-  const xx = [a.x, b.x, a.x - n.x * depth, b.x - n.x * depth]
-  const zz = [a.z, b.z, a.z - n.z * depth, b.z - n.z * depth]
-  return {
-    minX: Math.min(...xx), maxX: Math.max(...xx),
-    minZ: Math.min(...zz), maxZ: Math.max(...zz),
-  }
+  return wall.orientation === 'z'
+    ? { minX: wall.origin.x - depth, maxX: wall.origin.x,
+        minZ: wall.origin.z - wall.lengthMm, maxZ: wall.origin.z }
+    : { minX: wall.origin.x, maxX: wall.origin.x + wall.lengthMm,
+        minZ: wall.origin.z - depth, maxZ: wall.origin.z }
 }
 
 /**
@@ -75,7 +57,6 @@ export function wallFootprint(wall: Wall, inset: { startMm: number; endMm: numbe
  */
 export function validateWallTopology(
   walls: readonly Wall[], connections: readonly WallConnection[],
-  closure?: ProjectDocument['building']['closure'],
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const fail = (code: string, messageRu: string, ids: string[]) => {
@@ -85,8 +66,8 @@ export function validateWallTopology(
   const out = new Set<string>()
   const incoming = new Set<string>()
   for (const wall of walls) {
-    if (!isPlanDirection(wall.orientation)) {
-      fail('UNSUPPORTED_WALL_AXIS', 'Поддерживаются направления +X, −Z, −X, +Z', [wall.wallId])
+    if (!['x', 'z'].includes(wall.orientation)) {
+      fail('UNSUPPORTED_WALL_AXIS', 'Сейчас поддерживается направление стен X или -Z', [wall.wallId])
     }
     if (![wall.lengthMm, wall.heightMm, wall.sectionMm?.height,
       wall.origin?.x, wall.origin?.y, wall.origin?.z].every(validNumber)) {
@@ -95,7 +76,7 @@ export function validateWallTopology(
   }
   for (const link of connections) {
     if (!link || typeof link !== 'object' ||
-      !['california-right', 'end-to-end', 'chain-turn-right', 'chain-turn-left'].includes(link.type)) {
+      !['california-right', 'end-to-end'].includes(link.type)) {
       fail('INVALID_WALL_CONNECTION', 'Недопустимый тип соединения', [])
       continue
     }
@@ -123,11 +104,6 @@ export function validateWallTopology(
     if (link.type === 'end-to-end' && from.orientation !== to.orientation) {
       fail('INVALID_END_TO_END_AXIS', 'Прямой стык возможен только у сонаправленных стен', ids)
     }
-    const turn = connectionTurn(link)
-    if (turn && isPlanDirection(from.orientation) && isPlanDirection(to.orientation) &&
-      rotatedDirection(from.orientation, turn) !== to.orientation) {
-      fail('INVALID_CHAIN_TURN', 'Направление стены не соответствует повороту цепочки', ids)
-    }
     const origin = jointOrigin(from, to, link.type)
     if ((['x', 'y', 'z'] as const).some(axis =>
       !validNumber(origin[axis]) || Math.abs(origin[axis] - to.origin[axis]) > EPS)) {
@@ -149,36 +125,6 @@ export function validateWallTopology(
       current = next.get(current)
     }
   }
-  if (closure) {
-    const ids = [closure.fromWallId, closure.toWallId]
-    const first = walls[0], last = walls[walls.length - 1]
-    if (!first || !last || walls.length < 4 ||
-      closure.type !== 'butt-right' || closure.fromWallId !== last.wallId ||
-      closure.toWallId !== first.wallId) {
-      fail('INVALID_WALL_CLOSURE', 'Замыкание возможно только с последней стены к первой', ids)
-    } else if (connections.length !== walls.length - 1 ||
-      walls.slice(1).some((wall, i) => connections[i]?.fromWallId !== walls[i].wallId ||
-        connections[i]?.toWallId !== wall.wallId)) {
-      fail('INVALID_WALL_CLOSURE', 'Для замыкания требуется последовательная цепочка', ids)
-    } else if (!isPlanDirection(first.orientation) || !isPlanDirection(last.orientation) ||
-      rotatedDirection(last.orientation, 'right') !== first.orientation) {
-      fail('INVALID_WALL_CLOSURE', 'Замыкающий угол должен совпадать с началом первой стены', ids)
-    } else {
-      const end = wallEnd(last)
-      if (Math.abs(end.x - first.origin.x) > EPS ||
-          Math.abs(end.z - first.origin.z) > EPS ||
-          Math.abs(end.y - first.origin.y) > EPS) {
-        fail('WALL_CLOSURE_GAP', 'Замыкающая стена не достигает первой: измените длину цепочки', ids)
-      }
-    }
-  }
-  const asDocument = { building: { walls, connections, closure } } as ProjectDocument
-  for (const wall of walls) {
-    const inset = wallFrameInsets(asDocument, wall.wallId)
-    if (wall.lengthMm - inset.startMm - inset.endMm < wall.sectionMm.width * 4) {
-      fail('WALL_CORNER_TRIM_TOO_SHORT', 'Стена слишком короткая для соединения углов', [wall.wallId])
-    }
-  }
   // AABB footprint is a conservative but independent collision check.
   // California joint intentionally has overlapping wall footprints, though
   // its real board volumes were verified separately by the corner validator.
@@ -189,8 +135,7 @@ export function validateWallTopology(
         a.sectionMm?.height, b.sectionMm?.height].every(validNumber)) continue
       if (connections.some(link => link && link.type === 'california-right' &&
         link.fromWallId === a.wallId && link.toWallId === b.wallId)) continue
-      const p = wallFootprint(a, wallFrameInsets(asDocument, a.wallId))
-      const q = wallFootprint(b, wallFrameInsets(asDocument, b.wallId))
+      const p = wallFootprint(a), q = wallFootprint(b)
       const overlapX = Math.min(p.maxX, q.maxX) - Math.max(p.minX, q.minX)
       const overlapZ = Math.min(p.maxZ, q.maxZ) - Math.max(p.minZ, q.minZ)
       if (overlapX > EPS && overlapZ > EPS) {

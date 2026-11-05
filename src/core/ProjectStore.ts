@@ -10,7 +10,6 @@ import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
 import { translateWallsToExteriorZero, migrateLegacyWallOrigins } from './world-origin'
 import { effectiveConnections, reflowConnections } from './wall-topology'
-import { previewChainClosure, wallEndPosition } from './wall-chain'
 
 export type ProjectCommand =
   | { type: 'SET_PROJECT_NAME'; payload: { projectName: string } }
@@ -25,11 +24,9 @@ export type ProjectCommand =
   | { type: 'ADD_OPENING'; payload: { wallId: string; opening: { id: string; type: 'window' | 'door' | 'garage-door'; positionXmm: number; widthMm: number; heightMm: number; sillHeightMm: number; garage?: import('./project').GarageDoorSpec } } }
   | { type: 'REMOVE_OPENING'; payload: { openingId: string } }
   | { type: 'ADD_WALL'; payload: { wall: Wall; connection?: WallConnection } }
-  | { type: 'CLOSE_CHAIN'; payload: Record<string, never> }
-  | { type: 'REOPEN_CHAIN'; payload: Record<string, never> }
   | { type: 'SET_WALL_ORIGIN'; payload: { wallId: string; origin: Vector3 } }
   | { type: 'ANCHOR_FIRST_WALL_AT_ZERO'; payload: Record<string, never> }
-  | { type: 'SET_WALL_AXIS'; payload: { wallId: string; orientation: 'x' | 'z' | '-x' | '+z' } }
+  | { type: 'SET_WALL_AXIS'; payload: { wallId: string; orientation: 'x' | 'z' } }
   | { type: 'REMOVE_WALL'; payload: { wallId: string } }
   | { type: 'REPLACE_PROJECT'; payload: { document: ProjectDocument } }
 
@@ -278,8 +275,8 @@ export class ProjectStore {
           const { wallId, orientation } = command.payload
           const wall = candidate.building.walls.find(w => w.wallId === wallId)
           if (!wall) return { success: false, errorCode: 'WALL_NOT_FOUND', messageRu: 'Стена не найдена' }
-          if (!['x', 'z', '-x', '+z'].includes(orientation)) {
-            return { success: false, errorCode: 'UNSUPPORTED_WALL_AXIS', messageRu: 'Поддерживаются X, −Z, −X и +Z' }
+          if (orientation !== 'x' && orientation !== 'z') {
+            return { success: false, errorCode: 'UNSUPPORTED_WALL_AXIS', messageRu: 'Поддерживаются направления X и -Z' }
           }
           const links = effectiveConnections(candidate)
           if (links.some(link => link.fromWallId === wallId || link.toWallId === wallId)) {
@@ -410,8 +407,6 @@ export class ProjectStore {
           break
         }
         case 'ADD_WALL': {
-          if (candidate.building.closure) return { success: false,
-            errorCode: 'CHAIN_ALREADY_CLOSED', messageRu: 'Сначала разомкните контур' }
           const wall = command.payload.wall
           if (candidate.building.walls.some(w => w.wallId === wall.wallId)) {
             return { success: false, errorCode: 'DUPLICATE_WALL_ID', messageRu: 'Такой ID стены уже существует' }
@@ -440,56 +435,7 @@ export class ProjectStore {
           if (connection) changedIds.push('building.connections')
           break
         }
-        case 'CLOSE_CHAIN': {
-          const preview = previewChainClosure(candidate)
-          if (!preview.valid || !preview.direction) return { success: false,
-            errorCode: 'CHAIN_CANNOT_CLOSE', messageRu: preview.reason }
-          const walls = candidate.building.walls
-          const last = walls[walls.length - 1]
-          const first = walls[0]
-          const next = Math.max(0, ...walls.map(w =>
-            Number(w.wallId.split('-')[1] ?? 0))) + 1
-          const wallId = 'wall-' + String(next).padStart(3, '0')
-          const newWall: Wall = {
-            ...last, wallId, orientation: preview.direction,
-            lengthMm: preview.lengthMm, origin: wallEndPosition(last),
-            sectionMm: { ...last.sectionMm }, openings: [],
-          }
-          const oldLinks = effectiveConnections(candidate)
-          candidate.building.walls.push(newWall)
-          candidate.building.connections = [...oldLinks, {
-            fromWallId: last.wallId, toWallId: wallId, type: 'chain-turn-right',
-          }]
-          candidate.building.closure = {
-            fromWallId: wallId, toWallId: first.wallId, type: 'butt-right',
-          }
-          changedIds.push('building.walls[' + wallId + ']', 'building.connections',
-            'building.closure')
-          break
-        }
-        case 'REOPEN_CHAIN': {
-          if (!candidate.building.closure) return { success: false,
-            errorCode: 'CHAIN_NOT_CLOSED', messageRu: 'Контур ещё не замкнут' }
-          const lastId = candidate.building.closure.fromWallId
-          if (candidate.building.openings.some(o => o.wallId === lastId)) {
-            return { success: false, errorCode: 'CLOSING_WALL_HAS_OPENINGS',
-              messageRu: 'Сначала удалите проёмы замыкающей стены' }
-          }
-          // A closed closing panel is cropped at both ends. Merely
-          // clearing closure would restore its end studs INSIDE the
-          // first wall. Remove the auto-created final segment and its
-          // parent edge in the SAME validated Undo/Redo transaction.
-          candidate.building.walls = candidate.building.walls.filter(w => w.wallId !== lastId)
-          candidate.building.connections =
-            (candidate.building.connections ?? []).filter(c => c.toWallId !== lastId)
-          delete candidate.building.closure
-          changedIds.push('building.closure', 'building.walls[' + lastId + ']',
-            'building.connections')
-          break
-        }
         case 'REMOVE_WALL': {
-          if (candidate.building.closure) return { success: false,
-            errorCode: 'CHAIN_ALREADY_CLOSED', messageRu: 'Сначала разомкните контур' }
           const wallId = command.payload.wallId
           const index = candidate.building.walls.findIndex(w => w.wallId === wallId)
           if (index <= 0) {

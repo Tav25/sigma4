@@ -34,7 +34,7 @@ export interface Wall {
   thicknessMm: number
   studSpacingMm: number
   sectionMm: { width: number; height: number }
-  orientation: 'x' | 'y' | 'z' | '-x' | '+z'
+  orientation: 'x' | 'y' | 'z'
   /** Lower OUTSIDE corner in global millimetres; NOT the stud midplane. */
   origin: Vector3
   openings: string[]
@@ -43,7 +43,7 @@ export interface Wall {
 export interface WallConnection {
   fromWallId: string
   toWallId: string
-  type: 'california-right' | 'end-to-end' | 'chain-turn-right' | 'chain-turn-left'
+  type: 'california-right' | 'end-to-end'
 }
 
 export interface GarageDoorSpec {
@@ -115,8 +115,6 @@ export interface ProjectDocument {
     walls: Wall[]
     /** Optional for backward compatibility with legacy two-wall projects. */
     connections?: WallConnection[]
-    /** Final chain-end contact with its first wall; not a cyclic parenting edge. */
-    closure?: { fromWallId: string; toWallId: string; type: 'butt-right' }
     openings: Opening[]
     markers: Marker[]
   }

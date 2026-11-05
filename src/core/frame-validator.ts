@@ -107,7 +107,7 @@ export function validateStructure(doc: any): ValidationIssue[] {
           checkPositive(w.sectionMm.width, 'sectionMm.width', 'Ширина сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
           checkPositive(w.sectionMm.height, 'sectionMm.height', 'Высота сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
         }
-        if (!['x', 'y', 'z', '-x', '+z'].includes(w.orientation)) {
+        if (!['x', 'y', 'z'].includes(w.orientation)) {
           issues.push(createIssue('INVALID_WALL_ORIENTATION', 'error', `${path}.orientation`, 'Недопустимая ориентация стены', w.wallId ? [w.wallId] : []))
         }
         if (w.origin) {
@@ -235,7 +235,7 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
   const { building, assembly } = doc
   for (const opening of building.openings) issues.push(...garageEngineeringNotices(opening))
   const links = effectiveConnections(doc)
-  issues.push(...validateWallTopology(building.walls, links, building.closure))
+  issues.push(...validateWallTopology(building.walls, links))
   const california = links.find(link => link && link.type === 'california-right' &&
     building.walls.some(w => w.wallId === link.fromWallId) &&
     building.walls.some(w => w.wallId === link.toWallId))
@@ -553,7 +553,7 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
           checkPositive(w.sectionMm.width, 'sectionMm.width', 'Ширина сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
           checkPositive(w.sectionMm.height, 'sectionMm.height', 'Высота сечения', 'f', path, issues, w.wallId ? [w.wallId] : [])
         }
-        if (!['x', 'y', 'z', '-x', '+z'].includes(w.orientation)) {
+        if (!['x', 'y', 'z'].includes(w.orientation)) {
           issues.push(createIssue('INVALID_WALL_ORIENTATION', 'error', `${path}.orientation`, 'Недопустимая ориентация стены', w.wallId ? [w.wallId] : []))
         }
         if (w.origin) {
@@ -659,7 +659,7 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
              toWallId: doc.building.walls[1].wallId,
              type: 'california-right' as const }]
         : [])
-    issues.push(...validateWallTopology(doc.building.walls, links, doc.building.closure))
+    issues.push(...validateWallTopology(doc.building.walls, links))
   }
   if (doc.building?.connections !== undefined && !Array.isArray(doc.building.connections)) {
     issues.push(createIssue('INVALID_CONNECTIONS_ARRAY', 'error', 'building.connections',

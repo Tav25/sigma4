@@ -1,7 +1,6 @@
 import type { Wall } from '../core/project'
 import type { TimberElement } from '../core/timber'
 import { calculateWorldBounds } from './view-bounds'
-import { planUnit, isPlanDirection } from '../core/wall-chain'
 
 /** Coordinates remain world millimetres, not view-relative pixel positions. */
 export interface DimensionPoint { x: number; y: number; z: number }
@@ -78,23 +77,23 @@ export function buildDimensionLayout(walls: readonly Wall[], elements: TimberEle
   const OVERALL_OFFSET_MM = 460
   const EXTENSION_START_MM = 45
   const lines: DimensionLine[] = walls.map((wall) => {
-    const alongX = wall.orientation === 'x' || wall.orientation === '-x'
-    const vector = isPlanDirection(wall.orientation) ? planUnit(wall.orientation) : { x: 1, z: 0 }
+    const alongX = wall.orientation === 'x'
     const from = asPoint(wall.origin.x, wall.origin.z)
-    const to = asPoint(wall.origin.x + vector.x * wall.lengthMm,
-      wall.origin.z + vector.z * wall.lengthMm)
+    const to = asPoint(alongX ? wall.origin.x + wall.lengthMm : wall.origin.x,
+      alongX ? wall.origin.z : wall.origin.z - wall.lengthMm)
     const ownElements = elements.filter(element => element.wallId === wall.wallId)
     const ownAabb = calculateWorldBounds(ownElements)
     // Each wall in a valid assembly has timber. Fallback is deterministic
     // for a temporarily empty wall, without relying on global building bounds.
-    const outward = wall.orientation === 'x' || wall.orientation === 'z' ? 1 : -1
-    const faceZ = ownAabb.isEmpty() ? wall.origin.z
-      : outward > 0 ? ownAabb.max.z * 1000 : ownAabb.min.z * 1000
-    const faceX = ownAabb.isEmpty() ? wall.origin.x
-      : outward > 0 ? ownAabb.max.x * 1000 : ownAabb.min.x * 1000
+    const faceZ = ownAabb.isEmpty()
+      ? wall.origin.z + wall.sectionMm.height / 2
+      : ownAabb.max.z * 1000
+    const faceX = ownAabb.isEmpty()
+      ? wall.origin.x + wall.sectionMm.height / 2
+      : ownAabb.max.x * 1000
     const coordinate = alongX ? faceZ : faceX
-    const dimCoordinate = coordinate + outward * WALL_OFFSET_MM
-    const footCoordinate = coordinate + outward * EXTENSION_START_MM
+    const dimCoordinate = coordinate + WALL_OFFSET_MM
+    const footCoordinate = coordinate + EXTENSION_START_MM
     return {
       id: 'wall-dim-' + wall.wallId,
       kind: 'wall' as const,
