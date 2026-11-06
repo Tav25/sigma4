@@ -462,9 +462,9 @@ try {
   await page.getByTestId('plan-selected-graph-node').waitFor()
   await page.getByTestId('plan-node-edit-x').fill('2,75')
   await page.getByTestId('plan-save-graph-node').click()
-  const finalDownload=page.waitForEvent('download')
+  const graphFinalDownload=page.waitForEvent('download')
   await page.getByTestId('plan-export').click()
-  const final=JSON.parse(await readFile(await (await finalDownload).path(),'utf8'))
+  const final=JSON.parse(await readFile(await (await graphFinalDownload).path(),'utf8'))
   assert.equal(final.building.floorPlan.graph.nodes.some(n=>n.xMm===2750&&n.zMm===-3500),true)
   assert.equal(final.validation.valid,true)
 
