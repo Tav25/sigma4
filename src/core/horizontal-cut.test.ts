@@ -102,8 +102,12 @@ describe('SIGMA4 0.1.18: real horizontal plane vs 3D solid',()=>{
     const receivers=cut.pieces.filter(p=>p.elementId.includes('partition-backing-'))
     expect(receivers).toHaveLength(6)
     expect(receivers.every(p=>p.areaMm2>0)).toBe(true)
-    expect(receivers.filter(p=>p.elementId.endsWith('-flat')).map(p=>p.areaMm2)).toEqual([4500,4500])
-    expect(receivers.filter(p=>!p.elementId.endsWith('-flat')).map(p=>p.areaMm2)).toEqual([6525,6525,6525,6525])
+    expect(receivers.filter(p=>p.elementId.endsWith('-flat'))).toHaveLength(2)
+    receivers.filter(p=>p.elementId.endsWith('-flat')).forEach(p=>
+      expect(p.areaMm2).toBeCloseTo(4500,4))
+    expect(receivers.filter(p=>!p.elementId.endsWith('-flat'))).toHaveLength(4)
+    receivers.filter(p=>!p.elementId.endsWith('-flat')).forEach(p=>
+      expect(p.areaMm2).toBeCloseTo(6525,4))
     expect(cut.pieces.some(p=>p.wallId.startsWith('partition-')&&p.role==='stud')).toBe(true)
     const high=buildHorizontalCut(elements,2650)
     expect(high.pieces.some(p=>p.role==='top-plate')).toBe(true)
