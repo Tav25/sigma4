@@ -1,4 +1,6 @@
 import type { PlanPoint } from './floor-plan'
+import type { ProjectDocument } from './project'
+import { physicalTimberBoxes, boxesFaceContact } from './frame-structural-validator'
 import type { TimberElement, Wall } from './project'
 import {
   isPartitionWall, partitionAttachments, type PartitionSide, type PartitionHost,
@@ -211,5 +213,26 @@ export function connectTopPlateLaps(
     if(!end||!start)throw Error('Нет второго верхнего слоя для наружного угла '+
       a.wallId+' — '+b.wallId)
     link(end,start)
+  }
+
+  // An upper cap may be cut AFTER another T/corner joint was created.
+  // Recheck all cap-to-cap links in the final physical scene: a cloned
+  // right-hand piece must inherit the contact only if it ACTUALLY touches.
+  // Also discover the new right-hand contact created by the channel split.
+  const scene={building:{walls,openings:[],markers:[]},
+    assembly:{elements}} as unknown as ProjectDocument
+  const caps=physicalTimberBoxes(scene).filter(box=>
+    isCap(box.element,box.element.wallId))
+  const byBox=new Map(caps.map(b=>[b.id,b]))
+  for(const a of caps){
+    a.element.connectionIds=a.element.connectionIds.filter(target=>{
+      const b=byBox.get(target)
+      return !b || boxesFaceContact(a,b)
+    })
+  }
+  for(let i=0;i<caps.length;i++)for(let j=i+1;j<caps.length;j++){
+    const a=caps[i],b=caps[j]
+    if(a.wallId===b.wallId)continue
+    if(boxesFaceContact(a,b))link(a.element,b.element)
   }
 }

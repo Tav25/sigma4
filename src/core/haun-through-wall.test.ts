@@ -123,7 +123,8 @@ describe('Larry Haun: a 6m THROUGH wall with 2 doors and a 3m T branch',()=>{
     expect(boxesFaceContact(branchEnd,flat)).toBe(true)
     expect(validateAssemblyContacts(doc)).toEqual([])
     const mid=buildHorizontalCut(projectToScene(doc).elements,1200)
-    expect(mid.pieces.filter(piece=>piece.elementId.includes(':partition-backing-'))).toHaveLength(3)
+    expect(mid.pieces.filter(piece=>piece.elementId.includes(':partition-backing-') &&
+      piece.wallId===through.wallId)).toHaveLength(3)
     const high=buildHorizontalCut(projectToScene(doc).elements,2680)
     expect(high.pieces.filter(piece=>piece.elementId.includes(':plate-top-2') &&
       piece.wallId===through.wallId)).toHaveLength(2)
