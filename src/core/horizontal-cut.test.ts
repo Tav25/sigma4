@@ -50,8 +50,8 @@ describe('SIGMA4 0.1.18: real horizontal plane vs 3D solid',()=>{
     const polygon=timberSectionAtHeight(piece,900)
     const dx=Math.max(...polygon.map(p=>p.xMm))-Math.min(...polygon.map(p=>p.xMm))
     const dz=Math.max(...polygon.map(p=>p.zMm))-Math.min(...polygon.map(p=>p.zMm))
-    expect(dx).toBeCloseTo(145,6)
-    expect(dz).toBeCloseTo(45,6)
+    expect(dx).toBeCloseTo(45,6)
+    expect(dz).toBeCloseTo(145,6)
     expect(area(polygon)).toBeCloseTo(45*145,4)
   })
   it('cuts rolled vertical stud by rotated diamond, not its larger rectangular AABB',()=>{
