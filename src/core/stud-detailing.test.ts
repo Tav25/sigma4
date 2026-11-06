@@ -22,7 +22,7 @@ function assertIndependentBays(doc:ProjectDocument,wallId:string) {
   expect(ends.every(Boolean)).toBe(true)
   const limits=[ends[0].position.x,...reg(doc,wallId).map(e=>e.position.x),ends[1].position.x].sort((a,b)=>a-b)
   expect(limits[0]).toBeCloseTo(wall.sectionMm.width/2,5)
-  expect(limits.at(-1)).toBeCloseTo(wall.lengthMm-wall.sectionMm.width/2,5)
+  expect(limits[limits.length-1]).toBeCloseTo(wall.lengthMm-wall.sectionMm.width/2,5)
   expect(reg(doc,wallId).every(e=>
     e.lengthMm===wall.heightMm-3*wall.sectionMm.width &&
     e.position.y===wall.sectionMm.width)).toBe(true)

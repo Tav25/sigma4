@@ -80,7 +80,7 @@ function studExtent(member: TimberElement): [number, number] {
     member.position.x + member.sectionMm.width / 2]
 }
 
-function physicalStud(wall: Wall, centre: number, id: string, role: string,
+function physicalStud(wall: Wall, centre: number, id: string, role: TimberElement['role'],
   startY: number, lengthMm: number): TimberElement {
   return {
     elementId: wall.wallId + ':' + id,
