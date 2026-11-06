@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.16')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.17')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -578,6 +578,22 @@ try {
   await page.getByTestId('frame-section-height').fill('2120')
   assert.ok(await section.getByTestId('frame-section-piece').count() > atDoorHeight)
   await page.screenshot({ path: dir + '/29-garage-partition-section.png' })
+  // 0.1.17: the actual generated assembly (not only a drawn 2D symbol)
+  // must contain two transverse receiving studs per outside T connection.
+  await page.getByTestId('tab-plan').click()
+  const receiverDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const receiverDoc=JSON.parse(await readFile(await (await receiverDownload).path(),'utf8'))
+  const receiving=receiverDoc.assembly.elements.filter(e=>e.elementId.includes(':partition-backing-'))
+  assert.equal(receiving.length,4)
+  const frontReceiving=receiving.filter(e=>e.wallId==='plan-front')
+  const leftReceiving=receiving.filter(e=>e.wallId==='plan-left')
+  assert.equal(frontReceiving.length,2)
+  assert.equal(leftReceiving.length,2)
+  assert.equal(frontReceiving.every(e=>e.sectionMm.width===45&&e.sectionMm.height===145),true)
+  assert.equal(frontReceiving.every(e=>e.connectionIds.some(id=>id.startsWith('partition-'))),true)
+  assert.equal(receiverDoc.validation.valid,true)
+
   // Direct 2D editing uses the selected host, a transient preview, and one
   // canonical command when a placement or drag is confirmed.
   await page.reload({ waitUntil: 'networkidle' })
@@ -733,7 +749,7 @@ try {
   await mobile.screenshot({ path: dir + '/34-direct-openings-touch.png' })
   await mobile.close()
   assert.deepEqual(errors, [], 'Browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  console.log('SIGMA4 BROWSER PASS: v0.1.17 two exterior partition receiving studs per joint, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()
