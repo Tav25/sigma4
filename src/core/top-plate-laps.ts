@@ -18,7 +18,6 @@ type Junction = {
   branches: { side: PartitionSide; atStart: boolean; trim: number }[]
 }
 const EPS = 0.001
-const same = (a: PlanPoint, b: PlanPoint) => a.xMm === b.xMm && a.zMm === b.zMm
 const alongX = (side: PartitionHost) => side.start.zMm === side.end.zMm
 const onSegment = (p: PlanPoint, side: PartitionHost) =>
   alongX(side)
