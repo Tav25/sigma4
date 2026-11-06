@@ -9,6 +9,7 @@ import { effectiveConnections, validateWallTopology } from './wall-topology'
 import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
 import { validateAssemblyContacts } from './frame-structural-validator'
 import { validatePhysicalThroughRuns } from './structural-runs'
+import { validateTopPlateLaps } from './top-plate-validation'
 import { validateOpeningHeaderInputs, verifyOpeningFraming, verifyHeaderLoadInputs } from './opening-profiles'
 import { wallMidplaneOrigin } from './world-origin'
 import { validateFloorPlan } from './floor-plan'
@@ -486,6 +487,7 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
   // after legacy geometry/opening checks. This never mutates authored JSON.
   issues.push(...validateAssemblyContacts(doc))
   issues.push(...validatePhysicalThroughRuns(doc))
+  issues.push(...validateTopPlateLaps(doc))
   return issues
 }
 
