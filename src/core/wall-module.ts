@@ -1,5 +1,6 @@
 import { generateWallPanel, type WallPanelParams } from './wall'
 import { generateWallWithOpenings, type WindowOpening } from './window'
+import { generatePartitionWithDoors } from './partition-door'
 import type { Wall, Opening, TimberElement } from './project'
 
 /**
@@ -9,15 +10,16 @@ import type { Wall, Opening, TimberElement } from './project'
 export function generateWallModule(
   wall: Wall,
   openings: readonly Opening[],
-  options: { unprefixedIds?: boolean } = {},
+  options: { unprefixedIds?: boolean; partition?: boolean } = {},
 ): TimberElement[] {
+  const partition = options.partition
   const params: WallPanelParams = {
     length: wall.lengthMm,
     height: wall.heightMm,
     sectionWidth: wall.sectionMm.width,
     sectionHeight: wall.sectionMm.height,
     spacing: wall.studSpacingMm,
-    topLayers: 2,
+    topLayers: partition ? 1 : 2,
   }
   const wallOpenings: WindowOpening[] = openings
     .filter(opening => opening.wallId === wall.wallId)
@@ -33,7 +35,7 @@ export function generateWallModule(
     .sort((a, b) => a.positionXmm - b.positionXmm)
 
   const panel = wallOpenings.length
-    ? generateWallWithOpenings(params, wallOpenings)
+    ? (partition ? generatePartitionWithDoors(params, wallOpenings) : generateWallWithOpenings(params, wallOpenings))
     : generateWallPanel(params)
 
   return panel.elements.map((element: any): TimberElement => ({

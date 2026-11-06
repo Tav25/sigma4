@@ -491,7 +491,7 @@
             },
             "frame": {
               "type": "object",
-              "description": "Authored exterior openings use distances from the outer corner, not from the generated panel origin.",
+              "description": "Authored opening offsets are measured from the original plan-side start.",
               "required": [
                 "built",
                 "openings"
@@ -501,6 +501,7 @@
                 "built": {
                   "type": "boolean"
                 },
+                "partitions": { "const": true },
                 "openings": {
                   "type": "array",
                   "items": {

@@ -24,6 +24,7 @@ export type ProjectCommand =
   | { type: 'PLAN_MOVE_POINT'; payload: { index: number; point: PlanPoint } }
   | { type: 'PLAN_FRAME_SAVE_OPENING'; payload: { opening: Opening } }
   | { type: 'PLAN_FRAME_REMOVE_OPENING'; payload: { openingId: string } }
+  | { type: 'PLAN_FRAME_ENABLE_PARTITIONS'; payload: Record<string, never> }
   | { type: 'PLAN_FRAME_BUILD'; payload: Record<string, never> }
   | { type: 'PLAN_FRAME_RESIZE'; payload: { widthMm: number; depthMm: number } }
   | { type: 'PLAN_CLOSE'; payload: Record<string, never> }
@@ -317,6 +318,7 @@ export class ProjectStore {
         }
         case 'PLAN_FRAME_SAVE_OPENING':
         case 'PLAN_FRAME_REMOVE_OPENING':
+        case 'PLAN_FRAME_ENABLE_PARTITIONS':
         case 'PLAN_FRAME_BUILD':
         case 'PLAN_FRAME_RESIZE': {
           const plan = candidate.building.floorPlan
@@ -347,6 +349,8 @@ export class ProjectStore {
             else frame.openings[index] = opening
           } else if (command.type === 'PLAN_FRAME_REMOVE_OPENING') {
             frame.openings = frame.openings.filter(item => item.id !== command.payload.openingId)
+          } else if (command.type === 'PLAN_FRAME_ENABLE_PARTITIONS') {
+            frame.partitions = true
           } else {
             frame.built = true
           }

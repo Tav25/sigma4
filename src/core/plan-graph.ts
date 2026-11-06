@@ -229,8 +229,8 @@ export function moveGraphEdgeToDimension(
   const clearance=planWallClearances(graphView(plan),id)
   const ref=clearance?.[side]
   if(!clearance||!ref)throw Error('Не удалось найти соседнюю стену')
-  const target=side==='negative'?ref.referenceMm+desiredMm:ref.referenceMm-desiredMm
-  return moveGraphEdge(plan,id,target-clearance.coordinateMm)
+  const offset=(desiredMm-ref.distanceMm)*(side==='negative'?1:-1)
+  return moveGraphEdge(plan,id,Math.round(offset))
 }
 /** Validation must never mutate author data. */
 export function validatePlanGraph(plan:FloorPlan):string[] {

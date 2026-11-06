@@ -12,7 +12,8 @@ import { validateProject, validateSourceParameters } from './frame-validator'
 import { generateWallModule } from './wall-module'
 import { connectPerimeterCorner, connectRightCaliforniaCorner } from './corner-connection'
 import { effectiveConnections } from './wall-topology'
-import { perimeterCorners, projectPlanFrame } from './plan-frame'
+import { addPartitionBacking, isPartitionWall } from './partition-layout'
+import { perimeterCorners, planFrameOpeningSides, projectPlanFrame } from './plan-frame'
 import { CURRENT_COORDINATE_SCHEMA, migrateLegacyWallOrigins } from './world-origin'
 
 const SW = 45
@@ -24,10 +25,14 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
   const linked = doc.building.floorPlan?.frame?.built === true
   const walls = doc.building.walls
   const elements = walls.flatMap((wall, index) =>
-    generateWallModule(wall, doc.building.openings, { unprefixedIds: !linked && index === 0 }))
+    generateWallModule(wall, doc.building.openings, { unprefixedIds: !linked && index === 0, partition: linked && isPartitionWall(wall.wallId) }))
   if (linked) {
     for (const corner of perimeterCorners(walls)) {
       connectPerimeterCorner(elements, corner)
+    }
+    const plan = doc.building.floorPlan!
+    for (const side of planFrameOpeningSides(plan)) {
+      if ('endInsetMm' in side) addPartitionBacking(elements, walls, side)
     }
     return { elements }
   }

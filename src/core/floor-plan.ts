@@ -353,12 +353,19 @@ export function exteriorWallStrips(plan: FloorPlan): PlanPoint[][] {
   })
 }
 
+interface ClearanceSpan {
+  referenceMm: number
+  distanceMm: number
+  referenceFaceMm?: number
+  wallFaceMm?: number
+}
+
 export interface PlanClearance {
   axis: 'x' | 'z'
   scanMm: number
   coordinateMm: number
-  negative: { referenceMm: number; distanceMm: number } | null
-  positive: { referenceMm: number; distanceMm: number } | null
+  negative: ClearanceSpan | null
+  positive: ClearanceSpan | null
 }
 
 /**
@@ -367,7 +374,8 @@ export interface PlanClearance {
  * bounding rectangle (important for L-shaped footprints).
  */
 export function planWallClearances(plan: FloorPlan, wallId: string): PlanClearance | null {
-  const wall = (plan.graph ? graphView(plan).interiorWalls : plan.interiorWalls).find(w => w.id === wallId)
+  const walls = graphView(plan).interiorWalls
+  const wall = walls.find(w => w.id === wallId)
   if (!wall || !plan.closed || !planIsOrthogonal(wall.start, wall.end)) return null
   const axis: 'x' | 'z' = wall.start.xMm === wall.end.xMm ? 'x' : 'z'
   const parallel = axis === 'x'
@@ -375,6 +383,7 @@ export function planWallClearances(plan: FloorPlan, wallId: string): PlanClearan
   const scanMm = parallel ?
     (wall.start.zMm + wall.end.zMm) / 2 :
     (wall.start.xMm + wall.end.xMm) / 2
+  const halfThickness = wall.thicknessMm / 2
   const references = planSegments(plan).filter(seg => seg.id !== wallId)
     .filter(seg => parallel
       ? seg.start.xMm === seg.end.xMm &&
@@ -383,18 +392,24 @@ export function planWallClearances(plan: FloorPlan, wallId: string): PlanClearan
       : seg.start.zMm === seg.end.zMm &&
         scanMm >= Math.min(seg.start.xMm, seg.end.xMm) &&
         scanMm <= Math.max(seg.start.xMm, seg.end.xMm))
-    .map(seg => parallel ? seg.start.xMm : seg.start.zMm)
-  const smaller = references.filter(n => n < coordinateMm)
-  const larger = references.filter(n => n > coordinateMm)
-  const minus = smaller.length ? Math.max(...smaller) : null
-  const plus = larger.length ? Math.min(...larger) : null
-  return {
-    axis, scanMm, coordinateMm,
-    negative: minus === null ? null :
-      { referenceMm: minus, distanceMm: coordinateMm - minus },
-    positive: plus === null ? null :
-      { referenceMm: plus, distanceMm: plus - coordinateMm },
+    .map(seg => ({
+      coordinate: parallel ? seg.start.xMm : seg.start.zMm,
+      depth: seg.exterior ? plan.exteriorThicknessMm ?? DEFAULT_EXTERIOR_THICKNESS_MM
+        : walls.find(item => item.id === seg.id)!.thicknessMm / 2,
+    }))
+  function measure(direction: -1 | 1): ClearanceSpan | null {
+    const reference = references.filter(item => (item.coordinate - coordinateMm) * direction > 0)
+      .sort((a, b) => (a.coordinate - b.coordinate) * direction)[0]
+    if (!reference) return null
+    if (!plan.frame?.partitions) {
+      return { referenceMm: reference.coordinate, distanceMm: Math.abs(reference.coordinate - coordinateMm) }
+    }
+    const referenceFaceMm = reference.coordinate - direction * reference.depth
+    const wallFaceMm = coordinateMm + direction * halfThickness
+    return { referenceMm: reference.coordinate, referenceFaceMm, wallFaceMm,
+      distanceMm: (referenceFaceMm - wallFaceMm) * direction }
   }
+  return { axis, scanMm, coordinateMm, negative: measure(-1), positive: measure(1) }
 }
 
 /**
@@ -434,8 +449,6 @@ export function moveWallToClearance(
   const c = planWallClearances(plan, wallId)
   const reference = c?.[side]
   if (!c || !reference) return null
-  const nextPosition = side === 'negative'
-    ? reference.referenceMm + desiredMm
-    : reference.referenceMm - desiredMm
-  return moveInteriorWallWithDependents(plan, wallId, nextPosition - c.coordinateMm)
+  const offset = (desiredMm - reference.distanceMm) * (side === 'negative' ? 1 : -1)
+  return moveInteriorWallWithDependents(plan, wallId, Math.round(offset))
 }

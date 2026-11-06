@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import type { CommandResult, ProjectCommand } from '../core/ProjectStore'
 import { decimalMetersToMm, planBounds, type FloorPlan } from '../core/floor-plan'
 import { defaultGarageDoorSpec, GARAGE_DOOR_PRESETS } from '../core/garage-door'
-import { MIN_FRAME_SIDE_MM, rectangularFrameSides } from '../core/plan-frame'
+import { MIN_FRAME_SIDE_MM, planFrameOpeningSides } from '../core/plan-frame'
+import { isPartitionWall } from '../core/partition-layout'
 import type { Opening } from '../core/project'
 
 export type PlanFramePick = { wallId: string; offsetMm: number } | { opening: Opening }
@@ -20,6 +21,7 @@ const fields = [
 ] as const
 
 const emptyOpenings: Opening[] = []
+const doorDefaults = { type: 'door', widthMm: 900, heightMm: 2100, sillHeightMm: 0, garage: undefined } as const
 
 interface Props {
   plan: FloorPlan
@@ -32,7 +34,7 @@ interface Props {
 }
 
 export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIssues, onBuilt }: Props) {
-  const sides = rectangularFrameSides(plan)
+  const sides = planFrameOpeningSides(plan)
   const openings = plan.frame?.openings ?? emptyOpenings
   const bounds = planBounds(plan.exterior)
   const width = (bounds.maxX - bounds.minX) / 1000
@@ -54,6 +56,7 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
     } else if (pick) {
       setDraft(previous => ({
         widthMm: 1200, heightMm: 1200, sillHeightMm: 900, type: 'window', id: '', ...previous,
+        ...(isPartitionWall(pick.wallId) && previous?.type !== 'door' ? doorDefaults : {}),
         wallId: pick.wallId, positionUmm: pick.offsetMm,
       }))
     }
@@ -103,6 +106,11 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
         }
         apply({ type: 'PLAN_FRAME_RESIZE', payload: { widthMm, depthMm } })
       }}>Применить габариты</button>
+      {!!(plan.graph?.edges.length || plan.interiorWalls.length) && !plan.frame?.partitions &&
+        <button type="button" className="plan-button plan-secondary" data-testid="plan-frame-enable-partitions"
+          onClick={() => apply({ type: 'PLAN_FRAME_ENABLE_PARTITIONS', payload: {} })}>
+          Включить перегородки в каркас
+        </button>}
       <div className="plan-frame-fields">
         <button type="button" className="plan-button plan-secondary" data-testid="plan-frame-add-opening"
           onClick={() => {
@@ -120,14 +128,17 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
       </button>)}
       {draft && <div className="plan-frame-form">
         <label>Стена<select data-testid="plan-frame-opening-wall" value={draft.wallId}
-          onChange={event => setDraft({ ...draft, wallId: event.target.value })}>
+          onChange={event => {
+            const wallId = event.target.value
+            setDraft({ ...draft, wallId, ...(isPartitionWall(wallId) && draft.type !== 'door' ? doorDefaults : {}) })
+          }}>
           {sides.map(side => <option key={side.wallId} value={side.wallId}>{side.label}</option>)}
         </select></label>
         <label>Тип<select data-testid="plan-frame-opening-type" value={draft.type}
           onChange={event => changeType(event.target.value as Opening['type'])}>
-          {openingTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+          {openingTypes.filter(type => !isPartitionWall(draft.wallId) || type.value === 'door').map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
         </select></label>
-        <p className="plan-guidance">Отступ измеряется по стрелке от наружного угла до начала проёма.</p>
+        <p className="plan-guidance">Отступ измеряется по стрелке от начала линии стены до начала проёма.</p>
         <div className="plan-frame-fields">
           {fields.filter(field => field.name !== 'sillHeightMm' || draft.type === 'window').map(field =>
             <label key={field.name}>{field.label}
@@ -152,8 +163,9 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
       }}>{plan.frame?.built ? 'Открыть каркас 3D' : 'Построить каркас'}</button>
       <p className="plan-guidance">Наружные стены · 45 × 145 мм · высота 2700 мм · шаг 600 мм.</p>
       {!plan.frame?.built && <p className="plan-guidance">Связанный каркас заменит текущую модель во вкладке 3D. Действие можно отменить.</p>}
-      {!!(plan.graph?.edges.length || plan.interiorWalls.length) &&
-        <p className="plan-guidance">Внутренние стены остаются на плане 2D.</p>}
+      {plan.frame?.partitions && <p className="plan-guidance">
+        Ненесущие перегородки · толщина от 89 мм · шаг стоек 400 мм · обычные двери.
+      </p>}
     </>}
   </section>
 }

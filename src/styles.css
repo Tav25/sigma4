@@ -294,3 +294,9 @@ body,
 .plan-frame-form {margin-top:10px;padding:10px;border:1px solid #d9e2ea;border-radius:8px}
 .plan-frame-form label {margin-top:6px}
 .plan-frame-fields [aria-pressed="true"] {background:#e2f4f0;border-color:#6db1a5;color:#175e57}
+
+.frame-section-toggle {position:absolute;z-index:2;top:12px;left:12px;padding:7px 12px}
+.frame-horizontal-section {display:flex;flex-direction:column;height:100%;min-height:0;background:#f6f9fc}
+.frame-section-toolbar {display:flex;gap:16px;align-items:center;padding:56px 14px 8px;font-size:13px}
+.frame-section-toolbar input {width:85px;margin-left:8px}
+.frame-horizontal-section svg {flex:1;min-height:0;width:100%;padding:14px}

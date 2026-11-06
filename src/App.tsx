@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { HorizontalSection } from './components/HorizontalSection'
 import { SceneView } from './scene/SceneView'
 import { FloorPlanEditor } from './components/FloorPlanEditor'
 import { timberVolumeM3, type TimberElement as CoreTimberElement } from './core/timber'
@@ -54,6 +55,7 @@ export default function App() {
   const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [workspace, setWorkspace] = useState<'plan' | 'frame'>('plan')
+  const [showSection, setShowSection] = useState(false)
   const [showEdges, setShowEdges] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
   const [commandError, setCommandError] = useState<string | null>(null)
@@ -341,7 +343,7 @@ export default function App() {
           <div style={{ fontSize: 11, padding: '8px 9px', border: '1px solid #d8e2ee',
             borderRadius: 7, background: '#edf5fc', color: '#3c647f', marginBottom: 12 }}>
             {linkedFrame ? <>
-              Каркас наружных стен построен по плану. Размеры и проёмы редактируются в 2D.
+              Каркас стен построен по плану. Размеры и проёмы редактируются в 2D.
               <button type="button" className="plan-button plan-secondary" onClick={() => setWorkspace('plan')}>
                 Редактировать план
               </button>
@@ -470,7 +472,7 @@ export default function App() {
               <div>Тип: {selectedOpening.type === 'garage-door' ? 'Гаражные секционные ворота' : selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
               {linkedFrame ? <>
                 <div>Размер: {selectedOpening.widthMm} × {selectedOpening.heightMm} мм</div>
-                <div>От наружного угла: {planOpening?.positionUmm} мм</div>
+                <div>От начала линии стены: {planOpening?.positionUmm} мм</div>
               </> : <>
               {selectedOpening.type === 'garage-door' && (
                 <div style={{ margin: '8px 0', fontSize: 12 }}>
@@ -587,7 +589,12 @@ export default function App() {
           )}
         </aside>
         <main className="viewport-wrap">
-          <ErrorBoundary>
+          {linkedFrame && snapshot.building.floorPlan?.frame?.partitions &&
+            <button type="button" className="frame-section-toggle" data-testid="frame-section-toggle"
+              onClick={() => setShowSection(value => !value)}>{showSection ? 'Вернуться в 3D' : 'Горизонтальный разрез'}</button>}
+          {linkedFrame && snapshot.building.floorPlan?.frame?.partitions && showSection
+            ? <HorizontalSection elements={elements} />
+            : <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
               openings={sceneOpenings} markers={markers} wallCount={snapshot.building.walls.length}
               dimensions={dimensions} showDimensions={showDimensions}
@@ -604,7 +611,7 @@ export default function App() {
                 }
               }}
               onSelect={setSelectedId} />
-          </ErrorBoundary>
+          </ErrorBoundary>}
         </main>
       </div>
       )}

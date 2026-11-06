@@ -9,7 +9,7 @@ import {
 } from '../core/floor-plan'
 import { graphView, moveGraphEdge, moveGraphEdgeToDimension, moveGraphPoint } from '../core/plan-graph'
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
-import { planSidePoint, rectangularFrameSides } from '../core/plan-frame'
+import { planSidePoint, planFrameOpeningSides } from '../core/plan-frame'
 import { PlanFrameControls, type PlanFramePick } from './PlanFrameControls'
 
 const WIDTH = 1200
@@ -73,7 +73,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
   }, [plan.exteriorThicknessMm])
   const [framePick, setFramePick] = useState<PlanFramePick | null>(null)
   const [frameIssueIds, setFrameIssueIds] = useState<string[]>([])
-  const frameSides = rectangularFrameSides(plan)
+  const frameSides = planFrameOpeningSides(plan)
   const hasFrameWork = plan.frame?.built || !!plan.frame?.openings.length
   const points = plan.exterior
   const viewPlan=graphView(plan)
@@ -885,28 +885,6 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
               return <line key={side.wallId} x1={start.x} y1={start.y} x2={end.x} y2={end.y}
                 stroke="#14777b" strokeWidth={2} markerEnd="url(#plan-frame-arrow)" pointerEvents="none" />
             })}
-            {plan.frame?.openings.map(opening => {
-              const side = frameSides.find(item => item.wallId === opening.wallId)
-              if (!side) return null
-              const a = xy(planSidePoint(side, opening.positionUmm))
-              const b = xy(planSidePoint(side, opening.positionUmm + opening.widthMm))
-              const conflict = frameIssueIds.includes(opening.id)
-              const color = conflict ? '#ba3026'
-                : { window: '#1568a0', door: '#826029', 'garage-door': '#514a95' }[opening.type]
-              return <g key={opening.id} data-testid={'plan-frame-opening-' + opening.id}
-                data-conflict={conflict} pointerEvents={tool === 'frame' ? 'auto' : 'none'}
-                onClick={event => {
-                  if (ignoreClick.current || event.shiftKey || tool !== 'frame') return
-                  event.stopPropagation()
-                  setFramePick({ opening })
-                }}>
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="white" strokeWidth={12} />
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={6} />
-                <text x={(a.x + b.x) / 2 + (a.x === b.x ? 19 : 0)}
-                  y={(a.y + b.y) / 2 - (a.y === b.y ? 8 : 0)} textAnchor="middle"
-                  fill={color} fontSize={13} fontWeight={750} pointerEvents="none">{opening.id}</text>
-              </g>
-            })}
             {current && proposal && !plan.closed && !(
               current.xMm===proposal.xMm&&current.zMm===proposal.zMm) && (
               <g pointerEvents="none">
@@ -952,21 +930,46 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
                 </text>
               </g>
             })}
+            {plan.frame?.openings.map(opening => {
+              const side = frameSides.find(item => item.wallId === opening.wallId)
+              if (!side) return null
+              const a = xy(planSidePoint(side, opening.positionUmm))
+              const b = xy(planSidePoint(side, opening.positionUmm + opening.widthMm))
+              const conflict = frameIssueIds.includes(opening.id)
+              const color = conflict ? '#ba3026'
+                : { window: '#1568a0', door: '#826029', 'garage-door': '#514a95' }[opening.type]
+              return <g key={opening.id} data-testid={'plan-frame-opening-' + opening.id}
+                data-conflict={conflict} pointerEvents={tool === 'frame' ? 'auto' : 'none'}
+                onClick={event => {
+                  if (ignoreClick.current || event.shiftKey || tool !== 'frame') return
+                  event.stopPropagation()
+                  setFramePick({ opening })
+                }}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="white" strokeWidth={12} />
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={6} />
+                <text x={(a.x + b.x) / 2 + (a.x === b.x ? 19 : 0)}
+                  y={(a.y + b.y) / 2 - (a.y === b.y ? 8 : 0)} textAnchor="middle"
+                  fill={color} fontSize={13} fontWeight={750} pointerEvents="none">{opening.id}</text>
+              </g>
+            })}
             {clearances && (['negative','positive'] as const).map(side => {
               const entry=clearances[side]
               if (!entry) return null
               const vertical=clearances.axis==='x'
               const row=clearances.scanMm
               const start=vertical
-                ? xy({xMm:entry.referenceMm,zMm:row})
-                : xy({xMm:row,zMm:entry.referenceMm})
+                ? xy({xMm:entry.referenceFaceMm ?? entry.referenceMm,zMm:row})
+                : xy({xMm:row,zMm:entry.referenceFaceMm ?? entry.referenceMm})
               const end=vertical
-                ? xy({xMm:clearances.coordinateMm,zMm:row})
-                : xy({xMm:row,zMm:clearances.coordinateMm})
+                ? xy({xMm:entry.wallFaceMm ?? clearances.coordinateMm,zMm:row})
+                : xy({xMm:row,zMm:entry.wallFaceMm ?? clearances.coordinateMm})
               const centerX=(start.x+end.x)/2
               const centerY=(start.y+end.y)/2
               const labelX=vertical?centerX:centerX+25
               const labelY=vertical?centerY-22:centerY
+              const dimensionLabel = plan.frame?.partitions
+                ? (entry.distanceMm / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 3 })
+                : meters(entry.distanceMm)
               const currentlyEditing=dimensionEdit?.side===side
               return <g key={side} data-testid={'plan-clearance-'+side}>
                 <line x1={start.x} y1={start.y} x2={end.x} y2={end.y}
@@ -976,19 +979,19 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
                 {!currentlyEditing && <g className="plan-click-dimension" role="button" tabIndex={0}
                   onClick={event=>{
                     event.stopPropagation()
-                    setDimensionEdit({side,value:meters(entry.distanceMm)})
+                    setDimensionEdit({side,value:dimensionLabel})
                   }}
                   onKeyDown={event=>{
                     if(event.key==='Enter' || event.key===' ') {
                       event.preventDefault()
-                      setDimensionEdit({side,value:meters(entry.distanceMm)})
+                      setDimensionEdit({side,value:dimensionLabel})
                     }
                   }}>
                   <rect x={labelX-47} y={labelY-17} rx={6} width={94} height={30}
                     fill="#fff" stroke="#72abb6" strokeWidth={1.5}/>
                   <text x={labelX} y={labelY+3} textAnchor="middle"
                     fill="#176f81" fontWeight={750} fontSize={13} pointerEvents="none">
-                    {meters(entry.distanceMm)} м
+                    {dimensionLabel} м
                   </text>
                 </g>}
                 {currentlyEditing && dimensionEdit && <foreignObject x={labelX-60} y={labelY-18}
@@ -1081,7 +1084,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
               :tool==='point'?'ЛКМ — свободная точка или узел на стене'
               :tool==='split'?'Нажмите отрезок в месте разделения'
               :tool==='erase'?'Нажмите отрезок для удаления · Undo доступен'
-              :tool==='frame'?'Нажмите на наружную стену или существующий проём'
+              :tool==='frame'?'Нажмите на стену или существующий проём'
               :'Перетащите стену или точку · кликните размер · Delete — удалить')
             :'ЛКМ — следующая точка · Shift+drag — сдвиг · колесо — масштаб'}</div>
         </div>

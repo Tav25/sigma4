@@ -4,6 +4,7 @@ import { createProjectFromCurrentState } from './project-store'
 import type { Opening } from './project'
 import { projectToScene } from '../scene/project-to-scene'
 import { buildDimensionLayout } from '../scene/dimension-model'
+import { planWallClearances } from './floor-plan'
 import { defaultGarageDoorSpec } from './garage-door'
 import { calculateWorldBounds } from '../scene/view-bounds'
 import { openingLocalToWorld } from '../scene/opening-geometry'
@@ -76,6 +77,57 @@ describe('frame from a rectangular plan', () => {
     const bounds = calculateWorldBounds(projectToScene(doc).elements)
     expect(bounds.max.x - bounds.min.x).toBeCloseTo(7, 6)
     expect(bounds.max.z - bounds.min.z).toBeCloseTo(10, 6)
+  })
+
+  it('frames the garage closet, preserves its door on a 300 mm move, and rebuilds JSON', () => {
+    const store = garage()
+    const point = (xMm: number, zMm: number) => ({ xMm, zMm })
+    for (const [start, end] of [
+      [point(0, -3000), point(4000, -3000)], [point(4000, -3000), point(4000, 0)],
+    ]) {
+      expect(store.dispatch({ type: 'PLAN_GRAPH_ADD_EDGE', payload: { start, end, thicknessMm: 100 } }).success).toBe(true)
+    }
+    expect(store.dispatch({ type: 'PLAN_FRAME_ENABLE_PARTITIONS', payload: {} }).success).toBe(true)
+    const door: Opening = { ...openings[1], wallId: 'partition-I001', positionUmm: 1200 }
+    const lowDoor = store.dispatch({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening: { ...door, heightMm: 1900 } } })
+    expect(lowDoor.success).toBe(false)
+    expect(lowDoor.messageRu).toContain('IRC')
+    expect(store.dispatch({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening: door } }).success).toBe(true)
+    expect(store.dispatch({ type: 'PLAN_FRAME_BUILD', payload: {} }).success).toBe(true)
+    const initial = store.getSnapshot()
+    expect(initial.building.walls.slice(4).map(wall => wall.lengthMm)).toEqual([3905, 2805])
+    expect(planWallClearances(initial.building.floorPlan!, 'I002')?.negative?.distanceMm).toBe(3805)
+    const initialElements = projectToScene(initial).elements
+    const doorHead = calculateWorldBounds(initialElements.filter(element => element.id === 'partition-I001:D01-header'))
+    expect(doorHead.max.z - doorHead.min.z).toBeCloseTo(0.1, 6)
+    expect(doorHead.max.y - doorHead.min.y).toBeCloseTo(0.045, 6)
+    expect(doorHead.min.y).toBeCloseTo(2.1, 6)
+    const pieces = initialElements.map(element => ({ element, box: calculateWorldBounds([element]) }))
+    const partitions = pieces.filter(({ element }) => element.wallId?.startsWith('partition-'))
+    for (const part of partitions) {
+      const collisions = pieces.filter(other => other !== part && (['x', 'y', 'z'] as const).every(axis =>
+        Math.min(part.box.max[axis], other.box.max[axis]) - Math.max(part.box.min[axis], other.box.min[axis]) > 1e-6))
+      expect(collisions.map(item => item.element.id)).toEqual([])
+    }
+    expect(initial.assembly.elements.filter(e => e.elementId.includes(':partition-backing-'))).toHaveLength(2)
+    const move = store.dispatch({ type: 'PLAN_SET_INTERIOR_CLEARANCE',
+      payload: { id: 'I002', side: 'negative', distanceMm: 4105 } })
+    expect(move.success).toBe(true)
+    const moved = store.getSnapshot()
+    expect(moved.building.walls[4].lengthMm).toBe(4205)
+    expect(planWallClearances(moved.building.floorPlan!, 'I002')?.negative?.distanceMm).toBe(4105)
+    expect(moved.building.floorPlan?.frame?.openings).toEqual([door])
+    const scene = projectToScene(moved)
+    const projection = scene.sceneOpenings.find(o => o.id === door.id)!
+    expect(openingLocalToWorld(projection, projection.positionXmm, 0)).toEqual({ x: 1200, y: 0, z: -3000 })
+    const dimensions = buildDimensionLayout(moved.building.walls, scene.elements)
+    expect(dimensions.overallXmm).toBeCloseTo(10000, 3)
+    expect(dimensions.overallZmm).toBeCloseTo(7000, 3)
+    const json = store.exportJson()
+    expect(store.dispatch({ type: 'PLAN_GRAPH_DELETE_EDGE', payload: { id: 'I001' } }).success).toBe(false)
+    expect(store.exportJson()).toBe(json)
+    expect(store.importJson(json).success).toBe(true)
+    expect(store.exportJson()).toBe(json)
   })
 
   it('rejects a resize that cuts through a saved opening and identifies it', () => {
