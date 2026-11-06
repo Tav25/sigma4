@@ -840,6 +840,23 @@ try {
   assert.ok(await page.locator('[data-element-id*=":plate-top-2"]').count()>=7)
   await page.screenshot({path:dir+'/36-northwest-9x6-tee-door-lapped-caps.png'})
   await page.getByTestId('tab-plan').click()
+  await page.getByTestId('plan-toolbar-select').click()
+  await clickNorthwest(3000,-5100)
+  await page.getByTestId('plan-selected-interior').waitFor()
+  const originalClearanceText=await page.getByTestId('plan-clearance-negative').textContent()
+  const originalClearanceMatch=originalClearanceText.match(/(\d+),(\d+)/)
+  assert.ok(originalClearanceMatch,'A numeric negative clearance must exist')
+  const clearanceMm=Math.round(Number(originalClearanceMatch[0].replace(',','.'))*1000)
+  for(const desiredMm of [clearanceMm+250,clearanceMm]){
+    const desired=(desiredMm/1000).toFixed(3).replace('.',',')
+    await page.getByTestId('plan-clearance-negative').locator('.plan-click-dimension').click()
+    await page.getByTestId('plan-dimension-input').fill(desired)
+    await page.getByTestId('plan-dimension-input').press('Enter')
+    await page.getByTestId('plan-dimension-input').waitFor({state:'detached'})
+    assert.match(await page.getByTestId('plan-clearance-negative').textContent(),
+      new RegExp(desired.replace(',','[,]')))
+  }
+  await page.screenshot({path:dir+'/37-northwest-9x6-wall-resized-back.png'})
   const nwBuiltDownload=page.waitForEvent('download')
   await page.getByTestId('plan-export').click()
   const nwBuilt=JSON.parse(await readFile(await (await nwBuiltDownload).path(),'utf8'))

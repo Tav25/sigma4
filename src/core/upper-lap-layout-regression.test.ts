@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createProjectStore } from './ProjectStore'
 import { createProjectFromCurrentState } from './project-store'
 import { graphView } from './plan-graph'
+import { planWallClearances } from './floor-plan'
 import { buildHorizontalCut } from './horizontal-cut'
 import { projectToScene } from '../scene/project-to-scene'
 import { validateProject } from './frame-validator'
@@ -62,6 +63,7 @@ function reproduce(reverse=false,door=false,style:'whole'|'upper-first'|'lower-f
   const json=store.exportJson()
   expect(store.importJson(json).success).toBe(true)
   expect(store.exportJson()).toBe(json)
+  return store
 }
 describe('SIGMA4: upper plate laps on screenshot 9x6 / 3x3.25 northwest room',()=>{
   it('supports upper-left room T with vertical through-wall',()=>reproduce(false,false))
@@ -77,6 +79,31 @@ describe('SIGMA4: upper plate laps on screenshot 9x6 / 3x3.25 northwest room',()
     'builds separately drawn walls (%s) without door, both directions',(style)=>{
       reproduce(false,false,style)
       reproduce(true,false,style)
+    })
+  it.each(['whole','upper-first','lower-first','branch-first'] as const)(
+    'moves an already built T-wall with its door and lapped caps (%s)',style=>{
+      const store=reproduce(false,true,style)
+      const edges=graphView(store.getSnapshot().building.floorPlan!).interiorWalls
+      const vertical=edges.find(edge=>edge.start.xMm===3000&&edge.end.xMm===3000 &&
+        Math.min(edge.start.zMm,edge.end.zMm)===-6000)!
+      expect(vertical).toBeDefined()
+      const original=store.exportJson()
+      const moved=store.dispatch({type:'PLAN_MOVE_INTERIOR_WALL',payload:{
+        id:vertical.id,offsetMm:250,
+      }})
+      expect(moved.success,JSON.stringify(moved,null,2)).toBe(true)
+      const after=graphView(store.getSnapshot().building.floorPlan!).interiorWalls
+      expect(after.filter(edge=>edge.start.xMm===3250&&edge.end.xMm===3250)).toHaveLength(2)
+      expect(store.getSnapshot().validation.valid).toBe(true)
+      expect(store.undo().success).toBe(true)
+      expect(store.exportJson()).toBe(original)
+      const ref=planWallClearances(store.getSnapshot().building.floorPlan!,vertical.id)?.negative
+      expect(ref).toBeDefined()
+      const dimension=store.dispatch({type:'PLAN_SET_INTERIOR_CLEARANCE',payload:{
+        id:vertical.id,side:'negative',distanceMm:ref!.distanceMm+250,
+      }})
+      expect(dimension.success,JSON.stringify(dimension,null,2)).toBe(true)
+      expect(store.getSnapshot().validation.valid).toBe(true)
     })
   it('reports the exact member and coordinates for a real invalid board',()=>{
     const doc=createProjectFromCurrentState({
