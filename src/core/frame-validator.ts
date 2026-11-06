@@ -10,6 +10,7 @@ import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
 import { wallMidplaneOrigin } from './world-origin'
 import { validateFloorPlan } from './floor-plan'
 import { perimeterCorners, projectPlanFrame, validatePlanFrame } from './plan-frame'
+import { isPartitionWall } from './partition-layout'
 
 const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0', '1.1.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
@@ -403,8 +404,15 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
       const rightLap = california?.toWallId === el.wallId &&
         el.elementId === `${el.wallId}:plate-top-2`
       const planLap = insetWalls.has(el.wallId) && el.elementId === `${el.wallId}:plate-top-2`
-      const minAllowed = rightLap || planLap ? -wall.sectionMm.height : 0
-      const maxAllowed = wall.lengthMm + (planLap ? wall.sectionMm.height : 0)
+      // The linked interior wall's second cap bridges across its host wall.
+      // Validate only that designated cap, never allow ordinary studs/plates
+      // to overhang by this extra amount. Contact is tested separately.
+      const interiorLap = building.floorPlan?.frame?.built && isPartitionWall(el.wallId) &&
+        el.role === 'top-plate' && el.elementId.startsWith(el.wallId + ':plate-top-2')
+      const maxHostDepth = Math.max(0, ...building.walls.map(w => w.sectionMm.height))
+      const minAllowed = interiorLap ? -maxHostDepth : rightLap || planLap ? -wall.sectionMm.height : 0
+      const maxAllowed = wall.lengthMm +
+        (interiorLap ? maxHostDepth : planLap ? wall.sectionMm.height : 0)
       if (minX < minAllowed - 0.001 || maxX > maxAllowed + 0.001) {
         issues.push(createIssue('ELEMENT_OUT_OF_WALL_BOUNDS', 'error', `assembly.elements[id=${el.elementId}]`, 'Элемент выходит за границы стены по X', [el.elementId, el.wallId]))
       }

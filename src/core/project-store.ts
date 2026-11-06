@@ -12,7 +12,8 @@ import { validateProject, validateSourceParameters } from './frame-validator'
 import { generateWallModule } from './wall-module'
 import { connectPerimeterCorner, connectRightCaliforniaCorner } from './corner-connection'
 import { effectiveConnections } from './wall-topology'
-import { addPartitionBacking, isPartitionWall } from './partition-layout'
+import { addPartitionBacking, isPartitionWall, type PartitionSide } from './partition-layout'
+import { connectTopPlateLaps } from './top-plate-laps'
 import { perimeterCorners, planFrameOpeningSides, projectPlanFrame } from './plan-frame'
 import { CURRENT_COORDINATE_SCHEMA, migrateLegacyWallOrigins } from './world-origin'
 
@@ -31,9 +32,10 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
       connectPerimeterCorner(elements, corner)
     }
     const plan = doc.building.floorPlan!
-    for (const side of planFrameOpeningSides(plan)) {
-      if ('endInsetMm' in side) addPartitionBacking(elements, walls, side)
-    }
+    const sides = planFrameOpeningSides(plan)
+    const partitions = sides.filter((side): side is PartitionSide => 'endInsetMm' in side)
+    for (const side of partitions) addPartitionBacking(elements, walls, side)
+    connectTopPlateLaps(elements, walls, partitions)
     return { elements }
   }
   // Physical joinery is independent of each individual wall's framing.

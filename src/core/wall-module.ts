@@ -19,7 +19,9 @@ export function generateWallModule(
     sectionWidth: wall.sectionMm.width,
     sectionHeight: wall.sectionMm.height,
     spacing: wall.studSpacingMm,
-    topLayers: partition ? 1 : 2,
+    // Double cap on linked partitions allows the upper course to lap across
+    // T/L/X intersections exactly like Haun's wall-framing sequence.
+    topLayers: 2,
   }
   const wallOpenings: WindowOpening[] = openings
     .filter(opening => opening.wallId === wall.wallId)

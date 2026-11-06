@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.19')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.20')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -610,6 +610,21 @@ try {
     nodes=>nodes.map(node=>Number(node.getAttribute('data-area-mm2'))))
   assert.equal(flatAreas.every(area=>Math.abs(area-4500)<0.001),true)
   await page.screenshot({ path: dir + '/34-haun-three-stud-channel-1200.png' })
+  // v0.1.20: the second upper course must bridge the 3D partition junction.
+  // The first cap remains at 2635 mm; the new lapped caps appear at 2680.
+  await section.getByTestId('frame-section-height').fill('2635')
+  const firstCourse=await section.locator('[data-wall-id^="partition-"][data-role="top-plate"]').count()
+  assert.equal(firstCourse,2)
+  await section.getByTestId('frame-section-height').fill('2680')
+  const secondCourse=section.locator('[data-wall-id^="partition-"][data-element-id*=":plate-top-2"]')
+  assert.equal(await secondCourse.count(),2)
+  const exteriorParts=section.locator('[data-wall-id="plan-front"][data-element-id*=":plate-top-2"]')
+  assert.equal(await exteriorParts.count(),2)
+  const capAreas=await secondCourse.evaluateAll(nodes=>
+    nodes.map(node=>Number(node.getAttribute('data-area-mm2'))))
+  assert.equal(capAreas.every(value=>value>0),true)
+  await page.screenshot({path:dir+'/35-haun-upper-plate-laps-2680.png'})
+
   // 0.1.17: the actual generated assembly (not only a drawn 2D symbol)
   // must contain two transverse receiving studs per outside T connection.
   await page.getByTestId('tab-plan').click()
@@ -787,7 +802,7 @@ try {
   await mobile.screenshot({ path: dir + '/34-direct-openings-touch.png' })
   await mobile.close()
   assert.deepEqual(errors, [], 'Browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  console.log('SIGMA4 BROWSER PASS: v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()

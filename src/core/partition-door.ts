@@ -7,7 +7,7 @@ export function generatePartitionWithDoors(params: WallPanelParams, doors: Windo
   const { sectionWidth: width, sectionHeight: depth, height, length } = params
   const panel = generateWallPanel(params)
   const bottom = panel.elements[0]
-  const head = panel.elements.find(element => element.role === 'top-plate')!
+  const caps = panel.elements.filter(element => element.role === 'top-plate')
   let cursor = 0
   const members: TimberElement[] = []
   const plate = (id: string, start: number, end: number) => ({
@@ -22,7 +22,7 @@ export function generatePartitionWithDoors(params: WallPanelParams, doors: Windo
     for (const [suffix, x] of [['left', start - width / 2], ['right', end + width / 2]] as const) {
       members.push({
         ...bottom, id: door.id + '-king-' + suffix, role: 'king-stud',
-        length: height - 2 * width, position: { x, y: width, z: -depth / 2 },
+        length: height - width * (1 + params.topLayers), position: { x, y: width, z: -depth / 2 },
         orientation: { mode: 'y', angle: 0, roll: 0 },
       })
     }
@@ -34,10 +34,10 @@ export function generatePartitionWithDoors(params: WallPanelParams, doors: Windo
     if (!door) return [stud]
     if (min < door.positionXmm || max > door.positionXmm + door.widthMm) return []
     const y = door.heightMm + width
-    const cripple = height - width - y
+    const cripple = height - params.topLayers * width - y
     return cripple > 0 ? [{
       ...stud, role: 'cripple-top' as const, length: cripple, position: { ...stud.position, y },
     }] : []
   })
-  return { ...panel, elements: [head, ...studs, ...members] }
+  return { ...panel, elements: [...caps, ...studs, ...members] }
 }
