@@ -927,7 +927,27 @@ try {
     e.elementId.startsWith('plan-front:W01-header-')).every(e=>
       e.sectionMm.height===235),true)
   await page.screenshot({path:dir+'/38-stage3-header-profile-235mm-jacks2.png'})
-  console.log('SIGMA4 BROWSER PASS: v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  // S17: resize a completed 9x6 plan to 10x7 through the actual UI.
+  // The bottom exterior attachment of a partition moves to -7000 mm,
+  // but the shared T node, D01 and configured W01 must remain valid.
+  await page.getByTestId('plan-frame-width').fill('10')
+  await page.getByTestId('plan-frame-depth').fill('7')
+  await page.getByTestId('plan-frame-resize').click()
+  assert.match(await page.getByTestId('plan-dimensions').textContent(),/10,00.*7,00/)
+  const s17Export=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const s17=JSON.parse(await readFile(await (await s17Export).path(),'utf8'))
+  assert.equal(s17.validation.valid,true)
+  assert.equal(s17.building.floorPlan.frame.openings.length,2)
+  assert.ok(s17.building.floorPlan.graph.nodes.some(n=>
+    n.xMm===3000 && n.zMm===-7000),'Partition bottom end must follow resized exterior')
+  assert.equal(s17.building.floorPlan.graph.nodes.filter(n=>
+    n.xMm===3000&&n.zMm===-6000).length,0)
+  assert.equal(s17.building.floorPlan.frame.openings.find(o=>o.id==='D01').wallId,
+    nwBuilt.building.floorPlan.frame.openings.find(o=>o.id==='D01').wallId)
+  assert.equal(s17.building.floorPlan.frame.openings.find(o=>o.id==='W01').headerPreview.depthMm,235)
+  await page.screenshot({path:dir+'/39-stage4-resize-bound-partition-10x7.png'})
+  console.log('SIGMA4 BROWSER PASS: v0.1.23 boundary-bound nodes and preserved openings on rectangle resize; v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()

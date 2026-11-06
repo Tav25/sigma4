@@ -10,13 +10,16 @@ import { validateProjectSnapshot, validateSourceParameters } from './frame-valid
 import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
 import { translateWallsToExteriorZero, migrateLegacyWallOrigins } from './world-origin'
+import {
+  resizePlanWithBoundNodes, preservePlanOpeningAttachments, PlanAttachmentConflict,
+} from './plan-attachment-constraints'
 import { effectiveConnections, reflowConnections } from './wall-topology'
 import { addGraphPoint, addGraphSegment, splitGraphEdge, deleteGraphEdge,
   deleteGraphPoint, moveGraphPoint, changeGraphEdge, moveGraphEdge,
   moveGraphEdgeToDimension } from './plan-graph'
 import { FRAME_SECTION, MIN_FRAME_SIDE_MM, rectangularFrameSides, withPlanOpening } from './plan-frame'
 import { emptyFloorPlan, validateFloorPlan, moveInteriorWallWithDependents,
-  moveWallToClearance, planBounds, PLAN_LIMIT_MM, type PlanPoint, type PlanInteriorWall } from './floor-plan'
+  moveWallToClearance, PLAN_LIMIT_MM, type PlanPoint, type PlanInteriorWall } from './floor-plan'
 
 export type ProjectCommand =
   | { type: 'SET_PROJECT_NAME'; payload: { projectName: string } }
@@ -311,8 +314,11 @@ export class ProjectStore {
             return { success: false, errorCode: 'INVALID_PLAN_POINT',
               messageRu: 'Первую точку (0,0) нельзя перемещать' }
           }
+          const original = this.deepClone(plan)
           plan.exterior[index] = { ...point }
-          const errors = validateFloorPlan(plan)
+          candidate.building.floorPlan =
+            preservePlanOpeningAttachments(original, plan, 'geometry')
+          const errors = validateFloorPlan(candidate.building.floorPlan)
           if (errors.length) return { success: false, errorCode: 'INVALID_FLOOR_PLAN', messageRu: errors[0] }
           changedIds.push('building.floorPlan.exterior[' + index + ']')
           break
@@ -334,12 +340,10 @@ export class ProjectStore {
               return { success: false, errorCode: 'INVALID_PLAN_DIMENSIONS',
                 messageRu: 'Наружные габариты должны быть от 0,38 до 100 м с точностью 1 мм' }
             }
-            const { minX, minZ } = planBounds(plan.exterior)
-            plan.exterior = plan.exterior.map(point => ({
-              xMm: point.xMm === 0 ? 0 : minX === 0 ? widthMm : -widthMm,
-              zMm: point.zMm === 0 ? 0 : minZ === 0 ? depthMm : -depthMm,
-            }))
-            changedIds.push('building.floorPlan.exterior')
+            const moved = resizePlanWithBoundNodes(plan, widthMm, depthMm)
+            candidate.building.floorPlan = preservePlanOpeningAttachments(plan, moved, 'resize')
+            changedIds.push('building.floorPlan.exterior', 'building.floorPlan.graph',
+              'building.floorPlan.frame')
             break
           }
 
@@ -464,11 +468,13 @@ export class ProjectStore {
               updated = moveGraphPoint(source, command.payload.id, command.payload.point)
               break
           }
-          const issues = validateFloorPlan(updated)
+          const geometry = command.type === 'PLAN_GRAPH_MOVE_POINT' ? 'geometry' : 'topology'
+          const preserved = preservePlanOpeningAttachments(source, updated, geometry)
+          const issues = validateFloorPlan(preserved)
           if (issues.length) return { success: false, errorCode: 'INVALID_GRAPH_PLAN',
             messageRu: issues[0] }
-          candidate.building.floorPlan = updated
-          changedIds.push('building.floorPlan.graph')
+          candidate.building.floorPlan = preserved
+          changedIds.push('building.floorPlan.graph', 'building.floorPlan.frame')
           break
         }
 
@@ -476,6 +482,7 @@ export class ProjectStore {
           const plan = candidate.building.floorPlan
           if (!plan?.closed) return { success: false, errorCode: 'PLAN_NOT_CLOSED',
             messageRu: 'Сначала замкните наружный периметр' }
+          const source = this.deepClone(plan)
           if (plan.graph) {
             candidate.building.floorPlan = addGraphSegment(plan,
               command.payload.wall.start, command.payload.wall.end,
@@ -484,15 +491,18 @@ export class ProjectStore {
             plan.interiorWalls.push({ ...command.payload.wall,
               start: { ...command.payload.wall.start }, end: { ...command.payload.wall.end } })
           }
+          candidate.building.floorPlan =
+            preservePlanOpeningAttachments(source, candidate.building.floorPlan!, 'topology')
           const errors = validateFloorPlan(candidate.building.floorPlan!)
           if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_WALL', messageRu: errors[0] }
-          changedIds.push('building.floorPlan.interiorWalls')
+          changedIds.push('building.floorPlan.interiorWalls', 'building.floorPlan.frame')
           break
         }
         case 'PLAN_UPDATE_INTERIOR_WALL': {
           const plan = candidate.building.floorPlan
           if (!plan) return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
             messageRu: 'Внутренняя стена не найдена' }
+          const source = this.deepClone(plan)
           if (plan.graph) candidate.building.floorPlan = changeGraphEdge(plan,
             command.payload.id, command.payload.start, command.payload.end,
             command.payload.thicknessMm)
@@ -504,15 +514,18 @@ export class ProjectStore {
             wall.end = { ...command.payload.end }
             wall.thicknessMm = command.payload.thicknessMm
           }
+          candidate.building.floorPlan =
+            preservePlanOpeningAttachments(source, candidate.building.floorPlan!, 'geometry')
           const errors = validateFloorPlan(candidate.building.floorPlan!)
           if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_WALL', messageRu: errors[0] }
-          changedIds.push('building.floorPlan.interiorWalls[' + command.payload.id + ']')
+          changedIds.push('building.floorPlan.interiorWalls[' + command.payload.id + ']', 'building.floorPlan.frame')
           break
         }
         case 'PLAN_REMOVE_INTERIOR_WALL': {
           const plan = candidate.building.floorPlan
           if (!plan) return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
             messageRu: 'Внутренняя стена не найдена' }
+          const source = this.deepClone(plan)
           if (plan.graph) candidate.building.floorPlan = deleteGraphEdge(plan,command.payload.id)
           else {
             if (!plan.interiorWalls.some(w => w.id === command.payload.id))
@@ -520,10 +533,12 @@ export class ProjectStore {
                 messageRu: 'Внутренняя стена не найдена' }
             plan.interiorWalls = plan.interiorWalls.filter(w => w.id !== command.payload.id)
           }
+          candidate.building.floorPlan =
+            preservePlanOpeningAttachments(source, candidate.building.floorPlan!, 'topology')
           const errors = validateFloorPlan(candidate.building.floorPlan!)
           if (errors.length) return { success: false, errorCode: 'DEPENDENT_INTERIOR_WALL',
             messageRu: errors[0] }
-          changedIds.push('building.floorPlan.interiorWalls')
+          changedIds.push('building.floorPlan.interiorWalls', 'building.floorPlan.frame')
           break
         }
 
@@ -542,11 +557,12 @@ export class ProjectStore {
               : moveWallToClearance(plan, command.payload.id, command.payload.side, command.payload.distanceMm))
           if (!updated) return { success: false, errorCode: 'INVALID_INTERIOR_MOVE',
             messageRu: 'Не удалось вычислить новое положение стены' }
-          const errors = validateFloorPlan(updated)
+          const preserved = preservePlanOpeningAttachments(plan, updated, 'geometry')
+          const errors = validateFloorPlan(preserved)
           if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_MOVE',
             messageRu: errors[0] }
-          candidate.building.floorPlan = updated
-          changedIds.push('building.floorPlan.interiorWalls')
+          candidate.building.floorPlan = preserved
+          changedIds.push('building.floorPlan.interiorWalls', 'building.floorPlan.frame')
           break
         }
         case 'PLAN_SET_EXTERIOR_THICKNESS': {
@@ -887,6 +903,8 @@ export class ProjectStore {
 
       return { success: true, document: rebuilt, changedIds, validation }
     } catch (e) {
+      if (e instanceof PlanAttachmentConflict)
+        return { success: false, errorCode: 'PLAN_ATTACHMENT_CONFLICT', messageRu: e.message }
       return { success: false, errorCode: 'INTERNAL_ERROR', messageRu: e instanceof Error ? e.message : 'Внутренняя ошибка' }
     }
   }
