@@ -1,5 +1,6 @@
 import { planBounds, type FloorPlan, type PlanPoint } from './floor-plan'
-import { PARTITION_MIN_DEPTH, isPartitionWall, partitionAttachments, partitionInside, partitionSides, type PartitionHost, type PartitionSide } from './partition-layout'
+import { PARTITION_MIN_DEPTH, isPartitionWall, partitionAttachments, partitionInside, partitionSides, sideOffset, type PartitionHost, type PartitionSide } from './partition-layout'
+import { physicalPartitionRuns } from './structural-runs'
 import { defaultGarageDoorSpec, GARAGE_DOOR_PRESETS, validateGarageOpening } from './garage-door'
 import { validateOpeningHeaderInputs, headerProfile } from './opening-profiles'
 import type { Opening, ProjectDocument, ValidationIssue, Wall } from './project'
@@ -69,6 +70,20 @@ export function planFrameOpeningSides(plan: FloorPlan, includeDraftPartitions = 
   const exterior = rectangularFrameSides(plan)
   if (!exterior.length) return []
   return [...exterior, ...(plan.frame?.partitions || includeDraftPartitions ? partitionSides(plan, exterior, DEPTH) : [])]
+}
+
+/**
+ * The editing graph keeps every T node as an individually selectable edge.
+ * Only the built 3D frame uses physical through-runs; no canonical graph
+ * node, segment or opening reference is modified.
+ */
+export function planStructuralFrameSides(plan: FloorPlan): PlanFrameSide[] {
+  const exterior=rectangularFrameSides(plan)
+  if (!exterior.length) return []
+  if (!plan.frame?.partitions) return exterior
+  const runs=physicalPartitionRuns(plan)
+  const physical:FloorPlan={...plan,graph:undefined,interiorWalls:runs.walls}
+  return [...exterior,...partitionSides(physical,exterior,DEPTH)]
 }
 
 export const PLAN_OPENING_PRESETS = [
@@ -257,10 +272,24 @@ export function perimeterCorners(walls: readonly Wall[]): PerimeterCorner[] {
 
 export function projectPlanFrame(plan: FloorPlan, frame: PlanFrame):
   Pick<ProjectDocument['building'], 'walls' | 'openings' | 'connections'> {
-  const sides = planFrameOpeningSides(plan)
+  const authoredSides = planFrameOpeningSides(plan)
+  const sides = planStructuralFrameSides(plan)
+  const owners=physicalPartitionRuns(plan).ownerBySegment
   const openings = frame.openings.map(opening => {
-    const side = sides.find(item => item.wallId === opening.wallId)
-    return { ...opening, positionUmm: opening.positionUmm - (side?.insetMm ?? 0) }
+    const authored=authoredSides.find(item=>item.wallId===opening.wallId)
+    if(!authored)throw Error('Неизвестная стена проёма '+opening.id)
+    const owner=isPartitionWall(opening.wallId)
+      ? 'partition-'+(owners.get(opening.wallId.slice('partition-'.length)) ??
+          opening.wallId.slice('partition-'.length))
+      : opening.wallId
+    const physical=sides.find(item=>item.wallId===owner)
+    if(!physical)throw Error('Не найдена конструктивная стена проёма '+opening.id)
+    const absolute=planSidePoint(authored,opening.positionUmm)
+    const u=sideOffset(physical,absolute)-physical.insetMm
+    if(u<0||u+opening.widthMm>planSideLength(physical)-physical.insetMm-
+        ('endInsetMm' in physical?physical.endInsetMm:physical.insetMm))
+      throw Error('Проём '+opening.id+' вышел за пределы конструктивной стены')
+    return {...opening,wallId:owner,positionUmm:u}
   })
   const walls: Wall[] = sides.map(side => {
     const origin = planSidePoint(side, side.insetMm)

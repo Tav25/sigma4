@@ -107,7 +107,7 @@ export function addPartitionBacking(elements: TimberElement[], walls: readonly W
 
     const { width, height } = wall.sectionMm
     const u = positionUmm - sideOffset(host, { xMm: wall.origin.x, zMm: wall.origin.z })
-    const studLength = wall.heightMm - width * (isPartitionWall(wall.wallId) ? 2 : 3)
+    const studLength = wall.heightMm - width * 3
     const branchEndU = atStart ? branch.sectionMm.width / 2 : branch.lengthMm - branch.sectionMm.width / 2
     const branchStud = elements.find(element =>
       element.wallId === side.wallId && element.role === 'stud' &&
@@ -121,7 +121,14 @@ export function addPartitionBacking(elements: TimberElement[], walls: readonly W
       if (!b.connectionIds.includes(a.elementId)) b.connectionIds.push(a.elementId)
     }
 
-    if (!isPartitionWall(wall.wallId)) {
+    // A joined, continuous through-wall has NO physical end stud at its T.
+    // Form the true Haun 3-stud receiver in both exterior and interior walls.
+    // Four-arm X junctions still use their separate endpoint profile.
+    const hostLength=Math.abs(host.end.xMm-host.start.xMm)+
+      Math.abs(host.end.zMm-host.start.zMm)
+    const isInteriorThrough=isPartitionWall(wall.wallId) &&
+      positionUmm > 0 && positionUmm < hostLength
+    if (!isPartitionWall(wall.wallId) || isInteriorThrough) {
       // The partition depth is the clear opening between the two 45-mm
       // exterior studs. E.g. partition 100 mm: stud centres u ±72.5 mm.
       // The flat nailer spans exactly this opening and is 45 mm deep;
@@ -189,7 +196,20 @@ export function addPartitionBacking(elements: TimberElement[], walls: readonly W
         // For mode=y, roll=90 maps local section HEIGHT to host +X and
         // local section WIDTH to -Z. The resulting cross-section fills
         // u±halfGap and sits in the innermost 45 mm of the host.
-        position: { x: u - halfGap, y: width, z: -height / 2 + width / 2 },
+        position: {
+          x: u - halfGap, y: width,
+          z: isInteriorThrough
+            ? (() => {
+              const node=atStart ? side.start : side.end
+              const other=atStart ? side.end : side.start
+              // Face the arriving wall in the host's signed local normal.
+              const approach=wall.orientation==='x'
+                ? other.zMm-node.zMm : other.xMm-node.xMm
+              return (wall.reversed ? -approach : approach)<0
+                ? -height/2+width/2 : height/2-width/2
+            })()
+            : -height/2+width/2,
+        },
         orientation: { mode: 'y', angle: 0, roll: 90 },
         connectionIds: [],
         generated: true,
@@ -201,8 +221,8 @@ export function addPartitionBacking(elements: TimberElement[], walls: readonly W
       continue
     }
 
-    // For interior T/X nodes, the canonical graph already splits the through
-    // wall. Reuse its end stud rather than inserting duplicate solids.
+    // Remaining exception: X junction with separate physical endpoint arms.
+    // Do not insert two overlapping receiver packages at the same node.
     const support = elements
       .filter(element => element.wallId === wall.wallId &&
         (element.role === 'stud' || element.role === 'king-stud'))

@@ -15,7 +15,7 @@ import { effectiveConnections } from './wall-topology'
 import { addPartitionBacking, isPartitionWall, type PartitionSide } from './partition-layout'
 import { connectTopPlateLaps } from './top-plate-laps'
 import { detailLinkedStuds } from './stud-detailing'
-import { perimeterCorners, planFrameOpeningSides, projectPlanFrame } from './plan-frame'
+import { perimeterCorners, planStructuralFrameSides, projectPlanFrame } from './plan-frame'
 import { CURRENT_COORDINATE_SCHEMA, migrateLegacyWallOrigins } from './world-origin'
 
 const SW = 45
@@ -34,7 +34,7 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
       connectPerimeterCorner(elements, corner)
     }
     const plan = doc.building.floorPlan!
-    const sides = planFrameOpeningSides(plan)
+    const sides = planStructuralFrameSides(plan)
     const partitions = sides.filter((side): side is PartitionSide => 'endInsetMm' in side)
     for (const side of partitions) addPartitionBacking(elements, walls, side)
     connectTopPlateLaps(elements, walls, partitions)

@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.24')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.25')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -834,7 +834,7 @@ try {
   await page.getByTestId('plan-frame-save-opening').click()
   await page.getByTestId('plan-frame-opening-D01').waitFor()
   await page.getByTestId('plan-frame-build').click()
-  await page.getByText('Количество стен: 7',{exact:true}).waitFor()
+  await page.getByText('Количество стен: 6',{exact:true}).waitFor()
   await page.getByTestId('frame-section-toggle').click()
   await page.getByTestId('frame-section-height').fill('2680')
   assert.ok(await page.locator('[data-element-id*=":plate-top-2"]').count()>=7)
@@ -861,7 +861,7 @@ try {
   await page.getByTestId('plan-export').click()
   const nwBuilt=JSON.parse(await readFile(await (await nwBuiltDownload).path(),'utf8'))
   assert.equal(nwBuilt.validation.valid,true)
-  assert.equal(nwBuilt.building.walls.length,7)
+  assert.equal(nwBuilt.building.walls.length,6)
   assert.equal(nwBuilt.building.floorPlan.frame.openings.length,1)
   // v0.1.21: ordinary studs are generated AFTER obligatory support posts,
   // openings and three-stud channels. They must not extend into the door.
@@ -957,8 +957,42 @@ try {
   assert.match(await page.getByTestId('structural-validator-summary').textContent(),
     /0 ошибок/)
   await page.screenshot({path:dir+'/40-stage5-structural-contact-validation.png'})
+  // v0.1.25: two authored halves of one graph-split wall produce ONE
+  // physical through-run, with doors on both sides of the T junction.
+  await page.getByTestId('tab-plan').click()
+  const s19Nodes=s17.building.floorPlan.graph.nodes
+  const s19Lower=s17.building.floorPlan.graph.edges.find(edge=>{
+    const a=s19Nodes.find(n=>n.id===edge.a),b=s19Nodes.find(n=>n.id===edge.b)
+    return a.xMm===3000&&b.xMm===3000&&
+      Math.min(a.zMm,b.zMm)===-7000
+  })
+  assert.ok(s19Lower,'The lower edited half must still be selectable in the authored graph')
+  await page.getByTestId('plan-frame-add-opening').click()
+  await page.getByTestId('plan-frame-opening-type').selectOption('door')
+  await page.getByTestId('plan-frame-opening-wall').selectOption('partition-'+s19Lower.id)
+  await page.getByTestId('plan-frame-opening-positionUmm').fill('1200')
+  await page.getByTestId('plan-frame-save-opening').click()
+  await page.getByTestId('plan-frame-opening-D02').waitFor()
+  await page.getByTestId('plan-frame-build').click()
+  await page.getByText('Количество стен: 6',{exact:true}).waitFor()
+  const s19Download=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const s19=JSON.parse(await readFile(await (await s19Download).path(),'utf8'))
+  assert.equal(s19.validation.valid,true)
+  assert.equal(s19.building.floorPlan.frame.openings.filter(o=>o.type==='door').length,2)
+  const s19Doors=s19.building.openings.filter(o=>o.type==='door')
+  assert.equal(new Set(s19Doors.map(o=>o.wallId)).size,1,
+    'Both doors must share the single physical through-wall')
+  const owner=s19Doors[0].wallId
+  assert.equal(s19.building.walls.find(w=>w.wallId===owner).lengthMm,6710)
+  assert.equal(s19.assembly.elements.filter(e=>e.elementId===owner+':plate-top-1').length,1)
+  assert.equal(s19.assembly.elements.filter(e=>e.wallId===owner&&
+    e.elementId.includes(':partition-backing-')).length,3)
+  assert.equal(s19.validation.issues.filter(i=>i.code.startsWith('HAUN_')).length,0)
+  await page.screenshot({path:dir+'/41-haun-physical-through-2doors-3stud-channel.png'})
 
-  console.log('SIGMA4 BROWSER PASS: v0.1.24 structural contact/overlap/support validation; v0.1.23 boundary-bound nodes and preserved openings on rectangle resize; v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+
+  console.log('SIGMA4 BROWSER PASS: v0.1.25 continuous through-wall, two doors and internal T channel; v0.1.24 structural contact/overlap/support validation; v0.1.23 boundary-bound nodes and preserved openings on rectangle resize; v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()
