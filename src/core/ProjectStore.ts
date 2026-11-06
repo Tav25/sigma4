@@ -318,6 +318,10 @@ export class ProjectStore {
           if (plan.interiorWalls.length || plan.graph?.nodes.length || plan.graph?.edges.length) return { success: false,
             errorCode: 'PLAN_HAS_INTERIOR', messageRu: 'Сначала удалите внутренние стены' }
           plan.closed = false
+          // An empty graph is only meaningful during a closed 2D plan.
+          // Reopening removes it so legacy empty/open documents remain valid.
+          if (plan.graph && !plan.graph.nodes.length && !plan.graph.edges.length)
+            delete plan.graph
           changedIds.push('building.floorPlan.closed')
           break
         }
