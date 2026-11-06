@@ -25,12 +25,36 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.17')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.18')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
   await page.getByTestId('tab-frame').click()
   await page.locator('.viewport canvas').waitFor({ state: 'visible' })
+  // 0.1.18: the exact horizontal cut is also available for unlinked 3D
+  // projects; verify actual boards at multiple heights and the SVG polygon.
+  await page.getByTestId('frame-section-toggle').click()
+  const universalCut = page.getByTestId('frame-section')
+  await universalCut.getByTestId('frame-section-svg').waitFor()
+  await universalCut.getByTestId('frame-section-height').fill('10')
+  await universalCut.locator('[data-element-id="plate-bottom-1"]').waitFor()
+  assert.equal(await universalCut.locator('[data-element-id="stud-01"]').count(),0)
+  const bottomPolygon = await universalCut.locator('[data-element-id="plate-bottom-1"]').getAttribute('points')
+  assert.ok(bottomPolygon?.split(' ').length >= 4)
+  await universalCut.getByTestId('frame-section-height').fill('1200')
+  await universalCut.locator('[data-element-id="stud-01"]').waitFor()
+  assert.equal(await universalCut.locator('[data-element-id="plate-bottom-1"]').count(),0)
+  const selectedPiece=universalCut.locator('[data-element-id="stud-01"]')
+  await selectedPiece.click()
+  assert.match(await universalCut.getByTestId('frame-section-selected').textContent(),/stud-01/)
+  assert.ok(Number(await selectedPiece.getAttribute('data-area-mm2'))>0)
+  await page.screenshot({path:dir+'/32-true-horizontal-cut-mid-height.png'})
+  await universalCut.getByTestId('frame-section-height').fill('2620')
+  await universalCut.locator('[data-role="top-plate"]').first().waitFor()
+  assert.equal(await universalCut.locator('[data-element-id="stud-01"]').count(),0)
+  await page.screenshot({path:dir+'/33-true-horizontal-cut-top-plate.png'})
+  await page.getByTestId('frame-section-toggle').click()
+  await page.locator('.viewport canvas').waitFor({state:'visible'})
   // New canonical project: its source origin and physical timber corner are zero.
   const startDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
@@ -749,7 +773,7 @@ try {
   await mobile.screenshot({ path: dir + '/34-direct-openings-touch.png' })
   await mobile.close()
   assert.deepEqual(errors, [], 'Browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.1.17 two exterior partition receiving studs per joint, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  console.log('SIGMA4 BROWSER PASS: v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 two exterior partition receiving studs per joint, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()

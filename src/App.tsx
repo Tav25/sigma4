@@ -589,10 +589,10 @@ export default function App() {
           )}
         </aside>
         <main className="viewport-wrap">
-          {linkedFrame && snapshot.building.floorPlan?.frame?.partitions &&
+          {elements.length > 0 &&
             <button type="button" className="frame-section-toggle" data-testid="frame-section-toggle"
               onClick={() => setShowSection(value => !value)}>{showSection ? 'Вернуться в 3D' : 'Горизонтальный разрез'}</button>}
-          {linkedFrame && snapshot.building.floorPlan?.frame?.partitions && showSection
+          {elements.length > 0 && showSection
             ? <HorizontalSection elements={elements} />
             : <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
