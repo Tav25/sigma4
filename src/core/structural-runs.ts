@@ -101,9 +101,9 @@ export function validatePhysicalThroughRuns(
   const plan=doc.building.floorPlan
   if(!plan?.frame?.built || !plan.graph)return []
   const issues:import('./project').ValidationIssue[]=[]
-  const bad=(code:string, messageRu:string, ids:string[])=>{
+  const bad=(code:string, messageRu:string, ids:readonly string[])=>{
     issues.push({code,severity:'error',path:'building.floorPlan.graph',
-      messageRu,affectedIds:ids})
+      messageRu,affectedIds:[...ids]})
   }
   const runs=physicalPartitionRuns(plan)
   const walls=new Map(doc.building.walls.map(w=>[w.wallId,w]))
