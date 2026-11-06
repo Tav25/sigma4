@@ -67,6 +67,20 @@ function mandatoryStations(elements: readonly TimberElement[], wall: Wall, openi
       throw Error('Отсутствует обязательная крайняя стойка узла ' + id)
     stations.push({ left: pair.left, right: pair.right, description: id })
   }
+  // California corner backing is a flatwise, full-height member spanning
+  // 145 mm ALONG the wall. It is just as mandatory as a three-stud channel.
+  // Reserving its footprint BEFORE infill prevents the restarted on-centre
+  // layout from driving a stud through that board near a wall end.
+  for (const member of own.filter(el => el.role === 'corner-backing')) {
+    const [lo, hi] = studExtent(member)
+    const halfWidth = wall.sectionMm.width / 2
+    if (hi - lo < wall.sectionMm.width - EPS)
+      throw Error('Угловая закладная слишком узкая: ' + member.elementId)
+    stations.push({
+      left: lo + halfWidth, right: hi - halfWidth,
+      description: 'угловая закладная ' + member.elementId,
+    })
+  }
   return stations.sort((a, b) => a.left - b.left || a.right - b.right)
 }
 
