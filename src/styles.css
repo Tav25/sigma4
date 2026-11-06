@@ -273,3 +273,19 @@ body,
 .plan-mode-buttons .plan-mode-active {font-weight:750}
 .plan-interior-hit {cursor:grab}
 .plan-interior-hit:active {cursor:grabbing}
+
+
+/* v0.1.12 – free points, polyline turns and segment-only operations. */
+.plan-tools-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.plan-tools-grid button {display:flex;align-items:center;justify-content:center;gap:6px;min-height:42px}
+.plan-tools-grid button span {font-size:17px;line-height:1}
+.plan-tools-grid button:disabled {opacity:.35;cursor:not-allowed}
+.plan-graph-node {cursor:pointer}
+.plan-graph-node:hover circle:first-child {stroke:#1a9fbb;stroke-width:3}
+.plan-graph-node:active {cursor:grabbing}
+.plan-interior-hit {cursor:pointer}
+.plan-tools-grid .plan-mode-active {box-shadow:0 0 0 2px rgba(38,135,161,.16)}
+@media(max-width:700px) {
+  .plan-tools-grid {grid-template-columns:repeat(3,minmax(0,1fr))}
+  .plan-tools-grid button {font-size:11px;min-height:38px}
+}

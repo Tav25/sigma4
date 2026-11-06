@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.11')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.12')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -353,142 +353,133 @@ try {
   })
   assert.equal(planSaved.validation.valid, true)
   assert.equal(planSaved.building.walls.length, 1) // existing 3D mode unchanged
-  // 0.1.1: draw inner walls with snapped endpoints, edit exact properties,
-  // reject an orphaning deletion, then remove in safe dependency order.
-  const clickPlanCoord = async (xMm, zMm) => {
-    const pos = await page.getByTestId('plan-canvas').evaluate((svg, p) => {
-      const node = n => svg.querySelector('[data-testid="plan-point-' + n + '"] circle')
-      const first = node(0), second = node(1), third = node(2)
-      if (!first || !second || !third) throw Error('Perimeter nodes not found')
-      const x0 = Number(first.getAttribute('cx'))
-      const y0 = Number(first.getAttribute('cy'))
-      const dx = Number(second.getAttribute('cx')) - x0
-      const dy = Number(third.getAttribute('cy')) - y0
-      const ctm = svg.getScreenCTM()
-      if (!ctm) throw Error('Plan CTM missing')
-      const point = new DOMPoint(x0 + dx * p.xMm / 6000,
-        y0 + dy * (-p.zMm) / 4000).matrixTransform(ctm)
-      return { x: point.x, y: point.y }
-    }, {xMm,zMm})
-    await page.mouse.click(pos.x, pos.y)
-  }
-  await page.getByTestId('plan-tool-interior').click()
-  await page.getByTestId('plan-wall-thickness').fill('150')
-  await clickPlanCoord(3000, 0)
-  await page.getByTestId('plan-anchor-info').waitFor()
-  await clickPlanCoord(3000, -4000)
-  await page.getByTestId('plan-internal-wall-I001').waitFor()
-  await page.getByTestId('plan-wall-thickness').fill('100')
-  await clickPlanCoord(0, -2000)
-  await clickPlanCoord(3000, -2000)
-  await page.getByTestId('plan-internal-wall-I002').waitFor()
-  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(), '2')
-  await page.screenshot({ path: dir + '/21-plan-two-inner-walls.png' })
-  const innerDownload = page.waitForEvent('download')
-  await page.getByTestId('plan-export').click()
-  const innerSaved = JSON.parse(await readFile(await (await innerDownload).path(), 'utf8'))
-  assert.deepEqual(innerSaved.building.floorPlan.interiorWalls, [
-    { id:'I001', start:{xMm:3000,zMm:0},end:{xMm:3000,zMm:-4000},thicknessMm:150 },
-    { id:'I002', start:{xMm:0,zMm:-2000},end:{xMm:3000,zMm:-2000},thicknessMm:100 },
-  ])
-  assert.equal(innerSaved.validation.valid,true)
-  await page.getByTestId('plan-tool-select').click()
-  await clickPlanCoord(3000, -1000)
-  await page.getByTestId('plan-selected-interior').waitFor()
-  await page.once('dialog', d => d.accept())
-  await page.getByTestId('plan-remove-interior').click()
-  await page.getByTestId('plan-error').waitFor() // connected T-junction protects the other wall
-  await clickPlanCoord(1500, -2000)
-  await page.once('dialog', d => d.accept())
-  await page.getByTestId('plan-remove-interior').click()
-  await page.getByTestId('plan-internal-wall-I002').waitFor({ state: 'detached' })
-  await clickPlanCoord(3000, -1000)
-  await page.getByTestId('plan-edit-thickness').fill('120')
-  await page.getByTestId('plan-save-interior').click()
-  const editedDownload = page.waitForEvent('download')
-  await page.getByTestId('plan-export').click()
-  const edited = JSON.parse(await readFile(await (await editedDownload).path(), 'utf8'))
-  assert.equal(edited.building.floorPlan.interiorWalls[0].thicknessMm, 120)
-  await page.once('dialog', d => d.accept())
-  await page.getByTestId('plan-remove-interior').click()
-  await page.getByTestId('plan-internal-wall-I001').waitFor({ state: 'detached' })
-  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(),'0')
+  // v0.1.12: keep the old 6x4 exterior construction, then start a fresh
+  // 10x7 metre garage to prove genuinely free points and segment-only erasure.
   await page.getByTestId('plan-reopen').click()
-  await page.getByTestId('plan-remove-last').click()
-  await page.getByTestId('plan-point-3').waitFor({ state: 'detached' })
-  const pos = await page.getByTestId('plan-canvas').evaluate(svg => {
-    const origin = svg.querySelector('[data-testid="plan-point-0"] circle')
-    const lastCorner = svg.querySelector('[data-testid="plan-point-2"] circle')
-    if (!origin || !lastCorner) throw Error('Plan points missing')
-    const x = Number(origin.getAttribute('cx'))
-    const y = Number(lastCorner.getAttribute('cy'))
-    const ctm = svg.getScreenCTM()
-    if (!ctm) throw Error('Plan CTM missing')
-    const p = new DOMPoint(x, y).matrixTransform(ctm)
-    return {x:p.x,y:p.y}
-  })
-  await page.mouse.click(pos.x,pos.y)
-  await page.getByTestId('plan-point-3').waitFor()
+  await page.once('dialog', d=>d.accept())
+  await page.getByTestId('plan-reset').click()
+  await page.getByTestId('plan-point-0').waitFor({state:'detached'})
+  await page.getByTestId('plan-add-exact').click() // (0,0)
+  await page.getByTestId('plan-direction').selectOption('+x')
+  await page.getByTestId('plan-length-input').fill('10')
+  await page.getByTestId('plan-add-exact').click() // (10,0)
+  await page.getByTestId('plan-length-input').fill('7')
+  await page.getByTestId('plan-add-exact').click() // (10,-7)
+  await page.getByTestId('plan-length-input').fill('10')
+  await page.getByTestId('plan-add-exact').click() // (0,-7)
   await page.getByTestId('plan-close').click()
   await page.getByTestId('plan-closed-status').waitFor()
+  assert.match(await page.getByTestId('plan-dimensions').textContent(),/10,00.*7,00/)
+  assert.match(await page.getByTestId('plan-area').textContent(),/70/)
+  await page.screenshot({path:dir+'/23-garage-10x7-empty.png'})
 
-  // SIGMA4 0.1.11: editable dimensions, linked wall movement and true-width walls.
+  const clickGarage = async (xMm,zMm) => {
+    const pos = await page.getByTestId('plan-canvas').evaluate((svg,p)=>{
+      const circle=i=>svg.querySelector('[data-testid="plan-point-'+i+'"] circle')
+      const a=circle(0),b=circle(1),c=circle(2)
+      if(!a||!b||!c)throw Error('Cannot find garage perimeter')
+      const x0=Number(a.getAttribute('cx')),y0=Number(a.getAttribute('cy'))
+      const dx=Number(b.getAttribute('cx'))-x0
+      const dy=Number(c.getAttribute('cy'))-y0
+      const point=new DOMPoint(x0+dx*p.xMm/10000,y0+dy*(-p.zMm)/7000)
+        .matrixTransform(svg.getScreenCTM())
+      return{x:point.x,y:point.y,screenPxPerMeter:dx/10}
+    },{xMm,zMm})
+    await page.mouse.click(pos.x,pos.y)
+    return pos
+  }
+
+  // 0.10m grid permits a 4.70m side wall while numeric edits retain 1mm accuracy.
+  await page.getByTestId('plan-grid-step').selectOption('100')
+  // Free point: the earlier wall-to-wall restriction must no longer apply.
+  await page.getByTestId('plan-tool-point').click()
+  await clickGarage(2500,-3500)
+  assert.equal((await page.getByTestId('plan-node-count').textContent())?.trim(),'1')
   await page.getByTestId('plan-tool-interior').click()
-  await clickPlanCoord(3000,0)
-  await clickPlanCoord(3000,-4000)
-  await page.getByTestId('plan-internal-wall-I001').waitFor()
-  await clickPlanCoord(0,-2000)
-  await clickPlanCoord(3000,-2000)
-  await page.getByTestId('plan-internal-wall-I002').waitFor()
+  await clickGarage(0,-2000)
+  await page.getByTestId('plan-anchor-info').waitFor()
+  await clickGarage(10000,-2000)
+  await page.keyboard.press('Enter') // Finish polyline: no implicit next wall
+  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(),'1')
+  await clickGarage(4700,0)
+  await clickGarage(4700,-2000)
+  await page.keyboard.press('Enter')
+  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(),'3')
+  await page.screenshot({path:dir+'/24-garage-before-erase.png'})
+
+  // Delete only the right horizontal piece, after automatic junction split.
+  await page.getByTestId('plan-tool-erase').click()
+  await clickGarage(7500,-2000)
+  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(),'2')
+  const deletedDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const deleted=JSON.parse(await readFile(await (await deletedDownload).path(),'utf8'))
+  assert.equal(deleted.building.floorPlan.graph.edges.length,2)
+  assert.equal(deleted.building.floorPlan.interiorWalls.length,0)
+  assert.equal(deleted.building.floorPlan.graph.nodes.some(n=>n.xMm===2500&&n.zMm===-3500),true)
+  assert.equal(deleted.validation.valid,true)
+  assert.equal(deleted.building.walls.length,1) // Legacy 3D timber not regenerated
+  await page.screenshot({path:dir+'/25-garage-angular-storage-after-erase.png'})
+
+  // Exact dimension moves a connected wall with its shared T node.
   await page.getByTestId('plan-tool-select').click()
-  await clickPlanCoord(3000,-1000)
+  await clickGarage(4700,-1000)
   await page.getByTestId('plan-clearance-negative').waitFor()
-  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/3,00/)
-  assert.match(await page.getByTestId('plan-clearance-positive').textContent(),/3,00/)
+  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/4,70/)
   await page.getByTestId('plan-clearance-negative').locator('.plan-click-dimension').click()
-  await page.getByTestId('plan-dimension-input').fill('3,50')
+  await page.getByTestId('plan-dimension-input').fill('5,20')
   await page.getByTestId('plan-dimension-input').press('Enter')
   await page.getByTestId('plan-dimension-input').waitFor({state:'detached'})
-  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/3,50/)
-  assert.match(await page.getByTestId('plan-clearance-positive').textContent(),/2,50/)
-  const afterDimensionDownload=page.waitForEvent('download')
-  await page.getByTestId('plan-export').click()
-  const afterDimension=JSON.parse(await readFile(await (await afterDimensionDownload).path(),'utf8'))
-  assert.equal(afterDimension.building.floorPlan.interiorWalls[0].start.xMm,3500)
-  assert.equal(afterDimension.building.floorPlan.interiorWalls[1].end.xMm,3500)
-  // Drag exactly half a metre. It must be one atomic committed move.
-  const dragFrom=await page.getByTestId('plan-canvas').evaluate(svg=>{
-    const start=svg.querySelector('[data-testid="plan-point-0"] circle')
-    const next=svg.querySelector('[data-testid="plan-point-1"] circle')
-    const third=svg.querySelector('[data-testid="plan-point-2"] circle')
-    if(!start||!next||!third)throw Error('Missing external vertices for drag')
-    const x0=Number(start.getAttribute('cx')), y0=Number(start.getAttribute('cy'))
-    const dx=Number(next.getAttribute('cx'))-x0
-    const dy=Number(third.getAttribute('cy'))-y0
-    const p=new DOMPoint(x0+dx*3500/6000,y0+dy*1000/4000)
-       .matrixTransform(svg.getScreenCTM())
-    return {x:p.x,y:p.y,scale:dx/6000*1000}
-  })
-  await page.mouse.move(dragFrom.x,dragFrom.y)
-  await page.mouse.down()
-  await page.mouse.move(dragFrom.x+dragFrom.scale*0.5,dragFrom.y,{steps:8})
-  await page.mouse.up()
-  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/4,00/)
-  assert.match(await page.getByTestId('plan-clearance-positive').textContent(),/2,00/)
+  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/5,20/)
   await page.getByTestId('plan-outer-thickness').fill('200')
   await page.getByTestId('plan-save-outer-thickness').click()
-  await page.getByTestId('plan-exterior-strip-0').waitFor()
   const movedDownload=page.waitForEvent('download')
   await page.getByTestId('plan-export').click()
   const moved=JSON.parse(await readFile(await (await movedDownload).path(),'utf8'))
+  const nodes=moved.building.floorPlan.graph.nodes
+  const edgeWalls=moved.building.floorPlan.graph.edges.map(edge=>{
+    const a=nodes.find(n=>n.id===edge.a),b=nodes.find(n=>n.id===edge.b)
+    return {start:a,end:b}
+  })
+  assert.equal(edgeWalls.some(w=>w.start.xMm===5200&&w.end.xMm===5200),true)
+  assert.equal(edgeWalls.some(w=>w.start.xMm===0&&w.end.xMm===5200),true)
   assert.equal(moved.building.floorPlan.exteriorThicknessMm,200)
-  assert.equal(moved.building.floorPlan.interiorWalls[0].start.xMm,4000)
-  assert.equal(moved.building.floorPlan.interiorWalls[1].end.xMm,4000)
   assert.equal(moved.validation.valid,true)
-  assert.equal(moved.building.walls.length,1)
-  await page.screenshot({path:dir+'/22-plan-editable-dimensions-4x2.png'})
+  await page.screenshot({path:dir+'/26-garage-moved-connected-wall.png'})
+
+  // Split an existing segment at an arbitrary point, then delete only a
+  // sub-segment. The shared T-node and the outer house remain intact.
+  await page.getByTestId('plan-tool-split').click()
+  await clickGarage(2300,-2000) // 0.10m snap -> 2.30m
+  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(),'3')
+  await page.getByTestId('plan-tool-erase').click()
+  await clickGarage(1000,-2000)
+  assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(),'2')
+
+  // Delete isolated point without touching connected wall nodes.
+  await page.getByTestId('plan-tool-select').click()
+  await clickGarage(2500,-3500)
+  await page.getByTestId('plan-selected-graph-node').waitFor()
+  await page.getByTestId('plan-node-edit-x').fill('2,75')
+  await page.getByTestId('plan-save-graph-node').click()
+  const finalDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const final=JSON.parse(await readFile(await (await finalDownload).path(),'utf8'))
+  assert.equal(final.building.floorPlan.graph.nodes.some(n=>n.xMm===2750&&n.zMm===-3500),true)
+  assert.equal(final.validation.valid,true)
+
+  await page.locator('#import-file').setInputFiles([{
+    name:'garage-0.1.12.sigma4.json',mimeType:'application/json',
+    buffer:Buffer.from(JSON.stringify(final)),
+  }])
+  await page.getByTestId('plan-wall-count').waitFor()
+  const reexport=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const imported=JSON.parse(await readFile(await (await reexport).path(),'utf8'))
+  assert.deepEqual(imported.building.floorPlan.graph,final.building.floorPlan.graph)
+  assert.equal(imported.validation.valid,true)
   assert.deepEqual(errors, [], 'Plan editor browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.1.11 editable bay dimensions, drag walls with T-joints, actual wall thickness; Plan 2D + inner walls, anchor joins, editing, dependency checks, exact metres, closure, perimeter, JSON, Undo path; 3D legacy verified; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
+  console.log('SIGMA4 BROWSER PASS: v0.1.12 free graph points, CAD polyline, auto T joint, segment erase/split, editable dimension, shared-node move, garage 10x7, JSON migration; 3D legacy verified; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
 
 } finally {
   await browser?.close()

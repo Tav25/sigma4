@@ -282,7 +282,7 @@
         },
         "floorPlan": {
           "type": "object",
-          "description": "SIGMA4 0.1.11 authored two-dimensional floor plan in millimetres. Exterior and interior wall centreline segments share the canonical JSON model; physically generated 3D framing remains separate.",
+          "description": "SIGMA4 0.1.12: graph.nodes/graph.edges are canonical for freely drafted walls; interiorWalls remains [] for graph documents or stores legacy v0.1.11 wall data until conversion.",
           "additionalProperties": false,
           "required": [
             "exterior",
@@ -322,6 +322,43 @@
             },
             "closed": {
               "type": "boolean"
+            },
+            "graph": {
+              "type": "object",
+              "description": "Canonical authored interior nodes and wall edges; when present interiorWalls is an empty legacy placeholder",
+              "additionalProperties": false,
+              "required": ["nodes", "edges"],
+              "properties": {
+                "nodes": {
+                  "type": "array",
+                  "maxItems": 500,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "xMm", "zMm"],
+                    "properties": {
+                      "id": {"type": "string", "minLength": 1},
+                      "xMm": {"type": "integer", "minimum": -100000, "maximum": 100000},
+                      "zMm": {"type": "integer", "minimum": -100000, "maximum": 100000}
+                    }
+                  }
+                },
+                "edges": {
+                  "type": "array",
+                  "maxItems": 500,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "a", "b", "thicknessMm"],
+                    "properties": {
+                      "id": {"type": "string", "minLength": 1},
+                      "a": {"type": "string", "minLength": 1},
+                      "b": {"type": "string", "minLength": 1},
+                      "thicknessMm": {"type": "integer", "minimum": 50, "maximum": 500}
+                    }
+                  }
+                }
+              }
             },
             "interiorWalls": {
               "type": "array",

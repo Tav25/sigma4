@@ -1,4 +1,5 @@
-/** SIGMA4 Plan V1: canonical 2D geometry, all source units in millimetres. */
+/** SIGMA4 2D authored plan; all source units in millimetres. */
+import { validatePlanGraph, graphView, type PlanGraph } from './plan-graph'
 export interface PlanPoint {
   xMm: number
   zMm: number
@@ -17,6 +18,8 @@ export interface FloorPlan {
   exterior: PlanPoint[]
   closed: boolean
   interiorWalls: PlanInteriorWall[]
+  /** New canonical node/edge source. Legacy interiorWalls must be [] when graph exists. */
+  graph?: PlanGraph
 }
 
 export const emptyFloorPlan = (): FloorPlan => ({
@@ -160,7 +163,8 @@ export function validateFloorPlan(raw: unknown): string[] {
   if (plan.closed && nodes.length >= 4 && planAreaM2(plan as FloorPlan) < 1) {
     errors.push('Площадь замкнутого контура должна быть не меньше 1 м²')
   }
-  errors.push(...validateInteriorPlan(plan as FloorPlan))
+  if (plan.graph) errors.push(...validatePlanGraph(plan as FloorPlan))
+  else errors.push(...validateInteriorPlan(plan as FloorPlan))
   return Array.from(new Set(errors))
 }
 
@@ -183,7 +187,7 @@ export function planSegments(plan: FloorPlan): PlanSegment[] {
     id: 'E' + plan.exterior.length, start: plan.exterior[plan.exterior.length - 1],
     end: plan.exterior[0], exterior: true,
   })
-  for (const w of plan.interiorWalls) result.push({
+  for (const w of (plan.graph ? graphView(plan).interiorWalls : plan.interiorWalls)) result.push({
     id: w.id, start: w.start, end: w.end, exterior: false,
   })
   return result
@@ -249,7 +253,7 @@ export function snapPlanAnchor(
 /** Crossings are logical joints, not duplicate authored walls. */
 export function planInteriorJunctions(plan: FloorPlan): PlanPoint[] {
   const seen = new Map<string, PlanPoint>()
-  const segs = plan.interiorWalls
+  const segs = plan.graph ? graphView(plan).interiorWalls : plan.interiorWalls
   for (let i = 0; i < segs.length; i++) {
     for (let j = i + 1; j < segs.length; j++) {
       const p = planAxisIntersection(segs[i].start, segs[i].end, segs[j].start, segs[j].end)
@@ -259,7 +263,7 @@ export function planInteriorJunctions(plan: FloorPlan): PlanPoint[] {
   return [...seen.values()]
 }
 export function nextInteriorWallId(plan: FloorPlan): string {
-  const ids = new Set(plan.interiorWalls.map(w => w.id))
+  const ids = new Set((plan.graph ? plan.graph.edges : plan.interiorWalls).map(w => w.id))
   let n = 1
   while (ids.has('I' + String(n).padStart(3, '0'))) n++
   return 'I' + String(n).padStart(3, '0')
@@ -361,7 +365,7 @@ export interface PlanClearance {
  * bounding rectangle (important for L-shaped footprints).
  */
 export function planWallClearances(plan: FloorPlan, wallId: string): PlanClearance | null {
-  const wall = plan.interiorWalls.find(w => w.id === wallId)
+  const wall = (plan.graph ? graphView(plan).interiorWalls : plan.interiorWalls).find(w => w.id === wallId)
   if (!wall || !plan.closed || !planIsOrthogonal(wall.start, wall.end)) return null
   const axis: 'x' | 'z' = wall.start.xMm === wall.end.xMm ? 'x' : 'z'
   const parallel = axis === 'x'

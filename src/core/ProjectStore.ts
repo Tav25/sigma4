@@ -10,6 +10,9 @@ import { buildProjectSnapshot, serializeProject } from './project-store'
 import { rightCornerOrigin } from './corner'
 import { translateWallsToExteriorZero, migrateLegacyWallOrigins } from './world-origin'
 import { effectiveConnections, reflowConnections } from './wall-topology'
+import { addGraphPoint, addGraphSegment, splitGraphEdge, deleteGraphEdge,
+  deleteGraphPoint, moveGraphPoint, changeGraphEdge, moveGraphEdge,
+  moveGraphEdgeToDimension } from './plan-graph'
 import { emptyFloorPlan, validateFloorPlan, moveInteriorWallWithDependents,
   moveWallToClearance, type PlanPoint, type PlanInteriorWall } from './floor-plan'
 
@@ -27,6 +30,13 @@ export type ProjectCommand =
   | { type: 'PLAN_MOVE_INTERIOR_WALL'; payload: { id: string; offsetMm: number } }
   | { type: 'PLAN_SET_INTERIOR_CLEARANCE'; payload: { id: string; side: 'negative' | 'positive'; distanceMm: number } }
   | { type: 'PLAN_SET_EXTERIOR_THICKNESS'; payload: { thicknessMm: number } }
+  | { type: 'PLAN_GRAPH_ADD_POINT'; payload: { point: PlanPoint } }
+  | { type: 'PLAN_GRAPH_ADD_EDGE'; payload: { start: PlanPoint; end: PlanPoint; thicknessMm: number } }
+  | { type: 'PLAN_GRAPH_SPLIT_EDGE'; payload: { id: string; point: PlanPoint } }
+  | { type: 'PLAN_GRAPH_DELETE_EDGE'; payload: { id: string } }
+  | { type: 'PLAN_GRAPH_DELETE_POINT'; payload: { id: string } }
+  | { type: 'PLAN_GRAPH_MOVE_POINT'; payload: { id: string; point: PlanPoint } }
+  | { type: 'PLAN_GRAPH_CLEAR'; payload: Record<string, never> }
   | { type: 'SET_WALL_LENGTH'; payload: { wallId: string; lengthMm: number } }
   | { type: 'SET_WALL_HEIGHT'; payload: { wallId: string; heightMm: number } }
   | { type: 'SET_STUD_SPACING'; payload: { wallId: string; studSpacingMm: number } }
@@ -305,7 +315,7 @@ export class ProjectStore {
           const plan = candidate.building.floorPlan
           if (!plan?.closed) return { success: false, errorCode: 'PLAN_ALREADY_OPEN',
             messageRu: 'Контур уже разомкнут' }
-          if (plan.interiorWalls.length) return { success: false,
+          if (plan.interiorWalls.length || plan.graph?.nodes.length || plan.graph?.edges.length) return { success: false,
             errorCode: 'PLAN_HAS_INTERIOR', messageRu: 'Сначала удалите внутренние стены' }
           plan.closed = false
           changedIds.push('building.floorPlan.closed')
@@ -322,7 +332,7 @@ export class ProjectStore {
         }
         case 'PLAN_CLEAR': {
           const plan = candidate.building.floorPlan
-          if (plan?.interiorWalls.length) return {
+          if (plan?.interiorWalls.length || plan?.graph?.nodes.length || plan?.graph?.edges.length) return {
             success: false, errorCode: 'PLAN_HAS_INTERIOR',
             messageRu: 'Нельзя удалить план с внутренними стенами' }
           candidate.building.floorPlan = emptyFloorPlan()
@@ -330,37 +340,103 @@ export class ProjectStore {
           break
         }
 
+
+        case 'PLAN_GRAPH_CLEAR': {
+          const plan=candidate.building.floorPlan
+          if(!plan?.closed)return {success:false,errorCode:'PLAN_NOT_CLOSED',
+            messageRu:'Сначала замкните наружный периметр'}
+          candidate.building.floorPlan={...plan,interiorWalls:[],graph:{nodes:[],edges:[]}}
+          changedIds.push('building.floorPlan.graph')
+          break
+        }
+        case 'PLAN_GRAPH_ADD_POINT':
+        case 'PLAN_GRAPH_ADD_EDGE':
+        case 'PLAN_GRAPH_SPLIT_EDGE':
+        case 'PLAN_GRAPH_DELETE_EDGE':
+        case 'PLAN_GRAPH_DELETE_POINT':
+        case 'PLAN_GRAPH_MOVE_POINT': {
+          const source = candidate.building.floorPlan
+          if (!source?.closed) return { success: false, errorCode: 'PLAN_NOT_CLOSED',
+            messageRu: 'Сначала замкните наружный периметр' }
+          let updated
+          switch (command.type) {
+            case 'PLAN_GRAPH_ADD_POINT':
+              updated = addGraphPoint(source, command.payload.point)
+              break
+            case 'PLAN_GRAPH_ADD_EDGE':
+              updated = addGraphSegment(source, command.payload.start,
+                command.payload.end, command.payload.thicknessMm)
+              break
+            case 'PLAN_GRAPH_SPLIT_EDGE':
+              updated = splitGraphEdge(source, command.payload.id, command.payload.point)
+              break
+            case 'PLAN_GRAPH_DELETE_EDGE':
+              updated = deleteGraphEdge(source, command.payload.id)
+              break
+            case 'PLAN_GRAPH_DELETE_POINT':
+              updated = deleteGraphPoint(source, command.payload.id)
+              break
+            case 'PLAN_GRAPH_MOVE_POINT':
+              updated = moveGraphPoint(source, command.payload.id, command.payload.point)
+              break
+          }
+          const issues = validateFloorPlan(updated)
+          if (issues.length) return { success: false, errorCode: 'INVALID_GRAPH_PLAN',
+            messageRu: issues[0] }
+          candidate.building.floorPlan = updated
+          changedIds.push('building.floorPlan.graph')
+          break
+        }
+
         case 'PLAN_ADD_INTERIOR_WALL': {
           const plan = candidate.building.floorPlan
           if (!plan?.closed) return { success: false, errorCode: 'PLAN_NOT_CLOSED',
             messageRu: 'Сначала замкните наружный периметр' }
-          plan.interiorWalls.push({ ...command.payload.wall,
-            start: { ...command.payload.wall.start }, end: { ...command.payload.wall.end } })
-          const errors = validateFloorPlan(plan)
+          if (plan.graph) {
+            candidate.building.floorPlan = addGraphSegment(plan,
+              command.payload.wall.start, command.payload.wall.end,
+              command.payload.wall.thicknessMm)
+          } else {
+            plan.interiorWalls.push({ ...command.payload.wall,
+              start: { ...command.payload.wall.start }, end: { ...command.payload.wall.end } })
+          }
+          const errors = validateFloorPlan(candidate.building.floorPlan!)
           if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_WALL', messageRu: errors[0] }
           changedIds.push('building.floorPlan.interiorWalls')
           break
         }
         case 'PLAN_UPDATE_INTERIOR_WALL': {
           const plan = candidate.building.floorPlan
-          const wall = plan?.interiorWalls.find(w => w.id === command.payload.id)
-          if (!wall) return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
+          if (!plan) return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
             messageRu: 'Внутренняя стена не найдена' }
-          wall.start = { ...command.payload.start }
-          wall.end = { ...command.payload.end }
-          wall.thicknessMm = command.payload.thicknessMm
-          const errors = validateFloorPlan(plan!)
+          if (plan.graph) candidate.building.floorPlan = changeGraphEdge(plan,
+            command.payload.id, command.payload.start, command.payload.end,
+            command.payload.thicknessMm)
+          else {
+            const wall = plan.interiorWalls.find(w => w.id === command.payload.id)
+            if (!wall) return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
+              messageRu: 'Внутренняя стена не найдена' }
+            wall.start = { ...command.payload.start }
+            wall.end = { ...command.payload.end }
+            wall.thicknessMm = command.payload.thicknessMm
+          }
+          const errors = validateFloorPlan(candidate.building.floorPlan!)
           if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_WALL', messageRu: errors[0] }
           changedIds.push('building.floorPlan.interiorWalls[' + wall.id + ']')
           break
         }
         case 'PLAN_REMOVE_INTERIOR_WALL': {
           const plan = candidate.building.floorPlan
-          if (!plan?.interiorWalls.some(w => w.id === command.payload.id))
-            return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
-              messageRu: 'Внутренняя стена не найдена' }
-          plan.interiorWalls = plan.interiorWalls.filter(w => w.id !== command.payload.id)
-          const errors = validateFloorPlan(plan)
+          if (!plan) return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
+            messageRu: 'Внутренняя стена не найдена' }
+          if (plan.graph) candidate.building.floorPlan = deleteGraphEdge(plan,command.payload.id)
+          else {
+            if (!plan.interiorWalls.some(w => w.id === command.payload.id))
+              return { success: false, errorCode: 'INTERIOR_WALL_NOT_FOUND',
+                messageRu: 'Внутренняя стена не найдена' }
+            plan.interiorWalls = plan.interiorWalls.filter(w => w.id !== command.payload.id)
+          }
+          const errors = validateFloorPlan(candidate.building.floorPlan!)
           if (errors.length) return { success: false, errorCode: 'DEPENDENT_INTERIOR_WALL',
             messageRu: errors[0] }
           changedIds.push('building.floorPlan.interiorWalls')
@@ -372,9 +448,14 @@ export class ProjectStore {
           const plan = candidate.building.floorPlan
           if (!plan?.closed) return { success: false, errorCode: 'PLAN_NOT_CLOSED',
             messageRu: 'Сначала замкните контур' }
-          const updated = command.type === 'PLAN_MOVE_INTERIOR_WALL'
-            ? moveInteriorWallWithDependents(plan, command.payload.id, command.payload.offsetMm)
-            : moveWallToClearance(plan, command.payload.id, command.payload.side, command.payload.distanceMm)
+          const updated = plan.graph
+            ? (command.type === 'PLAN_MOVE_INTERIOR_WALL'
+              ? moveGraphEdge(plan, command.payload.id, command.payload.offsetMm)
+              : moveGraphEdgeToDimension(plan, command.payload.id,
+                command.payload.side, command.payload.distanceMm))
+            : (command.type === 'PLAN_MOVE_INTERIOR_WALL'
+              ? moveInteriorWallWithDependents(plan, command.payload.id, command.payload.offsetMm)
+              : moveWallToClearance(plan, command.payload.id, command.payload.side, command.payload.distanceMm))
           if (!updated) return { success: false, errorCode: 'INVALID_INTERIOR_MOVE',
             messageRu: 'Не удалось вычислить новое положение стены' }
           const errors = validateFloorPlan(updated)
