@@ -964,7 +964,7 @@ try {
   const s19Lower=s17.building.floorPlan.graph.edges.find(edge=>{
     const a=s19Nodes.find(n=>n.id===edge.a),b=s19Nodes.find(n=>n.id===edge.b)
     return a.xMm===3000&&b.xMm===3000&&
-      Math.min(a.zMm,b.zMm)===-7000
+      Math.max(a.zMm,b.zMm)===0
   })
   assert.ok(s19Lower,'The lower edited half must still be selectable in the authored graph')
   // Switching away from Plan collapses the manual-opening disclosure.
