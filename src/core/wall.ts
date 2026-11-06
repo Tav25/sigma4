@@ -10,6 +10,8 @@ export interface WallPanelParams {
   sectionHeight: number
   spacing: number
   topLayers: number
+  /** In linked 2D plans generate the structural end posts first. */
+  requiredFirst?: boolean
 }
 
 function studStarts(length: number, spacing: number, sectionWidth: number): number[] {
@@ -59,7 +61,7 @@ export function generateWallPanel(params: WallPanelParams): FrameAssembly {
 
   // studs
   const studLength = height - sw * (1 + topLayers)
-  const starts = studStarts(length, spacing, sw)
+  const starts = params.requiredFirst ? [0, length - sw] : studStarts(length, spacing, sw)
   starts.forEach((sx, i) => {
     const idx = String(i + 1).padStart(2, '0')
     elements.push(cte({

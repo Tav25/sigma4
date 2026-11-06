@@ -10,7 +10,7 @@ import type { Wall, Opening, TimberElement } from './project'
 export function generateWallModule(
   wall: Wall,
   openings: readonly Opening[],
-  options: { unprefixedIds?: boolean; partition?: boolean } = {},
+  options: { unprefixedIds?: boolean; partition?: boolean; requiredFirst?: boolean } = {},
 ): TimberElement[] {
   const partition = options.partition
   const params: WallPanelParams = {
@@ -22,6 +22,7 @@ export function generateWallModule(
     // Double cap on linked partitions allows the upper course to lap across
     // T/L/X intersections exactly like Haun's wall-framing sequence.
     topLayers: 2,
+    requiredFirst: options.requiredFirst,
   }
   const wallOpenings: WindowOpening[] = openings
     .filter(opening => opening.wallId === wall.wallId)

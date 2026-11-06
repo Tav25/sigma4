@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.20')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.21')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -863,6 +863,18 @@ try {
   assert.equal(nwBuilt.validation.valid,true)
   assert.equal(nwBuilt.building.walls.length,7)
   assert.equal(nwBuilt.building.floorPlan.frame.openings.length,1)
+  // v0.1.21: ordinary studs are generated AFTER obligatory support posts,
+  // openings and three-stud channels. They must not extend into the door.
+  const frameStuds=nwBuilt.assembly.elements.filter(e=>
+    e.elementId.includes(':stud-layout-')&&e.role==='stud')
+  assert.ok(frameStuds.length>=12,'Expected feature-first ordinary stud detailing')
+  const framedDoor=nwBuilt.building.openings.find(o=>o.id==='D01')
+  assert.ok(framedDoor)
+  assert.equal(frameStuds.filter(e=>e.wallId===framedDoor.wallId).every(e=>
+    e.position.x<framedDoor.positionUmm-45 ||
+    e.position.x>framedDoor.positionUmm+framedDoor.widthMm+45),true)
+  assert.ok(nwBuilt.assembly.elements.some(e=>
+    e.elementId.includes('D01-cripple-top-layout-')))
 
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
@@ -882,7 +894,7 @@ try {
   await mobile.screenshot({ path: dir + '/34-direct-openings-touch.png' })
   await mobile.close()
   assert.deepEqual(errors, [], 'Browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  console.log('SIGMA4 BROWSER PASS: v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()

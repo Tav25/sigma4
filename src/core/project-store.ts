@@ -14,6 +14,7 @@ import { connectPerimeterCorner, connectRightCaliforniaCorner } from './corner-c
 import { effectiveConnections } from './wall-topology'
 import { addPartitionBacking, isPartitionWall, type PartitionSide } from './partition-layout'
 import { connectTopPlateLaps } from './top-plate-laps'
+import { detailLinkedStuds } from './stud-detailing'
 import { perimeterCorners, planFrameOpeningSides, projectPlanFrame } from './plan-frame'
 import { CURRENT_COORDINATE_SCHEMA, migrateLegacyWallOrigins } from './world-origin'
 
@@ -26,7 +27,8 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
   const linked = doc.building.floorPlan?.frame?.built === true
   const walls = doc.building.walls
   const elements = walls.flatMap((wall, index) =>
-    generateWallModule(wall, doc.building.openings, { unprefixedIds: !linked && index === 0, partition: linked && isPartitionWall(wall.wallId) }))
+    generateWallModule(wall, doc.building.openings, { unprefixedIds: !linked && index === 0, partition: linked && isPartitionWall(wall.wallId),
+      requiredFirst: linked }))
   if (linked) {
     for (const corner of perimeterCorners(walls)) {
       connectPerimeterCorner(elements, corner)
@@ -36,6 +38,10 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
     const partitions = sides.filter((side): side is PartitionSide => 'endInsetMm' in side)
     for (const side of partitions) addPartitionBacking(elements, walls, side)
     connectTopPlateLaps(elements, walls, partitions)
+    // Phase 2: only now fill bays between corners, king/jack posts, and
+    // the already-constructed three-stud receivers. Never infer framing
+    // from a continuous grid and delete it around structural features.
+    detailLinkedStuds(elements, walls, doc.building.openings)
     return { elements }
   }
   // Physical joinery is independent of each individual wall's framing.
