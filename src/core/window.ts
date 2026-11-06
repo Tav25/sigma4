@@ -1,6 +1,6 @@
 
 import { createTimberElement } from './timber'
-import type { GarageDoorSpec } from './project'
+import type { GarageDoorSpec, HeaderPreviewSpec, HeaderDesignLoads } from './project'
 import type { TimberElement } from './timber'
 import { generateWallPanel } from './wall'
 import type { WallPanelParams } from './wall'
@@ -13,6 +13,8 @@ export interface WindowOpening {
   sillHeightMm: number
   type: 'window' | 'door' | 'garage-door'
   garage?: GarageDoorSpec
+  headerPreview?: HeaderPreviewSpec
+  designLoads?: HeaderDesignLoads
 }
 
 export type Opening = WindowOpening

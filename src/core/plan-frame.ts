@@ -1,6 +1,7 @@
 import { planBounds, type FloorPlan, type PlanPoint } from './floor-plan'
 import { PARTITION_MIN_DEPTH, isPartitionWall, partitionAttachments, partitionInside, partitionSides, type PartitionHost, type PartitionSide } from './partition-layout'
 import { defaultGarageDoorSpec, GARAGE_DOOR_PRESETS, validateGarageOpening } from './garage-door'
+import { validateOpeningHeaderInputs, headerProfile } from './opening-profiles'
 import type { Opening, ProjectDocument, ValidationIssue, Wall } from './project'
 
 export interface PlanFrame {
@@ -19,7 +20,8 @@ const DEPTH = FRAME_SECTION.height
 export const MIN_FRAME_SIDE_MM = 2 * (DEPTH + FRAME_SECTION.width)
 
 function sideFramingMm(opening: Opening): number {
-  const count = opening.type === 'garage-door' ? opening.garage?.jackStudsPerSide ?? 2 : 1
+  const count = opening.type === 'garage-door' ? opening.garage?.jackStudsPerSide ?? 2 :
+    opening.headerPreview?.jackStudsPerSide ?? 1
   return (count + 1) * FRAME_SECTION.width
 }
 
@@ -166,6 +168,9 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
     ids.add(opening.id)
     const side = sides.find(item => item.wallId === opening.wallId)
     const reject = (message: string) => fail(opening.id + ': ' + message, [opening.id, opening.wallId])
+    for (const issue of validateOpeningHeaderInputs(opening,'endInsetMm' in side)) {
+      fail(issue.messageRu,issue.affectedIds)
+    }
     if (!side || !['window', 'door', 'garage-door'].includes(opening.type) ||
       ![opening.positionUmm, opening.widthMm, opening.heightMm, opening.sillHeightMm].every(Number.isInteger)) {
       reject('укажите стену, тип и целые размеры в мм')
@@ -205,7 +210,9 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
       opening.positionUmm + opening.widthMm > planSideLength(side) - margin) {
       reject('проём не помещается между угловыми стойками выбранной стены')
     }
-    const headerDepth = opening.type === 'garage-door' ? opening.garage?.lintelPreviewDepthMm ?? DEPTH : DEPTH
+    const headerDepth = headerProfile(opening,{
+      wallId:side.wallId,sectionMm:FRAME_SECTION,
+    }).depthMm
     if (opening.sillHeightMm + opening.heightMm + headerDepth > WALL_HEIGHT - 2 * FRAME_SECTION.width) {
       reject('недостаточно места по высоте для проёма и его перемычки')
     }

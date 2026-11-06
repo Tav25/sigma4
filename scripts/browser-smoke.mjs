@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.21')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.22')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -894,7 +894,40 @@ try {
   await mobile.screenshot({ path: dir + '/34-direct-openings-touch.png' })
   await mobile.close()
   assert.deepEqual(errors, [], 'Browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  // Stage 3: use real UI fields to add a 235-mm exterior header,
+  // two jack studs per side and explicit line-load demands.
+  const openPanel = page.locator('details.plan-manual-openings')
+  if (!(await openPanel.getAttribute('open'))) {
+    await page.getByTestId('plan-manual-openings').click()
+  }
+  await page.getByTestId('plan-frame-add-opening').click()
+  await page.getByTestId('plan-frame-opening-wall').selectOption('plan-front')
+  await page.getByTestId('plan-frame-opening-positionUmm').fill('6000')
+  await page.getByTestId('plan-header-profile-toggle').click()
+  await page.getByTestId('plan-header-depth').fill('235')
+  await page.getByTestId('plan-header-jacks').fill('2')
+  await page.getByTestId('plan-header-loads-enable').check()
+  await page.getByTestId('plan-header-dead-load').fill('3')
+  await page.getByTestId('plan-header-live-load').fill('2')
+  await page.getByTestId('plan-frame-save-opening').click()
+  await page.getByTestId('plan-frame-opening-W01').waitFor()
+  const structuralExport=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const structural=JSON.parse(await readFile(await (await structuralExport).path(),'utf8'))
+  const profileOpening=structural.building.floorPlan.frame.openings.find(o=>o.id==='W01')
+  assert.deepEqual(profileOpening.headerPreview,{depthMm:235,jackStudsPerSide:2})
+  assert.deepEqual(profileOpening.designLoads,{permanentKNPerM:3,variableKNPerM:2})
+  assert.equal(structural.validation.valid,true)
+  assert.equal(structural.validation.engineeringStatus,'not_evaluated')
+  assert.ok(structural.validation.issues.some(i=>
+    i.code==='HEADER_DEMAND_REQUIRES_DESIGN' && i.messageRu.includes('0.90')))
+  assert.equal(structural.assembly.elements.filter(e=>e.wallId==='plan-front' &&
+    e.elementId.startsWith('plan-front:W01-jack-')).length,4)
+  assert.equal(structural.assembly.elements.filter(e=>e.wallId==='plan-front' &&
+    e.elementId.startsWith('plan-front:W01-header-')).every(e=>
+      e.sectionMm.height===235),true)
+  await page.screenshot({path:dir+'/38-stage3-header-profile-235mm-jacks2.png'})
+  console.log('SIGMA4 BROWSER PASS: v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()

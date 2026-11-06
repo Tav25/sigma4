@@ -1,6 +1,7 @@
 import { generateWallPanel, type WallPanelParams } from './wall'
 import { generateWallWithOpenings, type WindowOpening } from './window'
 import { generatePartitionWithDoors } from './partition-door'
+import { applyLinkedHeaderProfile } from './opening-profiles'
 import type { Wall, Opening, TimberElement } from './project'
 
 /**
@@ -34,6 +35,8 @@ export function generateWallModule(
       sillHeightMm: opening.sillHeightMm,
       type: opening.type,
       ...(opening.garage ? { garage: { ...opening.garage } } : {}),
+      ...(opening.headerPreview ? { headerPreview: { ...opening.headerPreview } } : {}),
+      ...(opening.designLoads ? { designLoads: { ...opening.designLoads } } : {}),
     }))
     .sort((a, b) => a.positionXmm - b.positionXmm)
 
@@ -41,7 +44,12 @@ export function generateWallModule(
     ? (partition ? generatePartitionWithDoors(params, wallOpenings) : generateWallWithOpenings(params, wallOpenings))
     : generateWallPanel(params)
 
-  return panel.elements.map((element: any): TimberElement => ({
+  // Stage 3: preserve the long-established standalone 3D layout, but give
+  // plan-linked exterior openings configurable header / support packages.
+  if (options.requiredFirst && !partition && wallOpenings.length)
+    applyLinkedHeaderProfile(wallOpenings, panel.elements, wall)
+
+  const generated = panel.elements.map((element: any): TimberElement => ({
     elementId: options.unprefixedIds ? element.id : wall.wallId + ':' + element.id,
     wallId: wall.wallId,
     role: element.role,
@@ -52,4 +60,18 @@ export function generateWallModule(
     connectionIds: [],
     generated: true,
   }))
+  // Reciprocal logical joints between each preview header and the jack studs
+  // actually carrying it; visual links alone are not used for capacity claims.
+  if (options.requiredFirst) for (const opening of wallOpenings) {
+    for (const header of generated.filter(e =>
+      e.elementId === wall.wallId + ':' + opening.id + '-header-1' ||
+      e.elementId === wall.wallId + ':' + opening.id + '-header-2')) {
+      for (const jack of generated.filter(e=>e.role==='jack-stud' &&
+        e.elementId.startsWith(wall.wallId + ':' + opening.id + '-jack-'))) {
+        if (!header.connectionIds.includes(jack.elementId)) header.connectionIds.push(jack.elementId)
+        if (!jack.connectionIds.includes(header.elementId)) jack.connectionIds.push(header.elementId)
+      }
+    }
+  }
+  return generated
 }

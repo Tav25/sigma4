@@ -1,4 +1,5 @@
 import type { Opening, TimberElement, Wall } from './project'
+import { headerProfile } from './opening-profiles'
 
 /**
  * Haun's "detail the plates" order for linked plan-wall assemblies:
@@ -175,10 +176,7 @@ export function detailLinkedStuds(elements: TimberElement[], walls: readonly Wal
       }
       const inner = centersBetween(opening.positionUmm + sw / 2,
         opening.positionUmm + opening.widthMm - sw / 2, wall.studSpacingMm, sw)
-      const headerDepth = opening.type === 'garage-door'
-        ? opening.garage?.lintelPreviewDepthMm ?? wall.sectionMm.height
-        : opening.type === 'door' && wall.wallId.startsWith('partition-')
-          ? sw : wall.sectionMm.height
+      const headerDepth = headerProfile(opening,wall).depthMm
       const headerTop = opening.sillHeightMm + opening.heightMm + headerDepth
       const topLength = wall.heightMm - sw * 2 - headerTop
       const bottomLength = opening.sillHeightMm - 2 * sw

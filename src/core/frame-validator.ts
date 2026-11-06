@@ -7,6 +7,7 @@ import type {
 import { canFitCornerFraming, rightCornerOrigin } from './corner'
 import { effectiveConnections, validateWallTopology } from './wall-topology'
 import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
+import { validateOpeningHeaderInputs, verifyOpeningFraming, verifyHeaderLoadInputs } from './opening-profiles'
 import { wallMidplaneOrigin } from './world-origin'
 import { validateFloorPlan } from './floor-plan'
 import { perimeterCorners, projectPlanFrame, validatePlanFrame } from './plan-frame'
@@ -152,6 +153,7 @@ export function validateStructure(doc: any): ValidationIssue[] {
           issues.push(createIssue('INVALID_OPENING_TYPE', 'error', `${path}.type`, 'Тип проёма должен быть window, door или garage-door', o.id ? [o.id] : []))
         }
         issues.push(...validateGarageOpening(o))
+        issues.push(...validateOpeningHeaderInputs(o,typeof o.wallId==='string' && o.wallId.startsWith('partition-')))
 
         const checkNonNeg = (val: any, field: string, label: string) => {
           if (typeof val !== 'number' || val < 0) {
@@ -245,6 +247,15 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
 
   const { building, assembly } = doc
   for (const opening of building.openings) issues.push(...garageEngineeringNotices(opening))
+  // Stage 3: physically inspect the derived header and jack studs. Load
+  // demands are reported separately from structural capacity, which remains
+  // unevaluated without species/grade, tributary loads and design context.
+  if (building.floorPlan?.frame?.built) for (const opening of building.openings) {
+    const wall=building.walls.find(w=>w.wallId===opening.wallId)
+    if(!wall)continue
+    issues.push(...verifyOpeningFraming(opening,wall,assembly.elements))
+    issues.push(...verifyHeaderLoadInputs(opening,wall))
+  }
   const links = effectiveConnections(doc)
   issues.push(...validateWallTopology(building.walls, links))
   const california = links.find(link => link && link.type === 'california-right' &&

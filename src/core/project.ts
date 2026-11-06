@@ -60,6 +60,18 @@ export interface GarageDoorSpec {
   jackStudsPerSide: number
 }
 
+/** Authored PREVIEW geometry, not an engineering span-table approval. */
+export interface HeaderPreviewSpec {
+  depthMm: number
+  jackStudsPerSide: number
+}
+
+/** Supplied vertical line loads. They yield demand only, never capacity. */
+export interface HeaderDesignLoads {
+  permanentKNPerM: number
+  variableKNPerM: number
+}
+
 export interface DoorSwing {
   hinge: 'start' | 'end'
   side: 'left' | 'right'
@@ -70,6 +82,10 @@ export interface Opening {
   wallId: string
   type: 'window' | 'door' | 'garage-door'
   garage?: GarageDoorSpec
+  /** Optional exterior window/door header preview; garage uses garage spec. */
+  headerPreview?: HeaderPreviewSpec
+  /** Optional gravity loads, supplied by designer; requires engineering check. */
+  designLoads?: HeaderDesignLoads
   /** 2D door symbol, relative to the authored direction of the host wall. */
   swing?: DoorSwing
   positionUmm: number

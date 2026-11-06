@@ -130,7 +130,11 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
         <label>Стена<select data-testid="plan-frame-opening-wall" value={draft.wallId}
           onChange={event => {
             const wallId = event.target.value
-            setDraft({ ...draft, wallId, ...(isPartitionWall(wallId) && draft.type !== 'door' ? doorDefaults : {}) })
+            const { headerPreview: _oldPreview, designLoads: _oldLoads, ...withoutBearing } = draft
+            void _oldPreview; void _oldLoads
+            setDraft(isPartitionWall(wallId)
+              ? { ...withoutBearing, wallId, ...(draft.type !== 'door' ? doorDefaults : {}) }
+              : { ...draft, wallId })
           }}>
           {sides.map(side => <option key={side.wallId} value={side.wallId}>{side.label}</option>)}
         </select></label>
@@ -147,6 +151,65 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
                 onChange={event => setDraft({ ...draft, [field.name]: event.target.valueAsNumber })} />
             </label>)}
         </div>
+        <details className="plan-frame-header-preview">
+          <summary data-testid="plan-header-profile-toggle">Конструкция перемычки и нагрузки</summary>
+          {isPartitionWall(draft.wallId) ? <p className="plan-guidance">
+            Ненесущая перегородка: один плоский деревянный элемент над дверью,
+            отдельный расчёт несущей способности не выполняется.
+          </p> : <>
+            <p className="plan-guidance">Геометрия предварительная. Выбор досок и числа опор сам по себе не подтверждает расчёт по IRC/CSA.</p>
+            {draft.type==='garage-door' && draft.garage ? <div className="plan-frame-fields">
+              <label>Глубина предварительной перемычки, мм
+                <input type="number" min={90} max={610} step={1} data-testid="plan-header-depth"
+                  value={draft.garage.lintelPreviewDepthMm}
+                  onChange={event=>setDraft({...draft,garage:{...draft.garage!,
+                    lintelPreviewDepthMm:event.target.valueAsNumber}})}/>
+              </label>
+              <label>Опорных jack-стоек с каждой стороны
+                <input type="number" min={1} max={4} step={1} data-testid="plan-header-jacks"
+                  value={draft.garage.jackStudsPerSide}
+                  onChange={event=>setDraft({...draft,garage:{...draft.garage!,
+                    jackStudsPerSide:event.target.valueAsNumber}})}/>
+              </label>
+            </div> : <div className="plan-frame-fields">
+              <label>Глубина перемычки, мм
+                <input type="number" min={90} max={610} step={1} data-testid="plan-header-depth"
+                  value={draft.headerPreview?.depthMm ?? 145}
+                  onChange={event=>setDraft({...draft,
+                    headerPreview:{depthMm:event.target.valueAsNumber,
+                      jackStudsPerSide:draft.headerPreview?.jackStudsPerSide ?? 1}})}/>
+              </label>
+              <label>Опорных jack-стоек с каждой стороны
+                <input type="number" min={1} max={4} step={1} data-testid="plan-header-jacks"
+                  value={draft.headerPreview?.jackStudsPerSide ?? 1}
+                  onChange={event=>setDraft({...draft,
+                    headerPreview:{depthMm:draft.headerPreview?.depthMm ?? 145,
+                      jackStudsPerSide:event.target.valueAsNumber}})}/>
+              </label>
+            </div>}
+            <label><input type="checkbox" data-testid="plan-header-loads-enable"
+              checked={!!draft.designLoads}
+              onChange={event=>setDraft({...draft,
+                designLoads:event.target.checked?
+                  {permanentKNPerM:0,variableKNPerM:0}:undefined})}/>
+              Ввести погонные нагрузки для вычисления усилий (не несущей способности)
+            </label>
+            {draft.designLoads && <div className="plan-frame-fields">
+              <label>Постоянная, кН/м
+                <input type="number" min={0} step={0.1} data-testid="plan-header-dead-load"
+                  value={draft.designLoads.permanentKNPerM}
+                  onChange={event=>setDraft({...draft,
+                    designLoads:{...draft.designLoads!,permanentKNPerM:event.target.valueAsNumber}})}/>
+              </label>
+              <label>Переменная, кН/м
+                <input type="number" min={0} step={0.1} data-testid="plan-header-live-load"
+                  value={draft.designLoads.variableKNPerM}
+                  onChange={event=>setDraft({...draft,
+                    designLoads:{...draft.designLoads!,variableKNPerM:event.target.valueAsNumber}})}/>
+              </label>
+            </div>}
+          </>}
+        </details>
         <div className="plan-frame-fields">
           <button type="button" className="plan-button plan-secondary" data-testid="plan-frame-save-opening"
             onClick={save}>Сохранить проём</button>

@@ -240,6 +240,24 @@
                 "type": "number",
                 "minimum": 0
               },
+              "headerPreview": {
+                "type": "object",
+                "required": ["depthMm", "jackStudsPerSide"],
+                "additionalProperties": false,
+                "properties": {
+                  "depthMm": { "type": "integer", "minimum": 90, "maximum": 610 },
+                  "jackStudsPerSide": { "type": "integer", "minimum": 1, "maximum": 4 }
+                }
+              },
+              "designLoads": {
+                "type": "object",
+                "required": ["permanentKNPerM", "variableKNPerM"],
+                "additionalProperties": false,
+                "properties": {
+                  "permanentKNPerM": { "type": "number", "minimum": 0 },
+                  "variableKNPerM": { "type": "number", "minimum": 0 }
+                }
+              },
               "swing": {
                 "type": "object",
                 "required": ["hinge", "side"],
