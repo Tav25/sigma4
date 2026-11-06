@@ -7,13 +7,22 @@ import type { ProjectDocument, Vector3, Wall } from './project'
  */
 export const CURRENT_COORDINATE_SCHEMA = '1.1.0'
 
-export function wallMidplaneOrigin(wall: Pick<Wall, 'origin' | 'orientation' | 'sectionMm'>): Vector3 {
-  const half = wall.sectionMm.height / 2
-  return wall.orientation === 'z'
-    ? { ...wall.origin, x: wall.origin.x - half }
-    : wall.orientation === 'x'
-      ? { ...wall.origin, z: wall.origin.z - half }
-      : { ...wall.origin }
+export function wallYaw(orientation?: Wall['orientation'], reversed?: true): number {
+  return (orientation === 'z' ? Math.PI / 2 : 0) + (reversed ? Math.PI : 0)
+}
+
+/** +U follows the wall. Positive normal points outside. */
+export function wallLocalToWorld(origin: Vector3, orientation: Wall['orientation'],
+  reversed: Wall['reversed'], u: number, v: number, normal: number): Vector3 {
+  const sign = reversed ? -1 : 1
+  return orientation === 'z'
+    ? { x: origin.x + sign * normal, y: origin.y + v, z: origin.z - sign * u }
+    : { x: origin.x + sign * u, y: origin.y + v, z: origin.z + sign * normal }
+}
+
+export function wallMidplaneOrigin(wall: Pick<Wall, 'origin' | 'orientation' | 'sectionMm' | 'reversed'>): Vector3 {
+  return wall.orientation === 'y' ? { ...wall.origin }
+    : wallLocalToWorld(wall.origin, wall.orientation, wall.reversed, 0, 0, -wall.sectionMm.height / 2)
 }
 
 /** World-space physical outside lower-left corner of the first +X wall. */

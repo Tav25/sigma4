@@ -1,3 +1,4 @@
+import { wallYaw } from './world-origin'
 
 export interface Vec3 {
   x: number
@@ -25,7 +26,7 @@ export interface TimberElement {
   /** Scene-only ownership from canonical assembly; never stored redundantly. */
   wallId?: string
   // Derived from a wall in the scene; the saved assembly keeps local positions.
-  wallTransform?: { origin: Vec3; orientation: 'x' | 'z' }
+  wallTransform?: { origin: Vec3; reversed?: true; orientation: 'x' | 'z' }
 }
 
 export interface GeometrySpec {
@@ -108,7 +109,7 @@ export function rotateVectorByQuaternion(v: Vec3, q: { x: number; y: number; z: 
 export function generateTimberGeometry(element: TimberElement): GeometrySpec {
   const local = orientationQuaternion(element.orientation)
   // A right-hand wall goes into the room along -Z: local +X rotates +90° around Y.
-  const yaw = element.wallTransform?.orientation === 'z' ? Math.PI / 2 : 0
+  const yaw = wallYaw(element.wallTransform?.orientation, element.wallTransform?.reversed)
   const rotation = { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }
   const q = {
     x: rotation.w * local.x + rotation.x * local.w + rotation.y * local.z - rotation.z * local.y,

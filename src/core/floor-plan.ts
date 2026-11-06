@@ -1,4 +1,5 @@
 /** SIGMA4 2D authored plan; all source units in millimetres. */
+import type { PlanFrame } from './plan-frame'
 import { validatePlanGraph, graphView, type PlanGraph } from './plan-graph'
 export interface PlanPoint {
   xMm: number
@@ -20,6 +21,7 @@ export interface FloorPlan {
   interiorWalls: PlanInteriorWall[]
   /** New canonical node/edge source. Legacy interiorWalls must be [] when graph exists. */
   graph?: PlanGraph
+  frame?: PlanFrame
 }
 
 export const emptyFloorPlan = (): FloorPlan => ({

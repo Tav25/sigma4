@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.12')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.13')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -478,8 +478,66 @@ try {
   const imported=JSON.parse(await readFile(await (await reexport).path(),'utf8'))
   assert.deepEqual(imported.building.floorPlan.graph,final.building.floorPlan.graph)
   assert.equal(imported.validation.valid,true)
-  assert.deepEqual(errors, [], 'Plan editor browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.1.12 free graph points, CAD polyline, auto T joint, segment erase/split, editable dimension, shared-node move, garage 10x7, JSON migration; 3D legacy verified; migrated legacy and aligned; ISO only; each dimension adjacent to OWN wall; depth-occluded by timber; crisp half-size Helvetiker type; planar CAD arrows; exterior lines; 4m and 5m; corner; garage+door; JSON')
+  // New linked project: draw and edit the same geometry used by the real 3D scene.
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('plan-add-exact').click()
+  for (const length of ['10', '7', '10']) {
+    await page.getByTestId('plan-length-input').fill(length)
+    await page.getByTestId('plan-add-exact').click()
+  }
+  await page.getByTestId('plan-close').click()
+  await page.getByTestId('plan-frame-pick').click()
+  await clickGarage(1000, 0)
+  await page.getByTestId('plan-frame-opening-positionUmm').waitFor()
+  assert.equal(await page.getByTestId('plan-frame-opening-positionUmm').inputValue(), '1000')
+  await page.getByTestId('plan-frame-save-opening').click()
+  for (const [type, wall, offset] of [['door', 'plan-left', '1800'], ['garage-door', 'plan-back', '2000']]) {
+    await page.getByTestId('plan-frame-add-opening').click()
+    await page.getByTestId('plan-frame-opening-type').selectOption(type)
+    await page.getByTestId('plan-frame-opening-wall').selectOption(wall)
+    await page.getByTestId('plan-frame-opening-positionUmm').fill(offset)
+    await page.getByTestId('plan-frame-save-opening').click()
+  }
+  await page.getByTestId('plan-frame-opening-W01').waitFor()
+  await page.getByTestId('plan-frame-opening-D01').waitFor()
+  await page.getByTestId('plan-frame-opening-G01').waitFor()
+  await page.screenshot({ path: dir + '/27-linked-garage-plan.png' })
+
+  await page.getByTestId('plan-frame-build').click()
+  await page.getByText('Количество стен: 4', { exact: true }).waitFor()
+  await page.locator('.viewport[data-dimension-total-x="10000"][data-dimension-total-z="7000"]').waitFor()
+  await page.locator('.viewport canvas').waitFor({ state: 'visible' })
+  await page.screenshot({ path: dir + '/28-linked-garage-frame.png' })
+
+  await page.getByTestId('tab-plan').click()
+  await page.getByTestId('plan-frame-width').fill('11')
+  await page.getByTestId('plan-frame-resize').click()
+  assert.match(await page.getByTestId('plan-dimensions').textContent(), /11,00.*7,00/)
+  await page.getByTestId('plan-frame-width').fill('4')
+  await page.getByTestId('plan-frame-resize').click()
+  assert.match(await page.getByTestId('plan-frame-error').textContent(), /G01/)
+  assert.equal(await page.getByTestId('plan-frame-opening-G01').getAttribute('data-conflict'), 'true')
+  assert.match(await page.getByTestId('plan-dimensions').textContent(), /11,00.*7,00/)
+  const linkedDownload = page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const linkedJson = await readFile(await (await linkedDownload).path(), 'utf8')
+  const linked = JSON.parse(linkedJson)
+  assert.equal(linked.building.floorPlan.frame.built, true)
+  assert.equal(linked.building.floorPlan.frame.openings.length, 3)
+  assert.equal(linked.building.floorPlan.frame.openings.find(o => o.id === 'G01').positionUmm, 2000)
+  assert.equal(linked.building.walls.length, 4)
+  assert.equal(linked.validation.valid, true)
+
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.locator('#import-file').setInputFiles([{
+    name: 'linked-garage.sigma4.json', mimeType: 'application/json', buffer: Buffer.from(linkedJson),
+  }])
+  await page.getByTestId('plan-frame-opening-G01').waitFor()
+  assert.match(await page.getByTestId('plan-dimensions').textContent(), /11,00.*7,00/)
+  await page.getByTestId('plan-frame-build').click()
+  await page.locator('.viewport[data-dimension-total-x="11000"][data-dimension-total-z="7000"]').waitFor()
+  assert.deepEqual(errors, [], 'Browser exceptions')
+  console.log('SIGMA4 BROWSER PASS: legacy 3D, free graph plan, linked 2D-to-3D garage, resize, conflict highlighting and JSON roundtrip')
 
 } finally {
   await browser?.close()

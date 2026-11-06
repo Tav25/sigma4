@@ -1,5 +1,6 @@
 import type { ProjectDocument, Wall, Opening, TimberElement, Marker } from './project'
 import { effectiveConnections } from './wall-topology'
+import { perimeterWallPairs } from './plan-frame'
 
 /** Read-only projection. Records are REFERENCES to the canonical JSON. */
 export interface WallTreeNode {
@@ -30,7 +31,11 @@ export function buildProjectTree(doc: ProjectDocument): ProjectTreeModel {
       markers: doc.building.markers.filter(marker => openingIds.has(marker.openingId)),
     }
   })
-  const connections: ProjectTreeModel['connections'] = effectiveConnections(doc)
+  const connections = doc.building.floorPlan?.frame?.built
+    ? perimeterWallPairs(doc.building.walls).map(([from, to]) => ({
+      from: from.wallId, to: to.wallId, type: 'Калифорнийский угол',
+    }))
+    : effectiveConnections(doc)
     .map(link => ({
       from: link.fromWallId,
       to: link.toWallId,

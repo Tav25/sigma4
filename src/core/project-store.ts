@@ -8,10 +8,11 @@ import type {
   Assembly,
   ValidationResult,
 } from './project'
-import { validateProject } from './frame-validator'
+import { validateProject, validateSourceParameters } from './frame-validator'
 import { generateWallModule } from './wall-module'
 import { connectRightCaliforniaCorner } from './corner-connection'
 import { effectiveConnections } from './wall-topology'
+import { perimeterWallPairs, projectPlanFrame } from './plan-frame'
 import { CURRENT_COORDINATE_SCHEMA, migrateLegacyWallOrigins } from './world-origin'
 
 const SW = 45
@@ -20,8 +21,16 @@ const SH = 145
 export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
   // This generator knows nothing about wall numbers. Every instance uses the
   // same module; wallId ownership is preserved in each generated board.
-  const elements = doc.building.walls.flatMap((wall, index) =>
-    generateWallModule(wall, doc.building.openings, { unprefixedIds: index === 0 }))
+  const linked = doc.building.floorPlan?.frame?.built === true
+  const walls = doc.building.walls
+  const elements = walls.flatMap((wall, index) =>
+    generateWallModule(wall, doc.building.openings, { unprefixedIds: !linked && index === 0 }))
+  if (linked) {
+    for (const [wall, next] of perimeterWallPairs(walls)) {
+      connectRightCaliforniaCorner(elements, wall, next, true)
+    }
+    return { elements }
+  }
   // Physical joinery is independent of each individual wall's framing.
   const links = effectiveConnections(doc)
   for (const link of links) {
@@ -132,6 +141,10 @@ export function serializeProject(doc: ProjectDocument): string {
 
 export function parseProject(json: string): ProjectDocument {
   const parsed = migrateLegacyWallOrigins(JSON.parse(json) as ProjectDocument)
+  if (parsed.building.floorPlan?.frame?.built === true) {
+    const sourceErrors = validateSourceParameters(parsed).filter(issue => issue.severity === 'error')
+    if (sourceErrors.length) throw new Error(sourceErrors[0].messageRu)
+  }
   const rebuilt = buildProjectSnapshot(parsed)
   const validation = validateProject(rebuilt)
   if (!validation.valid) {
@@ -151,15 +164,16 @@ export function buildProjectSnapshot(doc: ProjectDocument): ProjectDocument {
   // even though the physical wall depth (stud section height) is 145mm.
   // Correct it during a validated rebuild/import without changing the
   // stud dimensions, wall placement, openings or the original input.
+  const plan = source.building.floorPlan
+  const projection = plan?.frame?.built ? projectPlanFrame(plan, plan.frame) : null
   const newDoc: ProjectDocument = {
     ...source,
-    building: {
-      ...source.building,
-      walls: source.building.walls.map(wall => ({
-        ...wall,
-        thicknessMm: wall.sectionMm.height,
-      })),
-    },
+    building: projection
+      ? { ...source.building, ...projection, markers: createDefaultMarkers(projection.openings) }
+      : {
+          ...source.building,
+          walls: source.building.walls.map(wall => ({ ...wall, thicknessMm: wall.sectionMm.height })),
+        },
   }
   newDoc.assembly = generateAssemblyFromDocument(newDoc)
   newDoc.validation = validateProject(newDoc)

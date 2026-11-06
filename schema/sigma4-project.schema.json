@@ -185,6 +185,10 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "reversed": {
+                "const": true,
+                "description": "Rotate the standard wall frame by 180 degrees."
               }
             }
           },
@@ -216,7 +220,8 @@
               "type": {
                 "enum": [
                   "window",
-                  "door"
+                  "door",
+                  "garage-door"
                 ]
               },
               "positionUmm": {
@@ -234,6 +239,67 @@
               "sillHeightMm": {
                 "type": "number",
                 "minimum": 0
+              },
+              "garage": {
+                "type": "object",
+                "required": [
+                  "installationProfile",
+                  "minSideRoomMm",
+                  "minHeadRoomMm",
+                  "minBackRoomExtraMm",
+                  "lintelPreviewDepthMm",
+                  "jackStudsPerSide"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "installationProfile": {
+                    "const": "clopay-standard-torsion"
+                  },
+                  "minSideRoomMm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 3000
+                  },
+                  "minHeadRoomMm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 3000
+                  },
+                  "minBackRoomExtraMm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 3000
+                  },
+                  "lintelPreviewDepthMm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 3000
+                  },
+                  "jackStudsPerSide": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4
+                  }
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "garage-door"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "garage"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "garage"
+                ]
               }
             }
           },
@@ -422,6 +488,54 @@
                   }
                 }
               }
+            },
+            "frame": {
+              "type": "object",
+              "description": "Authored exterior openings use distances from the outer corner, not from the generated panel origin.",
+              "required": [
+                "built",
+                "openings"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "built": {
+                  "type": "boolean"
+                },
+                "openings": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/properties/building/properties/openings/items"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "fromWallId",
+              "toWallId",
+              "type"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "fromWallId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "toWallId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "enum": [
+                  "california-right",
+                  "end-to-end"
+                ]
+              }
             }
           }
         }
@@ -471,7 +585,8 @@
                   "top-plate",
                   "header",
                   "sill",
-                  "corner-backing"
+                  "corner-backing",
+                  "garage-lintel-preview"
                 ]
               },
               "sectionMm": {

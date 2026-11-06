@@ -188,7 +188,11 @@ export function SceneView({
           const win = openingsRef.current.find((o) => o.id === hitId)
           if (win) {
             const px = getWallIntersection(event, hitId)
-            if (px === null || dragCallbacksRef.current.onWindowDragStart?.(hitId) === false) return
+            if (px === null) return
+            if (dragCallbacksRef.current.onWindowDragStart?.(hitId) === false) {
+              onWindowSelect?.(hitId)
+              return
+            }
             draggingRef.current = { id: hitId, startX: win.positionXmm, startPointer: px, previewedX: win.positionXmm }
             windowSelectedRef.current = hitId
             lastDraggedRef.current = hitId

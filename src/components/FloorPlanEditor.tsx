@@ -9,6 +9,8 @@ import {
 } from '../core/floor-plan'
 import { graphView, moveGraphEdge, moveGraphEdgeToDimension, moveGraphPoint } from '../core/plan-graph'
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
+import { planSidePoint, rectangularFrameSides } from '../core/plan-frame'
+import { PlanFrameControls, type PlanFramePick } from './PlanFrameControls'
 
 const WIDTH = 1200
 const HEIGHT = 760
@@ -28,16 +30,17 @@ type WallPointerDrag = { id: string; pointerId: number; startX: number; startY: 
   offsetMm: number; moved: boolean; candidate: FloorPlan | null }
 type NodePointerDrag = {id:string;pointerId:number;startX:number;startY:number;
   moved:boolean;point:PlanPoint|null;candidate:FloorPlan|null}
-type DraftTool = 'outline'|'interior'|'turn'|'point'|'split'|'erase'|'select'
+type DraftTool = 'outline'|'interior'|'turn'|'point'|'split'|'erase'|'select'|'frame'
 
 export interface FloorPlanEditorProps {
   plan?: FloorPlan
   onCommand: (command: ProjectCommand) => CommandResult
   onExport: () => void
   onImport: () => void
+  onFrameBuilt: () => void
 }
 
-export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, onImport }: FloorPlanEditorProps) {
+export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, onImport, onFrameBuilt }: FloorPlanEditorProps) {
   const [direction, setDirection] = useState<Direction>('+x')
   const [exactLength, setExactLength] = useState('6')
   const [snapMm, setSnapMm] = useState(250)
@@ -68,6 +71,10 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
   useEffect(() => {
     setOuterWidthDraft(String(plan.exteriorThicknessMm ?? DEFAULT_EXTERIOR_THICKNESS_MM))
   }, [plan.exteriorThicknessMm])
+  const [framePick, setFramePick] = useState<PlanFramePick | null>(null)
+  const [frameIssueIds, setFrameIssueIds] = useState<string[]>([])
+  const frameSides = rectangularFrameSides(plan)
+  const hasFrameWork = plan.frame?.built || !!plan.frame?.openings.length
   const points = plan.exterior
   const viewPlan=graphView(plan)
   const selectedInterior = viewPlan.interiorWalls.find(w => w.id === selectedInteriorId)
@@ -369,6 +376,19 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
     if (plan.closed) {
       if(tool==='interior'||tool==='turn'||tool==='point'){
         graphClick(canvasWorldPoint(svgFromEvent(event)))
+      } else if (tool === 'frame') {
+        const loc = svgFromEvent(event)
+        const raw = canvasWorldPoint(loc)
+        const closest = frameSides.map(side => {
+          const length = planDistanceMm(side.start, side.end)
+          const dx = Math.sign(side.end.xMm - side.start.xMm)
+          const dz = Math.sign(side.end.zMm - side.start.zMm)
+          const u = (raw.xMm - side.start.xMm) * dx + (raw.zMm - side.start.zMm) * dz
+          const point = xy(planSidePoint(side, Math.max(0, Math.min(length, u))))
+          return { wallId: side.wallId, offsetMm: Math.max(0, snap(u)),
+            distance: Math.hypot(point.x - loc.x, point.y - loc.y) }
+        }).sort((a, b) => a.distance - b.distance)[0]
+        if (closest && closest.distance <= 20) setFramePick(closest)
       }
       return
     }
@@ -601,22 +621,28 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
           <div className="plan-complete" data-testid="plan-closed-status">
             <strong>Контур замкнут</strong>
             <span>Теперь можно чертить внутренние стены с привязкой к контуру и существующим перегородкам.</span>
-            <button className="plan-button plan-secondary" type="button" data-testid="plan-reopen"
+            <button className="plan-button plan-secondary" type="button" data-testid="plan-reopen" disabled={hasFrameWork}
               onClick={() => {
                 if (apply({ type: 'PLAN_REOPEN', payload: {} })) {
                   setTool('outline'); setInteriorStart(null); setSelectedInteriorId(null)
                 }
               }}>Разомкнуть для продолжения</button>
           </div>
+          <PlanFrameControls plan={plan} pick={framePick} picking={tool === 'frame'}
+            onPick={() => {
+              finishPolyline()
+              setTool(tool === 'frame' ? 'select' : 'frame')
+            }}
+            onCommand={onCommand} onIssues={setFrameIssueIds} onBuilt={onFrameBuilt} />
           <div className="plan-tool-section" data-testid="plan-outer-wall-width">
             <strong className="plan-section-title">Толщина наружных стен</strong>
             <label htmlFor="outer-wall-width">Толщина внутрь периметра, мм</label>
             <input id="outer-wall-width" data-testid="plan-outer-thickness"
               type="number" min="50" max="500" step="1"
-              value={outerWidthDraft} onChange={e=>setOuterWidthDraft(e.target.value)}
+              disabled={hasFrameWork} value={outerWidthDraft} onChange={e=>setOuterWidthDraft(e.target.value)}
               onKeyDown={e=>{if(e.key==='Enter')setExteriorThickness()}} />
             <button type="button" className="plan-button plan-secondary"
-              data-testid="plan-save-outer-thickness" onClick={setExteriorThickness}>
+              data-testid="plan-save-outer-thickness" disabled={hasFrameWork} onClick={setExteriorThickness}>
               Применить толщину
             </button>
           </div>
@@ -736,7 +762,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
             Удалить последнюю точку
           </button>}
           <button type="button" className="plan-button plan-text" data-testid="plan-reset"
-            disabled={!points.length} onClick={() => {
+            disabled={!points.length || hasFrameWork} onClick={() => {
               if (window.confirm('Удалить весь наружный контур?')) {
                 if (apply({ type: 'PLAN_CLEAR', payload: {} })) {
                   setSelectedIndex(null); setHover(null); fitView()
@@ -777,7 +803,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
           <div className="plan-mode-mark"><span className="plan-dot" /> ПЛАН / {plan.closed
               ?({interior:'ЛОМАНАЯ СТЕНА',turn:'ПОВОРОТ 90°',point:'СВОБОДНАЯ ТОЧКА',
                 split:'РАЗДЕЛЕНИЕ',erase:'УДАЛЕНИЕ ОТРЕЗКА',select:'РЕДАКТИРОВАНИЕ',
-                outline:'НАРУЖНЫЙ КОНТУР'}[tool])
+                outline:'НАРУЖНЫЙ КОНТУР',frame:'ПРОЁМЫ'}[tool])
               :'НАРУЖНЫЙ КОНТУР'}</div>
           <label className="plan-grid-select">Шаг привязки
             <select data-testid="plan-grid-step" value={snapMm}
@@ -800,6 +826,9 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
             onPointerUp={pointerUp} onPointerCancel={pointerUp} onPointerLeave={() => setHover(null)}
             onWheel={wheel}>
             <defs>
+              <marker id="plan-frame-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8 Z" fill="#14777b" />
+              </marker>
               <pattern id="plan-small-grid" x={originX} y={originY}
                 width={px/4} height={px/4} patternUnits="userSpaceOnUse">
                 <path d={`M ${px/4} 0 L 0 0 0 ${px/4}`} fill="none" stroke="#e4eaf1" strokeWidth="0.8"/>
@@ -847,6 +876,35 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
                   <rect x={-40} y={-11} width={80} height={22} rx={5} fill="white" stroke="#dbe6ef" />
                   <text y={5} textAnchor="middle" className="plan-dimension-text">{label}</text>
                 </g>
+              </g>
+            })}
+            {tool === 'frame' && frameSides.map(side => {
+              const length = planDistanceMm(side.start, side.end)
+              const start = xy(planSidePoint(side, length * 0.06))
+              const end = xy(planSidePoint(side, length * 0.2))
+              return <line key={side.wallId} x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+                stroke="#14777b" strokeWidth={2} markerEnd="url(#plan-frame-arrow)" pointerEvents="none" />
+            })}
+            {plan.frame?.openings.map(opening => {
+              const side = frameSides.find(item => item.wallId === opening.wallId)
+              if (!side) return null
+              const a = xy(planSidePoint(side, opening.positionUmm))
+              const b = xy(planSidePoint(side, opening.positionUmm + opening.widthMm))
+              const conflict = frameIssueIds.includes(opening.id)
+              const color = conflict ? '#ba3026'
+                : { window: '#1568a0', door: '#826029', 'garage-door': '#514a95' }[opening.type]
+              return <g key={opening.id} data-testid={'plan-frame-opening-' + opening.id}
+                data-conflict={conflict} pointerEvents={tool === 'frame' ? 'auto' : 'none'}
+                onClick={event => {
+                  if (ignoreClick.current || event.shiftKey || tool !== 'frame') return
+                  event.stopPropagation()
+                  setFramePick({ opening })
+                }}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="white" strokeWidth={12} />
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={6} />
+                <text x={(a.x + b.x) / 2 + (a.x === b.x ? 19 : 0)}
+                  y={(a.y + b.y) / 2 - (a.y === b.y ? 8 : 0)} textAnchor="middle"
+                  fill={color} fontSize={13} fontWeight={750} pointerEvents="none">{opening.id}</text>
               </g>
             })}
             {current && proposal && !plan.closed && !(
@@ -1023,6 +1081,7 @@ export function FloorPlanEditor({ plan = emptyFloorPlan(), onCommand, onExport, 
               :tool==='point'?'ЛКМ — свободная точка или узел на стене'
               :tool==='split'?'Нажмите отрезок в месте разделения'
               :tool==='erase'?'Нажмите отрезок для удаления · Undo доступен'
+              :tool==='frame'?'Нажмите на наружную стену или существующий проём'
               :'Перетащите стену или точку · кликните размер · Delete — удалить')
             :'ЛКМ — следующая точка · Shift+drag — сдвиг · колесо — масштаб'}</div>
         </div>

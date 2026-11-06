@@ -1,13 +1,14 @@
 import type { ProjectDocument } from '../core/project'
 import type { TimberElement as SceneTimberElement } from '../core/timber'
 import type { WindowOpening } from '../core/window'
-import { wallMidplaneOrigin } from '../core/world-origin'
+import { wallLocalToWorld, wallMidplaneOrigin } from '../core/world-origin'
 
 export interface SceneOpening3D extends WindowOpening {
   wallId: string
   wallLengthMm: number
   wallOrigin: { x: number; y: number; z: number }
   wallOrientation: 'x' | 'z'
+  reversed?: true
 }
 
 export interface OpeningMarker {
@@ -43,7 +44,7 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
       material: 'wood',
       wallTransform: (() => {
         const wall = walls.get(element.wallId)
-        return wall ? { origin: wallMidplaneOrigin(wall), orientation: wall.orientation === 'z' ? 'z' as const : 'x' as const } : undefined
+        return wall ? { origin: wallMidplaneOrigin(wall), orientation: wall.orientation === 'z' ? 'z' as const : 'x' as const, ...(wall.reversed ? { reversed: wall.reversed } : {}) } : undefined
       })(),
     })),
     openings: document.building.openings.map(opening => ({
@@ -68,6 +69,7 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
         // the source building.walls[*].origin stays the exterior corner.
         wallOrigin: wallMidplaneOrigin(wall),
         wallOrientation: wall.orientation === 'z' ? 'z' as const : 'x' as const,
+        ...(wall.reversed ? { reversed: wall.reversed } : {}),
         positionXmm: opening.positionUmm,
         widthMm: opening.widthMm,
         heightMm: opening.heightMm,
@@ -84,15 +86,8 @@ export function projectToScene(document: ProjectDocument): SceneProjection {
       const horizontal = marker.anchor === 'left' ? 0 : marker.anchor === 'right' ? opening.widthMm : opening.widthMm / 2
       return [{
         openingId: marker.openingId,
-        position: {
-          x: wall.orientation === 'z'
-            ? wall.origin.x + marker.outsideOffsetMm
-            : wall.origin.x + opening.positionUmm + horizontal,
-          y: wall.origin.y + marker.elevationMm,
-          z: wall.orientation === 'z'
-            ? wall.origin.z - (opening.positionUmm + horizontal)
-            : wall.origin.z + marker.outsideOffsetMm,
-        },
+        position: wallLocalToWorld(wall.origin, wall.orientation, wall.reversed,
+          opening.positionUmm + horizontal, marker.elevationMm, marker.outsideOffsetMm),
         visible: marker.visible,
         color: marker.color,
       }]

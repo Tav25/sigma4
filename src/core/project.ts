@@ -37,6 +37,8 @@ export interface Wall {
   studSpacingMm: number
   sectionMm: { width: number; height: number }
   orientation: 'x' | 'y' | 'z'
+  /** Rotate the standard wall frame by 180° for the opposite perimeter faces. */
+  reversed?: true
   /** Lower OUTSIDE corner in global millimetres; NOT the stud midplane. */
   origin: Vector3
   openings: string[]
@@ -117,7 +119,7 @@ export interface ProjectDocument {
     walls: Wall[]
     /** Optional for backward compatibility with legacy two-wall projects. */
     connections?: WallConnection[]
-    /** Independent authored 2D plan; derived 3D framing is a later phase. */
+    /** Authored 2D plan; frame enables linked perimeter generation. */
     floorPlan?: FloorPlan
     openings: Opening[]
     markers: Marker[]

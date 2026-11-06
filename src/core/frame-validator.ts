@@ -9,6 +9,7 @@ import { effectiveConnections, validateWallTopology } from './wall-topology'
 import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
 import { wallMidplaneOrigin } from './world-origin'
 import { validateFloorPlan } from './floor-plan'
+import { projectPlanFrame, validatePlanFrame } from './plan-frame'
 
 const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0', '1.1.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
@@ -88,10 +89,12 @@ export function validateStructure(doc: any): ValidationIssue[] {
   }
 
   if (doc.building?.floorPlan !== undefined) {
-    for (const message of validateFloorPlan(doc.building.floorPlan)) {
+    const planErrors = validateFloorPlan(doc.building.floorPlan)
+    for (const message of planErrors) {
       issues.push(createIssue('INVALID_FLOOR_PLAN', 'error',
         'building.floorPlan', message, []))
     }
+    if (!planErrors.length) issues.push(...validatePlanFrame(doc.building.floorPlan))
   }
   const wallIds = new Set<string>()
   const openingIds = new Set<string>()
@@ -397,7 +400,8 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
       // local origin by the wall depth to tie into the first wall.
       const rightLap = california?.toWallId === el.wallId &&
         el.elementId === `${el.wallId}:plate-top-2`
-      const minAllowed = rightLap ? -wall.sectionMm.height : 0
+      const planLap = building.floorPlan?.frame?.built && el.elementId === `${el.wallId}:plate-top-2`
+      const minAllowed = rightLap || planLap ? -wall.sectionMm.height : 0
       if (minX < minAllowed - 0.001 || maxX > wall.lengthMm + 0.001) {
         issues.push(createIssue('ELEMENT_OUT_OF_WALL_BOUNDS', 'error', `assembly.elements[id=${el.elementId}]`, 'Элемент выходит за границы стены по X', [el.elementId, el.wallId]))
       }
@@ -452,6 +456,15 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
   return issues
 }
 
+function matchesJson(actual: unknown, expected: unknown): boolean {
+  if (actual === expected) return true
+  if (!actual || !expected || typeof actual !== 'object' || typeof expected !== 'object') return false
+  if (Array.isArray(actual) !== Array.isArray(expected)) return false
+  const entries = Object.entries(expected)
+  return entries.length === Object.keys(actual).length &&
+    entries.every(([key, value]) => matchesJson((actual as Record<string, unknown>)[key], value))
+}
+
 export function validateConsistency(doc: ProjectDocument | null | undefined): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   if (!doc || !doc.building || !doc.assembly) return issues
@@ -460,6 +473,15 @@ export function validateConsistency(doc: ProjectDocument | null | undefined): Va
 
   const wallIds = new Set(building.walls.map(w => w.wallId))
   const openingIds = new Set(building.openings.map(o => o.id))
+  const plan = building.floorPlan
+  if (plan?.frame?.built && !validateFloorPlan(plan).length && !validatePlanFrame(plan).length) {
+    const projection = projectPlanFrame(plan, plan.frame)
+    const actual = { walls: building.walls, openings: building.openings, connections: building.connections }
+    if (!matchesJson(actual, projection)) {
+      issues.push(createIssue('PLAN_FRAME_OUT_OF_SYNC', 'error', 'building.walls',
+        'Каркас не соответствует наружному плану', []))
+    }
+  }
 
   building.walls.forEach(wall => {
     wall.openings.forEach(oid => {
@@ -540,16 +562,20 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
   }
 
   if (doc.building?.floorPlan !== undefined) {
-    for (const message of validateFloorPlan(doc.building.floorPlan)) {
+    const planErrors = validateFloorPlan(doc.building.floorPlan)
+    for (const message of planErrors) {
       issues.push(createIssue('INVALID_FLOOR_PLAN', 'error',
         'building.floorPlan', message, []))
     }
+    if (!planErrors.length) issues.push(...validatePlanFrame(doc.building.floorPlan))
   }
   const wallIds = new Set<string>()
   const openingIds = new Set<string>()
 
+  const linked = doc.building?.floorPlan?.frame?.built === true
   if (doc.building) {
-    const b = doc.building
+    // Linked walls, openings, markers and connections are generated from the plan.
+    const b = linked ? { materials: doc.building.materials } : doc.building
 
     if (Array.isArray(b.walls)) {
       b.walls.forEach((w: any, i: number) => {
@@ -664,7 +690,7 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
     }
   }
 
-  if (doc.building && Array.isArray(doc.building.walls)) {
+  if (!linked && doc.building && Array.isArray(doc.building.walls)) {
     const links = Array.isArray(doc.building.connections)
       ? doc.building.connections
       : (doc.building.walls.length === 2
@@ -674,7 +700,7 @@ export function validateSourceParameters(doc: any): ValidationIssue[] {
         : [])
     issues.push(...validateWallTopology(doc.building.walls, links))
   }
-  if (doc.building?.connections !== undefined && !Array.isArray(doc.building.connections)) {
+  if (!linked && doc.building?.connections !== undefined && !Array.isArray(doc.building.connections)) {
     issues.push(createIssue('INVALID_CONNECTIONS_ARRAY', 'error', 'building.connections',
       'Соединения должны быть массивом', []))
   }

@@ -1,4 +1,5 @@
 import type { SceneOpening3D } from './project-to-scene'
+import { wallLocalToWorld, wallYaw } from '../core/world-origin'
 
 /**
  * One mapping from wall-local U,V,normal coordinates (millimetres) to world.
@@ -8,20 +9,18 @@ import type { SceneOpening3D } from './project-to-scene'
 export function openingLocalToWorld(
   opening: SceneOpening3D, uMm: number, vMm: number, normalMm = 0,
 ) {
-  const { wallOrigin: o, wallOrientation } = opening
-  return wallOrientation === 'z'
-    ? { x: o.x + normalMm, y: o.y + vMm, z: o.z - uMm }
-    : { x: o.x + uMm, y: o.y + vMm, z: o.z + normalMm }
+  return wallLocalToWorld(opening.wallOrigin, opening.wallOrientation, opening.reversed, uMm, vMm, normalMm)
 }
 
 export function openingWorldToLocalU(
   opening: SceneOpening3D, worldPointMeters: { x: number; z: number },
 ): number {
-  return opening.wallOrientation === 'z'
+  const distance = opening.wallOrientation === 'z'
     ? opening.wallOrigin.z / 1000 - worldPointMeters.z
     : worldPointMeters.x - opening.wallOrigin.x / 1000
+  return opening.reversed ? -distance : distance
 }
 
 export function openingYaw(opening: SceneOpening3D): number {
-  return opening.wallOrientation === 'z' ? Math.PI / 2 : 0
+  return wallYaw(opening.wallOrientation, opening.reversed)
 }

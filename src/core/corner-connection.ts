@@ -8,9 +8,11 @@ export function connectRightCaliforniaCorner(
   elements: TimberElement[],
   front: Wall,
   right: Wall,
+  prefixed = false,
 ): void {
+  const frontPrefix = prefixed ? front.wallId + ':' : ''
   const frontTop = elements.find(element =>
-    element.wallId === front.wallId && element.elementId === 'plate-top-2')
+    element.wallId === front.wallId && element.elementId === frontPrefix + 'plate-top-2')
   if (frontTop) frontTop.lengthMm -= front.sectionMm.height
 
   const rightTopId = right.wallId + ':plate-top-2'
@@ -22,7 +24,7 @@ export function connectRightCaliforniaCorner(
   }
 
   const backing: TimberElement = {
-    elementId: 'warm-corner-stud',
+    elementId: frontPrefix + 'warm-corner-stud',
     wallId: front.wallId,
     role: 'corner-backing',
     lengthMm: front.heightMm - front.sectionMm.width * 3,
@@ -52,7 +54,7 @@ export function connectRightCaliforniaCorner(
     backing.connectionIds = [frontEnd.elementId, rightStart.elementId]
   }
   if (frontTop && rightTop) {
-    frontTop.connectionIds = [rightTop.elementId]
-    rightTop.connectionIds = [frontTop.elementId]
+    frontTop.connectionIds.push(rightTop.elementId)
+    rightTop.connectionIds.push(frontTop.elementId)
   }
 }

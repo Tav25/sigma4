@@ -1,13 +1,12 @@
 import type { Wall, WallConnection, ValidationIssue, ProjectDocument, Vector3 } from './project'
 import { rightCornerOrigin } from './corner'
+import { wallLocalToWorld } from './world-origin'
 
 const EPS = 0.01
 const validNumber = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n)
 
 export function wallEnd(wall: Wall): Vector3 {
-  return wall.orientation === 'z'
-    ? { x: wall.origin.x, y: wall.origin.y, z: wall.origin.z - wall.lengthMm }
-    : { x: wall.origin.x + wall.lengthMm, y: wall.origin.y, z: wall.origin.z }
+  return wallLocalToWorld(wall.origin, wall.orientation, wall.reversed, wall.lengthMm, 0, 0)
 }
 
 /** Read legacy two-wall California joint without silently rewriting old JSON. */
@@ -42,12 +41,12 @@ export function reflowConnections(walls: Wall[], connections: readonly WallConne
 }
 
 export function wallFootprint(wall: Wall) {
-  const depth = wall.sectionMm.height
-  return wall.orientation === 'z'
-    ? { minX: wall.origin.x - depth, maxX: wall.origin.x,
-        minZ: wall.origin.z - wall.lengthMm, maxZ: wall.origin.z }
-    : { minX: wall.origin.x, maxX: wall.origin.x + wall.lengthMm,
-        minZ: wall.origin.z - depth, maxZ: wall.origin.z }
+  const opposite = wallLocalToWorld(wall.origin, wall.orientation, wall.reversed,
+    wall.lengthMm, 0, -wall.sectionMm.height)
+  return {
+    minX: Math.min(wall.origin.x, opposite.x), maxX: Math.max(wall.origin.x, opposite.x),
+    minZ: Math.min(wall.origin.z, opposite.z), maxZ: Math.max(wall.origin.z, opposite.z),
+  }
 }
 
 /**
@@ -98,10 +97,10 @@ export function validateWallTopology(
       fail('INCOMPATIBLE_JOIN_SECTIONS', 'Высота и сечения соединяемых стен должны совпадать', ids)
     }
     if (link.type === 'california-right' &&
-       (walls[0] !== from || walls[1] !== to || from.orientation !== 'x' || to.orientation !== 'z')) {
+       (walls[0] !== from || walls[1] !== to || from.orientation !== 'x' || to.orientation !== 'z' || from.reversed || to.reversed)) {
       fail('UNSUPPORTED_CALIFORNIA_JOINT', 'Калифорнийский угол пока поддержан для первых двух стен X → -Z', ids)
     }
-    if (link.type === 'end-to-end' && from.orientation !== to.orientation) {
+    if (link.type === 'end-to-end' && (from.orientation !== to.orientation || from.reversed !== to.reversed)) {
       fail('INVALID_END_TO_END_AXIS', 'Прямой стык возможен только у сонаправленных стен', ids)
     }
     const origin = jointOrigin(from, to, link.type)

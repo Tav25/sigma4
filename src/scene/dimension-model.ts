@@ -1,5 +1,6 @@
 import type { Wall } from '../core/project'
 import type { TimberElement } from '../core/timber'
+import { wallEnd } from '../core/wall-topology'
 import { calculateWorldBounds } from './view-bounds'
 
 /** Coordinates remain world millimetres, not view-relative pixel positions. */
@@ -79,21 +80,16 @@ export function buildDimensionLayout(walls: readonly Wall[], elements: TimberEle
   const lines: DimensionLine[] = walls.map((wall) => {
     const alongX = wall.orientation === 'x'
     const from = asPoint(wall.origin.x, wall.origin.z)
-    const to = asPoint(alongX ? wall.origin.x + wall.lengthMm : wall.origin.x,
-      alongX ? wall.origin.z : wall.origin.z - wall.lengthMm)
+    const to = wallEnd(wall)
     const ownElements = elements.filter(element => element.wallId === wall.wallId)
     const ownAabb = calculateWorldBounds(ownElements)
-    // Each wall in a valid assembly has timber. Fallback is deterministic
-    // for a temporarily empty wall, without relying on global building bounds.
-    const faceZ = ownAabb.isEmpty()
-      ? wall.origin.z + wall.sectionMm.height / 2
-      : ownAabb.max.z * 1000
-    const faceX = ownAabb.isEmpty()
-      ? wall.origin.x + wall.sectionMm.height / 2
-      : ownAabb.max.x * 1000
-    const coordinate = alongX ? faceZ : faceX
-    const dimCoordinate = coordinate + WALL_OFFSET_MM
-    const footCoordinate = coordinate + EXTENSION_START_MM
+    const outside = wall.reversed ? -1 : 1
+    const face = ownAabb[outside < 0 ? 'min' : 'max']
+    const coordinate = ownAabb.isEmpty()
+      ? (alongX ? wall.origin.z : wall.origin.x) + outside * wall.sectionMm.height / 2
+      : (alongX ? face.z : face.x) * 1000
+    const dimCoordinate = coordinate + outside * WALL_OFFSET_MM
+    const footCoordinate = coordinate + outside * EXTENSION_START_MM
     return {
       id: 'wall-dim-' + wall.wallId,
       kind: 'wall' as const,

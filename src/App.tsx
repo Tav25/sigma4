@@ -75,6 +75,7 @@ export default function App() {
   }, [])
 
   const wall = snapshot.building.walls.find(w => w.wallId === selectedWallId) ?? snapshot.building.walls[0]
+  const linkedFrame = snapshot.building.floorPlan?.frame?.built === true
   const firstWall = snapshot.building.walls[0]
   const firstExteriorCorner = firstWall.orientation === 'x'
     ? firstWallExteriorLowerLeft(firstWall) : firstWall.origin
@@ -330,15 +331,20 @@ export default function App() {
         <ErrorBoundary>
           <FloorPlanEditor plan={snapshot.building.floorPlan}
             onCommand={dispatch} onExport={exportJson}
-            onImport={() => document.getElementById('import-file')?.click()} />
+            onImport={() => document.getElementById('import-file')?.click()}
+            onFrameBuilt={() => setWorkspace('frame')} />
         </ErrorBoundary>
       ) : (
       <div className="main">
         <aside className="left-panel">
           <div style={{ fontSize: 11, padding: '8px 9px', border: '1px solid #d8e2ee',
             borderRadius: 7, background: '#edf5fc', color: '#3c647f', marginBottom: 12 }}>
-            Существующий 3D-каркас. Чертёж плана пока хранится отдельно;
-            автоматическое создание каркаса по плану — следующий этап.
+            {linkedFrame ? <>
+              Каркас наружных стен построен по плану. Размеры и проёмы редактируются в 2D.
+              <button type="button" className="plan-button plan-secondary" onClick={() => setWorkspace('plan')}>
+                Редактировать план
+              </button>
+            </> : 'Самостоятельный 3D-каркас. Связанный каркас можно построить из прямоугольника во вкладке «План 2D».'}
           </div>
           <h2 className="panel-title">Дерево проекта</h2>
           <ProjectTree
@@ -362,6 +368,7 @@ export default function App() {
               setSelectedOpeningId(null)
             }}
           />
+          {!linkedFrame && <>
           <h2 className="panel-title" style={{ marginTop: 16 }}>Стены</h2>
           <div className="param-group">
             <button type="button" className="param-input" style={{ cursor: 'pointer' }}
@@ -424,10 +431,13 @@ export default function App() {
             <label className="param-label">Сечение</label>
             <input type="text" className="param-input" value="45x145" readOnly />
           </div>
+          </>}
           <div className="param-group">
             <div>Количество элементов: {elements.length}</div>
             <div>Количество стен: {snapshot.building.walls.length}</div>
-            <div>Соединения: {wallLinks.length}</div>
+            {linkedFrame
+              ? <div>Наружные габариты: {Math.round(dimensions.overallXmm)} × {Math.round(dimensions.overallZmm)} мм</div>
+              : <div>Соединения: {wallLinks.length}</div>}
           </div>
           <div className="param-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -441,15 +451,15 @@ export default function App() {
             </label>
           </div>
 
-          <h2 className="panel-title" style={{ marginTop: 16 }}>Проёмы</h2>
-          <div className="param-group">
+          {(!linkedFrame || selectedOpening) && <h2 className="panel-title" style={{ marginTop: 16 }}>Проёмы</h2>}
+          {!linkedFrame && <div className="param-group">
             <button type="button" className="param-input" onClick={() => addOpening('window')} style={{ cursor: 'pointer' }}>Добавить окно</button>
             <button type="button" className="param-input" onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
             <button type="button" className="param-input" data-testid="add-garage-door"
               onClick={() => addOpening('garage-door')} style={{ cursor: 'pointer', marginTop: 6 }}>
               + Гаражные ворота
             </button>
-          </div>
+          </div>}
           {selectedOpening && (
             <div className="props">
               <h3 className="props-title">
@@ -457,6 +467,10 @@ export default function App() {
               </h3>
               <div>ID: {selectedOpening.id}</div>
               <div>Тип: {selectedOpening.type === 'garage-door' ? 'Гаражные секционные ворота' : selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
+              {linkedFrame ? <>
+                <div>Размер: {selectedOpening.widthMm} × {selectedOpening.heightMm} мм</div>
+                <div>От наружного угла: {selectedOpening.positionXmm + wall.sectionMm.height} мм</div>
+              </> : <>
               {selectedOpening.type === 'garage-door' && (
                 <div style={{ margin: '8px 0', fontSize: 12 }}>
                   <label className="param-label" htmlFor="garage-preset">Североамериканский размер</label>
@@ -507,15 +521,16 @@ export default function App() {
               <div style={{ marginTop: 8 }}>
                 <button type="button" className="param-input" onClick={() => deleteOpening(selectedOpening.id)} style={{ cursor: 'pointer' }}>Удалить {selectedOpening.type === 'garage-door' ? 'гаражные ворота' : selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
               </div>
+              </>}
             </div>
           )}
 
           <h2 className="panel-title" style={{ marginTop: 16 }}>Проект</h2>
           <div className="param-group" style={{ fontSize: 12 }} data-testid="first-wall-exterior-corner">
-            Нижний левый наружный угол стены 1:
+            {linkedFrame ? 'Начало первой панели:' : 'Нижний левый наружный угол стены 1:'}
             X={firstExteriorCorner.x}, Y={firstExteriorCorner.y}, Z={firstExteriorCorner.z} мм
           </div>
-          {!exteriorZeroAligned && (
+          {!linkedFrame && !exteriorZeroAligned && (
             <div className="param-group">
               <button type="button" data-testid="anchor-first-wall-to-zero"
                 className="param-input" style={{ cursor: 'pointer' }}
@@ -541,6 +556,7 @@ export default function App() {
             <div style={{ color: hasErrors ? '#cc0000' : '#006600', marginTop: 4 }}>
               Валидация: {validation?.valid ? 'OK' : 'ОШИБКИ'}
             </div>
+            {linkedFrame && <div>Инженерный расчёт: не выполнен</div>}
             {snapshot.building.openings.some(o => o.type === 'garage-door') && (
               <div style={{ color: '#a25a00', marginTop: 4 }}>
                 Гаражные ворота: расчёт несущей перемычки и пространственной жёсткости не выполнен.
@@ -575,7 +591,7 @@ export default function App() {
               openings={sceneOpenings} markers={markers} wallCount={snapshot.building.walls.length}
               dimensions={dimensions} showDimensions={showDimensions}
               selectedWindowId={selectedOpeningId}
-              onWindowDragStart={startOpeningDrag}
+              onWindowDragStart={linkedFrame ? () => false : startOpeningDrag}
               onWindowDragPreview={previewOpeningX}
               onWindowDragEnd={finishOpeningDrag}
               onWindowSelect={id => {

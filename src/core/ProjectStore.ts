@@ -1,5 +1,6 @@
 import type {
   ProjectDocument,
+  Opening,
   Wall,
   WallConnection,
   Vector3,
@@ -13,13 +14,18 @@ import { effectiveConnections, reflowConnections } from './wall-topology'
 import { addGraphPoint, addGraphSegment, splitGraphEdge, deleteGraphEdge,
   deleteGraphPoint, moveGraphPoint, changeGraphEdge, moveGraphEdge,
   moveGraphEdgeToDimension } from './plan-graph'
+import { FRAME_SECTION, MIN_FRAME_SIDE_MM, rectangularFrameSides } from './plan-frame'
 import { emptyFloorPlan, validateFloorPlan, moveInteriorWallWithDependents,
-  moveWallToClearance, type PlanPoint, type PlanInteriorWall } from './floor-plan'
+  moveWallToClearance, planBounds, PLAN_LIMIT_MM, type PlanPoint, type PlanInteriorWall } from './floor-plan'
 
 export type ProjectCommand =
   | { type: 'SET_PROJECT_NAME'; payload: { projectName: string } }
   | { type: 'PLAN_ADD_POINT'; payload: { point: PlanPoint } }
   | { type: 'PLAN_MOVE_POINT'; payload: { index: number; point: PlanPoint } }
+  | { type: 'PLAN_FRAME_SAVE_OPENING'; payload: { opening: Opening } }
+  | { type: 'PLAN_FRAME_REMOVE_OPENING'; payload: { openingId: string } }
+  | { type: 'PLAN_FRAME_BUILD'; payload: Record<string, never> }
+  | { type: 'PLAN_FRAME_RESIZE'; payload: { widthMm: number; depthMm: number } }
   | { type: 'PLAN_CLOSE'; payload: Record<string, never> }
   | { type: 'PLAN_REOPEN'; payload: Record<string, never> }
   | { type: 'PLAN_REMOVE_LAST'; payload: Record<string, never> }
@@ -274,6 +280,15 @@ export class ProjectStore {
     const candidate = this.deepClone(doc)
     const changedIds: string[] = []
 
+    const linked = doc.building.floorPlan?.frame?.built
+    if (linked && (command.type.startsWith('SET_WALL_') ||
+      command.type.startsWith('SET_OPENING_') ||
+      ['ADD_WALL', 'REMOVE_WALL', 'ANCHOR_FIRST_WALL_AT_ZERO', 'SET_STUD_SPACING',
+        'ADD_OPENING', 'REMOVE_OPENING', 'SET_WINDOW_SILL_HEIGHT', 'SET_MARKER_SETTINGS'].includes(command.type))) {
+      return { success: false, errorCode: 'FRAME_CONTROLLED_BY_PLAN',
+        messageRu: 'Стены и проёмы связанного каркаса редактируются в «Плане 2D»' }
+    }
+
     try {
       switch (command.type) {
         case 'PLAN_ADD_POINT': {
@@ -300,6 +315,46 @@ export class ProjectStore {
           changedIds.push('building.floorPlan.exterior[' + index + ']')
           break
         }
+        case 'PLAN_FRAME_SAVE_OPENING':
+        case 'PLAN_FRAME_REMOVE_OPENING':
+        case 'PLAN_FRAME_BUILD':
+        case 'PLAN_FRAME_RESIZE': {
+          const plan = candidate.building.floorPlan
+          if (!plan || !rectangularFrameSides(plan).length) {
+            return { success: false, errorCode: 'PLAN_FRAME_REQUIRES_RECTANGLE',
+              messageRu: 'Сначала замкните прямоугольный контур из четырёх углов' }
+          }
+          if (command.type === 'PLAN_FRAME_RESIZE') {
+            const { widthMm, depthMm } = command.payload
+            if (![widthMm, depthMm].every(mm => Number.isInteger(mm) && mm >= MIN_FRAME_SIDE_MM && mm <= PLAN_LIMIT_MM)) {
+              return { success: false, errorCode: 'INVALID_PLAN_DIMENSIONS',
+                messageRu: 'Наружные габариты должны быть от 0,38 до 100 м с точностью 1 мм' }
+            }
+            const { minX, minZ } = planBounds(plan.exterior)
+            plan.exterior = plan.exterior.map(point => ({
+              xMm: point.xMm === 0 ? 0 : minX === 0 ? widthMm : -widthMm,
+              zMm: point.zMm === 0 ? 0 : minZ === 0 ? depthMm : -depthMm,
+            }))
+            changedIds.push('building.floorPlan.exterior')
+            break
+          }
+
+          const frame = plan.frame ?? { built: false, openings: [] }
+          if (command.type === 'PLAN_FRAME_SAVE_OPENING') {
+            const opening = this.deepClone(command.payload.opening)
+            const index = frame.openings.findIndex(item => item.id === opening.id)
+            if (index < 0) frame.openings.push(opening)
+            else frame.openings[index] = opening
+          } else if (command.type === 'PLAN_FRAME_REMOVE_OPENING') {
+            frame.openings = frame.openings.filter(item => item.id !== command.payload.openingId)
+          } else {
+            frame.built = true
+          }
+          plan.exteriorThicknessMm ??= FRAME_SECTION.height
+          plan.frame = frame
+          changedIds.push('building.floorPlan.frame')
+          break
+        }
         case 'PLAN_CLOSE': {
           const plan = candidate.building.floorPlan
           if (!plan || plan.closed) return { success: false,
@@ -317,6 +372,11 @@ export class ProjectStore {
             messageRu: 'Контур уже разомкнут' }
           if (plan.interiorWalls.length || plan.graph?.nodes.length || plan.graph?.edges.length) return { success: false,
             errorCode: 'PLAN_HAS_INTERIOR', messageRu: 'Сначала удалите внутренние стены' }
+          if (plan.frame?.built || plan.frame?.openings.length) {
+            return { success: false, errorCode: 'PLAN_HAS_LINKED_FRAME',
+              messageRu: 'Габариты прямоугольника с проёмами меняются в разделе «Каркас по плану»' }
+          }
+          delete plan.frame
           plan.closed = false
           // An empty graph is only meaningful during a closed 2D plan.
           // Reopening removes it so legacy empty/open documents remain valid.
@@ -339,6 +399,10 @@ export class ProjectStore {
           if (plan?.interiorWalls.length || plan?.graph?.nodes.length || plan?.graph?.edges.length) return {
             success: false, errorCode: 'PLAN_HAS_INTERIOR',
             messageRu: 'Нельзя удалить план с внутренними стенами' }
+          if (plan?.frame?.built || plan?.frame?.openings.length) {
+            return { success: false, errorCode: 'PLAN_HAS_LINKED_FRAME',
+              messageRu: 'Очистка контура с проёмами или связанным каркасом недоступна' }
+          }
           candidate.building.floorPlan = emptyFloorPlan()
           changedIds.push('building.floorPlan')
           break
