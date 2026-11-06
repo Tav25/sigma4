@@ -4,6 +4,7 @@ import { createProjectFromCurrentState } from './project-store'
 import { graphView } from './plan-graph'
 import { buildHorizontalCut } from './horizontal-cut'
 import { projectToScene } from '../scene/project-to-scene'
+import { validateProject } from './frame-validator'
 import type { Opening } from './project'
 
 const p=(xMm:number,zMm:number)=>({xMm,zMm})
@@ -77,4 +78,15 @@ describe('SIGMA4: upper plate laps on screenshot 9x6 / 3x3.25 northwest room',()
       reproduce(false,false,style)
       reproduce(true,false,style)
     })
+  it('reports the exact member and coordinates for a real invalid board',()=>{
+    const doc=createProjectFromCurrentState({
+      projectId:'validator-diagnostics',length:6000,height:2700,spacing:600,openings:[],
+    })
+    const board=doc.assembly.elements.find(el=>el.elementId==='plate-bottom-1')!
+    board.position.x=-150
+    const issue=validateProject(doc).issues.find(i=>i.code==='ELEMENT_OUT_OF_WALL_BOUNDS')
+    expect(issue).toBeDefined()
+    expect(issue?.messageRu).toContain('plate-bottom-1')
+    expect(issue?.messageRu).toContain('допустимо от 0')
+  })
 })

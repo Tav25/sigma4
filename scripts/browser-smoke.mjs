@@ -785,6 +785,69 @@ try {
   assert.equal(direct.validation.valid, true)
   await page.screenshot({ path: dir + '/33-direct-openings-frame.png' })
 
+  // Screenshot regression: 9 x 6 metre house with a north-west 3 x 3.25 m
+  // room, through internal Z wall, left-facing T branch and door on the
+  // upper wall. Run it through the actual UI, not just the ProjectStore.
+  await page.reload({waitUntil:'networkidle'})
+  await page.getByTestId('plan-add-exact').click()
+  for(const length of ['9','6','9']){
+    await page.getByTestId('plan-length-input').fill(length)
+    await page.getByTestId('plan-add-exact').click()
+  }
+  await page.getByTestId('plan-close').click()
+  const clickNorthwest=async (xMm,zMm)=>{
+    const pos=await page.getByTestId('plan-canvas').evaluate((svg,p)=>{
+      const circle=i=>svg.querySelector('[data-testid="plan-point-'+i+'"] circle')
+      const a=circle(0),b=circle(1),c=circle(2)
+      if(!a||!b||!c)throw Error('Missing north-west perimeter nodes')
+      const x0=Number(a.getAttribute('cx')),y0=Number(a.getAttribute('cy'))
+      const dx=Number(b.getAttribute('cx'))-x0
+      const dy=Number(c.getAttribute('cy'))-y0
+      const point=new DOMPoint(x0+dx*p.xMm/9000,y0+dy*(-p.zMm)/6000)
+        .matrixTransform(svg.getScreenCTM())
+      return {x:point.x,y:point.y}
+    },{xMm,zMm})
+    await page.mouse.click(pos.x,pos.y)
+  }
+  await page.getByTestId('plan-toolbar-wall').click()
+  await clickNorthwest(3000,-6000)
+  await clickNorthwest(3000,0)
+  await page.keyboard.press('Enter')
+  await clickNorthwest(0,-3250)
+  await clickNorthwest(3000,-3250)
+  await page.keyboard.press('Enter')
+  assert.equal((await page.getByTestId('plan-wall-count').textContent()).trim(),'3')
+  const nwDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const nwDoc=JSON.parse(await readFile(await (await nwDownload).path(),'utf8'))
+  const nodes=nwDoc.building.floorPlan.graph.nodes
+  const topEdge=nwDoc.building.floorPlan.graph.edges.find(edge=>{
+    const a=nodes.find(n=>n.id===edge.a),b=nodes.find(n=>n.id===edge.b)
+    return a.xMm===3000 && b.xMm===3000 && Math.min(a.zMm,b.zMm)===-6000
+  })
+  assert.ok(topEdge,'Must split north-south wall at the 3.25m T node')
+  await page.getByTestId('plan-frame-enable-partitions').click()
+  await page.getByTestId('plan-manual-openings').click()
+  await page.getByTestId('plan-frame-add-opening').click()
+  await page.getByTestId('plan-frame-opening-wall').selectOption('partition-'+topEdge.id)
+  await page.getByTestId('plan-frame-opening-positionUmm').fill('1500')
+  await page.getByTestId('plan-frame-save-opening').click()
+  await page.getByTestId('plan-frame-opening-D01').waitFor()
+  await page.getByTestId('plan-frame-build').click()
+  await page.getByText('Количество стен: 7',{exact:true}).waitFor()
+  await page.getByTestId('frame-section-toggle').click()
+  await page.getByTestId('frame-section-height').fill('2680')
+  assert.ok(await page.locator('[data-element-id*=":plate-top-2"]').count()>=7)
+  await page.screenshot({path:dir+'/36-northwest-9x6-tee-door-lapped-caps.png'})
+  await page.getByTestId('tab-plan').click()
+  const nwBuiltDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const nwBuilt=JSON.parse(await readFile(await (await nwBuiltDownload).path(),'utf8'))
+  assert.equal(nwBuilt.validation.valid,true)
+  assert.equal(nwBuilt.building.walls.length,7)
+  assert.equal(nwBuilt.building.floorPlan.frame.openings.length,1)
+
+
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
   mobile.on('pageerror', error => errors.push(error.message))
   await mobile.goto(base, { waitUntil: 'networkidle' })
@@ -802,7 +865,7 @@ try {
   await mobile.screenshot({ path: dir + '/34-direct-openings-touch.png' })
   await mobile.close()
   assert.deepEqual(errors, [], 'Browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  console.log('SIGMA4 BROWSER PASS: northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()

@@ -414,7 +414,12 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
       const maxAllowed = wall.lengthMm +
         (interiorLap ? maxHostDepth : planLap ? wall.sectionMm.height : 0)
       if (minX < minAllowed - 0.001 || maxX > maxAllowed + 0.001) {
-        issues.push(createIssue('ELEMENT_OUT_OF_WALL_BOUNDS', 'error', `assembly.elements[id=${el.elementId}]`, 'Элемент выходит за границы стены по X', [el.elementId, el.wallId]))
+        issues.push(createIssue('ELEMENT_OUT_OF_WALL_BOUNDS', 'error',
+          `assembly.elements[id=${el.elementId}]`,
+          `Элемент выходит за границы стены по X: ${el.elementId} (${el.wallId}); ` +
+          `от ${Number(minX.toFixed(2))} до ${Number(maxX.toFixed(2))} мм, ` +
+          `допустимо от ${Number(minAllowed.toFixed(2))} до ${Number(maxAllowed.toFixed(2))} мм`,
+          [el.elementId, el.wallId]))
       }
       if (minY < 0 || maxY > wall.heightMm) {
         issues.push(createIssue('ELEMENT_OUT_OF_WALL_HEIGHT', 'error', `assembly.elements[id=${el.elementId}]`, 'Элемент выходит за границы стены по Y', [el.elementId, el.wallId]))
