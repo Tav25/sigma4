@@ -980,6 +980,9 @@ try {
   await page.getByTestId('plan-frame-opening-D02').waitFor()
   await page.getByTestId('plan-frame-build').click()
   await page.getByText('Количество стен: 6',{exact:true}).waitFor()
+  // On an already-built frame this button opens the 3D tab, so return
+  // to the plan before requesting its JSON download.
+  await page.getByTestId('tab-plan').click()
   const s19Download=page.waitForEvent('download')
   await page.getByTestId('plan-export').click()
   const s19=JSON.parse(await readFile(await (await s19Download).path(),'utf8'))
