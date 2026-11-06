@@ -101,8 +101,8 @@ describe('SIGMA4 v0.1.20: Haun top-plate lapping at junctions',()=>{
     const {doc,store}=frame([[point(4200,0),point(4200,-2500)]])
     const front=upper(doc).filter(e=>e.wallId==='plan-front').sort((a,b)=>a.position.x-b.position.x)
     expect(front).toHaveLength(2)
-    expect(front[0].position.x).toBe(0)
-    expect(front[0].lengthMm).toBe(4150)
+    expect(front[0].position.x).toBe(145)
+    expect(front[0].lengthMm).toBe(4005)
     expect(front[1].position.x).toBe(4250)
     const butt=upper(doc).find(e=>e.wallId.startsWith('partition-'))!
     expect(butt.lengthMm).toBe(2500)

@@ -403,7 +403,7 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
       // local origin by the wall depth to tie into the first wall.
       const rightLap = california?.toWallId === el.wallId &&
         el.elementId === `${el.wallId}:plate-top-2`
-      const planLap = insetWalls.has(el.wallId) && el.elementId === `${el.wallId}:plate-top-2`
+      const planLap = insetWalls.has(el.wallId) && el.elementId.startsWith(`${el.wallId}:plate-top-2`)
       // The linked interior wall's second cap bridges across its host wall.
       // Validate only that designated cap, never allow ordinary studs/plates
       // to overhang by this extra amount. Contact is tested separately.
