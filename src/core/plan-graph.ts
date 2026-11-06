@@ -195,6 +195,28 @@ export function changeGraphEdge(
   edge.thicknessMm=thicknessMm
   return next
 }
+/** Extend or shorten one canonical wall without reassigning shared node IDs. */
+export function resizePlanWallLength(
+  plan:FloorPlan,id:string,lengthMm:number,fixedEnd:'start'|'end',
+):FloorPlan {
+  if(!Number.isInteger(lengthMm)||lengthMm<MIN_PLAN_EDGE_MM||lengthMm>PLAN_LIMIT_MM)
+    throw Error('Длина стены должна быть от 0,30 до 100 м с точностью 1 мм')
+  if(fixedEnd!=='start'&&fixedEnd!=='end')throw Error('Выберите неподвижный конец стены')
+  const wall=graphView(plan).interiorWalls.find(w=>w.id===id)
+  if(!wall)throw Error('Стена не найдена')
+  const vertical=wall.start.xMm===wall.end.xMm
+  const horizontal=wall.start.zMm===wall.end.zMm
+  if(vertical===horizontal)throw Error('Редактировать длину можно только у прямой стены')
+  const start={...wall.start},end={...wall.end}
+  const axis=vertical?'zMm':'xMm'
+  const direction=Math.sign(end[axis]-start[axis])
+  if(fixedEnd==='start')end[axis]=start[axis]+direction*lengthMm
+  else start[axis]=end[axis]-direction*lengthMm
+  if(!within(start)||!within(end))throw Error('Новая длина выводит стену за пределы 100 м')
+  if(plan.graph)return changeGraphEdge(plan,id,start,end,wall.thicknessMm)
+  return {...plan,interiorWalls:plan.interiorWalls.map(w=>
+    w.id===id?{...w,start,end}:w)}
+}
 export function moveGraphEdge(plan:FloorPlan,id:string,offsetMm:number):FloorPlan {
   if(!Number.isInteger(offsetMm))throw Error('Смещение должно быть целым числом миллиметров')
   const next=ensureWallGraph(plan),g=graphOf(next)

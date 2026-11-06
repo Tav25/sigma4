@@ -7,7 +7,8 @@ import {
   DEFAULT_EXTERIOR_THICKNESS_MM,
   type FloorPlan, type PlanPoint, type PlanInteriorWall,
 } from '../core/floor-plan'
-import { addGraphPoint, addGraphSegment, graphView, moveGraphEdge, moveGraphEdgeToDimension, moveGraphPoint } from '../core/plan-graph'
+import { addGraphPoint, addGraphSegment, graphView, moveGraphEdge, moveGraphEdgeToDimension, moveGraphPoint, resizePlanWallLength } from '../core/plan-graph'
+import { preservePlanOpeningAttachments } from '../core/plan-attachment-constraints'
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
 import { planSidePoint, planFrameOpeningSides, planSideLength, validatePlanFrame, type PlanFrameSide } from '../core/plan-frame'
 import { sideOffset } from '../core/partition-layout'
@@ -17,6 +18,7 @@ import { OpeningCut, PlanOpeningDimensions, PlanOpeningSymbol, closestPointOnSid
 import { PlanOpeningInspector, PlanWallActions, PlanWallSelection } from './PlanSelection'
 import { PlanFrameControls, type PlanFramePick } from './PlanFrameControls'
 
+const preciseMetres = (mm:number) => (mm/1000).toFixed(3).replace('.', ',')
 const EMPTY_PLAN = emptyFloorPlan()
 const WIDTH = 1200
 const HEIGHT = 760
@@ -67,6 +69,8 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
   const [interiorThickness, setInteriorThickness] = useState('100')
   const [selectedInteriorId, setSelectedInteriorId] = useState<string | null>(null)
   const [interiorEdit, setInteriorEdit] = useState({ sx: '', sz: '', ex: '', ez: '', thickness: '100' })
+  const [wallLengthDraft, setWallLengthDraft] = useState('')
+  const [lengthFixedEnd, setLengthFixedEnd] = useState<'start'|'end'>('start')
   const [dimensionEdit, setDimensionEdit] = useState<{side:'negative'|'positive';value:string}|null>(null)
   const [outerWidthDraft, setOuterWidthDraft] = useState(String(plan.exteriorThicknessMm ?? DEFAULT_EXTERIOR_THICKNESS_MM))
   const [wallPreview, setWallPreview] = useState<FloorPlan | null>(null)
@@ -91,7 +95,7 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
     [wallPreview, frameSides])
   const { selectedWall, selectedOpening, placement, placementWall, preview, wallPick } = openingTools
   const openingInputActive = tool === 'select' || tool === 'frame'
-  const shownOpenings = openingTools.openings.map(opening => opening.id === preview?.opening.id
+  const shownOpenings = (wallPreview?.frame?.openings ?? openingTools.openings).map(opening => opening.id === preview?.opening.id
     ? { ...opening, positionUmm: preview.error ? openingTools.lastValidPosition ?? opening.positionUmm : preview.opening.positionUmm }
     : opening)
   const openingCuts = preview && !preview.error && placement ? [...shownOpenings, preview.opening] : shownOpenings
@@ -329,9 +333,11 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
     setSelectedGraphNodeId(null)
     setDimensionEdit(null)
     setSelectedIndex(null)
+    setLengthFixedEnd('start')
+    setWallLengthDraft(preciseMetres(planDistanceMm(wall.start,wall.end)))
     setInteriorEdit({
-      sx: meters(wall.start.xMm), sz: meters(wall.start.zMm),
-      ex: meters(wall.end.xMm), ez: meters(wall.end.zMm),
+      sx: preciseMetres(wall.start.xMm), sz: preciseMetres(wall.start.zMm),
+      ex: preciseMetres(wall.end.xMm), ez: preciseMetres(wall.end.zMm),
       thickness: String(wall.thicknessMm),
     })
   }
@@ -379,6 +385,36 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
     wallPointer.current={id:wall.id,pointerId:event.pointerId,startX:pos.x,
       startY:pos.y,offsetMm:0,moved:false,candidate:null}
     root.setPointerCapture(event.pointerId)
+  }
+  const saveWallLength = () => {
+    if (!selectedInterior) return
+    const lengthMm = decimalMetersToMm(wallLengthDraft)
+    if (lengthMm === null) {
+      setLocalError('Введите длину от 0,30 до 100 м с точностью 1 мм')
+      return
+    }
+    if (lengthMm === planDistanceMm(selectedInterior.start,selectedInterior.end)) {
+      setLocalError('')
+      return
+    }
+    let changed: PlanInteriorWall | undefined
+    try {
+      const candidate=resizePlanWallLength(plan,selectedInterior.id,lengthMm,lengthFixedEnd)
+      changed=graphView(candidate).interiorWalls.find(w=>w.id===selectedInterior.id)
+    } catch (error) {
+      setLocalError(error instanceof Error?error.message:'Неверная длина стены')
+      return
+    }
+    if (apply({type:'PLAN_SET_INTERIOR_LENGTH',payload:{
+      id:selectedInterior.id,lengthMm,fixedEnd:lengthFixedEnd,
+    }})) {
+      setWallLengthDraft(preciseMetres(lengthMm))
+      if(changed)setInteriorEdit({
+        sx:preciseMetres(changed.start.xMm),sz:preciseMetres(changed.start.zMm),
+        ex:preciseMetres(changed.end.xMm),ez:preciseMetres(changed.end.zMm),
+        thickness:String(changed.thicknessMm),
+      })
+    }
   }
   const updateInteriorWall = () => {
     if (!selectedInterior) return
@@ -560,7 +596,8 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
         zMm:Math.round((old.zMm+dy/px*1000)/snapMm)*snapMm,
       }
       try{
-        const candidate=moveGraphPoint(plan,nodeMoving.id,nextPoint)
+        const candidate=preservePlanOpeningAttachments(plan,
+          moveGraphPoint(plan,nodeMoving.id,nextPoint),'geometry')
         const errors=validateFloorPlan(candidate)
         if(errors.length)throw Error(errors[0])
         nodeMoving.candidate=candidate;nodeMoving.point=nextPoint
@@ -585,8 +622,9 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
       const offsetMm=Math.round(raw / snapMm) * snapMm
       let candidate:FloorPlan|null=null
       try{
-        candidate=plan.graph?moveGraphEdge(plan,moving.id,offsetMm)
+        const moved=plan.graph?moveGraphEdge(plan,moving.id,offsetMm)
           :moveInteriorWallWithDependents(plan,moving.id,offsetMm)
+        candidate=moved?preservePlanOpeningAttachments(plan,moved,'geometry'):null
       }catch{candidate=null}
       const errors=candidate ? validateFloorPlan(candidate) : ['Неверное перемещение']
       if (!candidate || errors.length) {
@@ -912,7 +950,24 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
                     onChange={e => setInteriorEdit(prev => ({...prev, [key]: e.target.value}))} />
                 </label>
               )}
-              <p className="plan-guidance">Длина: {meters(planDistanceMm(selectedInterior.start, selectedInterior.end))} м</p>
+              <div className="plan-length-editor" data-testid="plan-length-editor">
+                <strong>Изменить длину стены</strong>
+                <label>Длина, м
+                  <input type="text" data-testid="plan-length-value" value={wallLengthDraft}
+                    onChange={event => setWallLengthDraft(event.target.value)} />
+                </label>
+                <label>Неподвижный конец
+                  <select data-testid="plan-length-anchor" value={lengthFixedEnd}
+                    onChange={event => setLengthFixedEnd(event.target.value as 'start'|'end')}>
+                    <option value="start">Начало</option>
+                    <option value="end">Конец</option>
+                  </select>
+                </label>
+                <button className="plan-button plan-secondary" type="button"
+                  data-testid="plan-save-length" onClick={saveWallLength}>Применить длину</button>
+                <p className="plan-muted">Общие узлы сохраняются. Разрывы соединений и конфликты с проёмами блокируются.</p>
+              </div>
+              <p className="plan-guidance">Текущая длина: {preciseMetres(planDistanceMm(selectedInterior.start, selectedInterior.end))} м</p>
               <button className="plan-button plan-primary" data-testid="plan-save-interior"
                 type="button" onClick={updateInteriorWall}>Применить координаты</button>
               <button className="plan-button plan-text" data-testid="plan-remove-interior"

@@ -16,7 +16,7 @@ import {
 import { effectiveConnections, reflowConnections } from './wall-topology'
 import { addGraphPoint, addGraphSegment, splitGraphEdge, deleteGraphEdge,
   deleteGraphPoint, moveGraphPoint, changeGraphEdge, moveGraphEdge,
-  moveGraphEdgeToDimension } from './plan-graph'
+  moveGraphEdgeToDimension, resizePlanWallLength } from './plan-graph'
 import { FRAME_SECTION, MIN_FRAME_SIDE_MM, rectangularFrameSides, withPlanOpening } from './plan-frame'
 import { emptyFloorPlan, validateFloorPlan, moveInteriorWallWithDependents,
   moveWallToClearance, PLAN_LIMIT_MM, type PlanPoint, type PlanInteriorWall } from './floor-plan'
@@ -37,6 +37,7 @@ export type ProjectCommand =
   | { type: 'PLAN_CLEAR'; payload: Record<string, never> }
   | { type: 'PLAN_ADD_INTERIOR_WALL'; payload: { wall: PlanInteriorWall } }
   | { type: 'PLAN_UPDATE_INTERIOR_WALL'; payload: { id: string; start: PlanPoint; end: PlanPoint; thicknessMm: number } }
+  | { type: 'PLAN_SET_INTERIOR_LENGTH'; payload: { id: string; lengthMm: number; fixedEnd: 'start' | 'end' } }
   | { type: 'PLAN_REMOVE_INTERIOR_WALL'; payload: { id: string } }
   | { type: 'PLAN_MOVE_INTERIOR_WALL'; payload: { id: string; offsetMm: number } }
   | { type: 'PLAN_SET_INTERIOR_CLEARANCE'; payload: { id: string; side: 'negative' | 'positive'; distanceMm: number } }
@@ -496,6 +497,20 @@ export class ProjectStore {
           const errors = validateFloorPlan(candidate.building.floorPlan!)
           if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_WALL', messageRu: errors[0] }
           changedIds.push('building.floorPlan.interiorWalls', 'building.floorPlan.frame')
+          break
+        }
+        case 'PLAN_SET_INTERIOR_LENGTH': {
+          const source = candidate.building.floorPlan
+          if (!source?.closed) return { success: false, errorCode: 'PLAN_NOT_CLOSED',
+            messageRu: 'Сначала замкните наружный периметр' }
+          const updated = resizePlanWallLength(source, command.payload.id,
+            command.payload.lengthMm, command.payload.fixedEnd)
+          const preserved = preservePlanOpeningAttachments(source, updated, 'geometry')
+          const errors = validateFloorPlan(preserved)
+          if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_LENGTH',
+            messageRu: errors[0] }
+          candidate.building.floorPlan = preserved
+          changedIds.push('building.floorPlan.graph', 'building.floorPlan.frame')
           break
         }
         case 'PLAN_UPDATE_INTERIOR_WALL': {

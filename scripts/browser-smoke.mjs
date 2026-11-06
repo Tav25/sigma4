@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.27')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.28')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -481,6 +481,30 @@ try {
   await page.getByTestId('plan-tool-erase').click()
   await clickGarage(1000,-2000)
   assert.equal((await page.getByTestId('plan-wall-count').textContent())?.trim(),'2')
+
+  // 0.1.28: change length of a free end, retaining the T-connected fixed endpoint.
+  await page.getByTestId('plan-tool-select').click()
+  await clickGarage(3500,-2000)
+  await page.getByTestId('plan-length-editor').waitFor()
+  await page.getByTestId('plan-length-anchor').selectOption('end')
+  await page.getByTestId('plan-length-value').fill('3,200')
+  await page.getByTestId('plan-save-length').click()
+  const lengthDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const afterLength=JSON.parse(await readFile(await (await lengthDownload).path(),'utf8'))
+  const lengthNodes=afterLength.building.floorPlan.graph.nodes
+  const lengthWalls=afterLength.building.floorPlan.graph.edges.map(edge=>[
+    lengthNodes.find(n=>n.id===edge.a),lengthNodes.find(n=>n.id===edge.b),
+  ])
+  assert.ok(lengthWalls.some(([a,b])=>
+    a.xMm===2000&&b.xMm===5200&&a.zMm===-2000&&b.zMm===-2000))
+  await page.screenshot({path:dir+'/41-wall-length-fixed-T-anchor.png'})
+  await page.keyboard.press('Control+z')
+  const undoLengthDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const undoLength=JSON.parse(await readFile(await (await undoLengthDownload).path(),'utf8'))
+  assert.ok(undoLength.building.floorPlan.graph.nodes.some(n=>n.xMm===2300&&n.zMm===-2000))
+  await page.keyboard.press('Control+y')
 
   // Delete isolated point without touching connected wall nodes.
   await page.getByTestId('plan-tool-select').click()
