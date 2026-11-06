@@ -153,12 +153,10 @@ export function validateTopPlateLaps(doc:ProjectDocument):ValidationIssue[] {
     const contacts=new Set<string>()
     let disconnected=false
     for(const branchCaps of incoming){
-      const connected=branchCaps.some(branch=>hostCaps.some(cap=>{
-        if(!boxesFaceContact(branch,cap))return false
-        contacts.add(cap.id)
-        return true
-      }))
-      if(!connected)disconnected=true
+      const touching=hostCaps.filter(cap=>branchCaps.some(branch=>
+        boxesFaceContact(branch,cap)))
+      for(const cap of touching)contacts.add(cap.id)
+      if(!touching.length)disconnected=true
     }
     const u=centreU(host,joint.point)
     const inside=u>radius/3&&u<host.lengthMm-radius/3
