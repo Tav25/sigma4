@@ -820,9 +820,9 @@ try {
   const nwDownload=page.waitForEvent('download')
   await page.getByTestId('plan-export').click()
   const nwDoc=JSON.parse(await readFile(await (await nwDownload).path(),'utf8'))
-  const nodes=nwDoc.building.floorPlan.graph.nodes
+  const nwNodes=nwDoc.building.floorPlan.graph.nodes
   const topEdge=nwDoc.building.floorPlan.graph.edges.find(edge=>{
-    const a=nodes.find(n=>n.id===edge.a),b=nodes.find(n=>n.id===edge.b)
+    const a=nwNodes.find(n=>n.id===edge.a),b=nwNodes.find(n=>n.id===edge.b)
     return a.xMm===3000 && b.xMm===3000 && Math.min(a.zMm,b.zMm)===-6000
   })
   assert.ok(topEdge,'Must split north-south wall at the 3.25m T node')
