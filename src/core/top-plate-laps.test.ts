@@ -138,7 +138,7 @@ describe('SIGMA4 v0.1.20: Haun top-plate lapping at junctions',()=>{
     expect(ids).toHaveLength(3)
     const transverse=doc.building.walls.find(w=>w.orientation==='z'&&ids.includes(w.wallId))!
     const transverseCap=upper(doc).find(e=>e.wallId===transverse.wallId)!
-    expect(transverseCap.lengthMm).toBe(transverse.lengthMm+100)
+    expect(transverseCap.lengthMm).toBe(transverse.lengthMm+145+100)
     assertNoUpperCollisions(doc)
     assertRealUpperJoin(doc)
   })
@@ -154,7 +154,7 @@ describe('SIGMA4 v0.1.20: Haun top-plate lapping at junctions',()=>{
     const verticals=doc.building.walls.filter(w=>w.wallId.startsWith('partition-')&&w.orientation==='z')
     for(const wall of verticals) {
       const cap=caps.find(el=>el.wallId===wall.wallId)!
-      expect(cap.lengthMm).toBe(wall.lengthMm+50)
+      expect(cap.lengthMm).toBe(wall.lengthMm+145+50)
     }
   })
 })
