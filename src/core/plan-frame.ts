@@ -161,7 +161,17 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
           (other.start.zMm === other.end.zMm) === (host.start.zMm === host.end.zMm) &&
           ((other.start.xMm === p.xMm && other.start.zMm === p.zMm) ||
            (other.end.xMm === p.xMm && other.end.zMm === p.zMm)))
-      if (!isCollinearContinuation &&
+      const samePoint=(a:PlanPoint,b:PlanPoint)=>a.xMm===b.xMm&&a.zMm===b.zMm
+      const terminalArms=partitions.filter(member=>
+        samePoint(member.start,p)||samePoint(member.end,p))
+      const isInteriorLCorner=!exteriorHost &&
+        (positionUmm===0||positionUmm===hostLength) &&
+        terminalArms.length===2 &&
+        terminalArms.some(member=>member.wallId===host.wallId) &&
+        terminalArms.some(member=>member.wallId===partition.wallId) &&
+        terminalArms[0].start.zMm===terminalArms[0].end.zMm !==
+          (terminalArms[1].start.zMm===terminalArms[1].end.zMm)
+      if (!isCollinearContinuation && !isInteriorLCorner &&
         (positionUmm < reserve || positionUmm > hostLength - reserve)) {
         fail(partition.label + ': примыкание слишком близко к углу', [partition.wallId, host.wallId])
       }
