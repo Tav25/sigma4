@@ -95,7 +95,9 @@ describe('frame from a rectangular plan', () => {
     expect(store.dispatch({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening: door } }).success).toBe(true)
     expect(store.dispatch({ type: 'PLAN_FRAME_BUILD', payload: {} }).success).toBe(true)
     const initial = store.getSnapshot()
-    expect(initial.building.walls.slice(4).map(wall => wall.lengthMm)).toEqual([3905, 2805])
+    // At an L, the X through-wall now ends at its centre line instead of
+    // artificially extending another 50 mm through the Z butt arm.
+    expect(initial.building.walls.slice(4).map(wall => wall.lengthMm)).toEqual([3855, 2805])
     expect(planWallClearances(initial.building.floorPlan!, 'I002')?.negative?.distanceMm).toBe(3805)
     const initialElements = projectToScene(initial).elements
     const doorHead = calculateWorldBounds(initialElements.filter(element => element.id === 'partition-I001:D01-header'))

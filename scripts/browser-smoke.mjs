@@ -1011,6 +1011,69 @@ try {
 
   await page.screenshot({path:dir+'/41-haun-physical-through-2doors-3stud-channel.png'})
 
+  // v0.1.27: browser integration of a genuine four-arm X in a new garage.
+  // The drawn graph keeps four independently editable arms, while the
+  // physical framing builds ONE X-through and TWO Z-butt wall modules.
+  await page.reload({waitUntil:'networkidle'})
+  await page.getByTestId('plan-add-exact').click()
+  for(const length of ['10','7','10']){
+    await page.getByTestId('plan-length-input').fill(length)
+    await page.getByTestId('plan-add-exact').click()
+  }
+  await page.getByTestId('plan-close').click()
+  const crossClick=async (xMm,zMm)=>{
+    const point=await page.getByTestId('plan-canvas').evaluate((svg,p)=>{
+      const circle=i=>svg.querySelector('[data-testid="plan-point-'+i+'"] circle')
+      const a=circle(0),b=circle(1),c=circle(2)
+      if(!a||!b||!c)throw Error('Missing perimeter points for 10x7 X plan')
+      const x0=Number(a.getAttribute('cx')),y0=Number(a.getAttribute('cy'))
+      const dx=Number(b.getAttribute('cx'))-x0
+      const dy=Number(c.getAttribute('cy'))-y0
+      const q=new DOMPoint(x0+dx*p.xMm/10000,y0+dy*(-p.zMm)/7000)
+        .matrixTransform(svg.getScreenCTM())
+      return {x:q.x,y:q.y}
+    },{xMm,zMm})
+    await page.mouse.click(point.x,point.y)
+  }
+  await page.getByTestId('plan-toolbar-wall').click()
+  await crossClick(0,-3000)
+  await crossClick(10000,-3000)
+  await page.keyboard.press('Enter')
+  await crossClick(4000,0)
+  await crossClick(4000,-7000)
+  await page.keyboard.press('Enter')
+  assert.equal((await page.getByTestId('plan-wall-count').textContent()).trim(),'4')
+  await page.getByTestId('plan-frame-enable-partitions').click()
+  await page.getByTestId('plan-frame-build').click()
+  await page.getByText('Количество стен: 7',{exact:true}).waitFor()
+  await page.getByTestId('frame-section-toggle').click()
+  await page.getByTestId('frame-section-height').fill('1200')
+  await page.screenshot({path:dir+'/42-stage21-X-four-member-receiver-cut-1200.png'})
+  await page.getByTestId('frame-section-height').fill('2680')
+  await page.screenshot({path:dir+'/43-stage21-X-two-course-overlap-cut-2680.png'})
+  await page.getByTestId('tab-plan').click()
+  const crossDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const crossDoc=JSON.parse(await readFile(await (await crossDownload).path(),'utf8'))
+  assert.equal(crossDoc.building.floorPlan.graph.edges.length,4)
+  assert.equal(crossDoc.building.walls.length,7)
+  assert.equal(crossDoc.validation.valid,true)
+  assert.equal(crossDoc.validation.engineeringStatus,'not_evaluated')
+  assert.equal(crossDoc.validation.issues.filter(i=>
+    i.severity==='error' && (i.code.startsWith('HAUN_') ||
+      i.code.startsWith('STRUCTURAL_'))).length,0)
+  const xParts=crossDoc.assembly.elements.filter(e=>
+    e.elementId.includes(':cross-backing-'))
+  assert.equal(xParts.length,4)
+  const xWall=crossDoc.building.walls.find(w=>w.wallId===xParts[0].wallId)
+  assert.equal(xWall.orientation,'x')
+  assert.equal(xWall.lengthMm,9710)
+  assert.equal(crossDoc.assembly.elements.filter(e=>
+    e.elementId===xWall.wallId+':plate-top-1').length,1)
+  assert.equal(crossDoc.assembly.elements.filter(e=>
+    e.wallId===xWall.wallId && e.elementId.includes(':plate-top-2')).length,2)
+
+
 
   console.log('SIGMA4 BROWSER PASS: v0.1.27 all straight/L/T/X joinery; v0.1.26 unified door framing with distinct nonbearing and bearing profiles; v0.1.25 continuous through-wall, two doors and internal T channel; v0.1.24 structural contact/overlap/support validation; v0.1.23 boundary-bound nodes and preserved openings on rectangle resize; v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
