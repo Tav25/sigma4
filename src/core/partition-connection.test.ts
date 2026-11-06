@@ -129,7 +129,7 @@ describe('SIGMA4 exterior-to-interior stud receiver (top view)', () => {
     const vertical = sides.filter(side=>side.start.xMm===4000 && side.end.xMm===4000)
     expect(vertical).toHaveLength(2)
     expect(vertical.every(side=>(side.start.zMm===-3000?side.insetMm:side.endInsetMm)===50)).toBe(true)
-    const horizontal=sides.filter(side=>side.start.zMm===-3000)
+    const horizontal=sides.filter(side=>side.start.zMm===-3000 && side.end.zMm===-3000)
     expect(horizontal).toHaveLength(2)
     expect(horizontal.every(side=>(side.start.xMm===4000?side.insetMm:side.endInsetMm)===0)).toBe(true)
     expect(doc.validation.valid).toBe(true)
