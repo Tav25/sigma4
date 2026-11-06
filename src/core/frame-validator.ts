@@ -9,7 +9,7 @@ import { effectiveConnections, validateWallTopology } from './wall-topology'
 import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
 import { wallMidplaneOrigin } from './world-origin'
 import { validateFloorPlan } from './floor-plan'
-import { projectPlanFrame, validatePlanFrame } from './plan-frame'
+import { perimeterCorners, projectPlanFrame, validatePlanFrame } from './plan-frame'
 
 const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0', '1.1.0']
 const SUPPORTED_RULESET_VERSIONS = ['1.0.0']
@@ -361,6 +361,8 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
     }
   })
 
+  const insetWalls = new Set(building.floorPlan?.frame?.built
+    ? perimeterCorners(building.walls).map(corner => corner.inset.wallId) : [])
   const elementIds = new Set<string>()
   assembly.elements.forEach(el => {
     if (elementIds.has(el.elementId)) {
@@ -400,9 +402,10 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
       // local origin by the wall depth to tie into the first wall.
       const rightLap = california?.toWallId === el.wallId &&
         el.elementId === `${el.wallId}:plate-top-2`
-      const planLap = building.floorPlan?.frame?.built && el.elementId === `${el.wallId}:plate-top-2`
+      const planLap = insetWalls.has(el.wallId) && el.elementId === `${el.wallId}:plate-top-2`
       const minAllowed = rightLap || planLap ? -wall.sectionMm.height : 0
-      if (minX < minAllowed - 0.001 || maxX > wall.lengthMm + 0.001) {
+      const maxAllowed = wall.lengthMm + (planLap ? wall.sectionMm.height : 0)
+      if (minX < minAllowed - 0.001 || maxX > maxAllowed + 0.001) {
         issues.push(createIssue('ELEMENT_OUT_OF_WALL_BOUNDS', 'error', `assembly.elements[id=${el.elementId}]`, 'Элемент выходит за границы стены по X', [el.elementId, el.wallId]))
       }
       if (minY < 0 || maxY > wall.heightMm) {

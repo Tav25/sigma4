@@ -38,6 +38,7 @@ describe('frame from a rectangular plan', () => {
     const assertFrame = (width: number) => {
       const doc = store.getSnapshot()
       expect(doc.building.walls.map(wall => wall.wallId)).toEqual(['plan-front', 'plan-right', 'plan-back', 'plan-left'])
+      expect(doc.building.walls.map(wall => wall.lengthMm)).toEqual([width, 6710, width, 6710])
       expect(doc.validation.valid).toBe(true)
       const scene = projectToScene(doc)
       const dimensions = buildDimensionLayout(doc.building.walls, scene.elements)
@@ -66,6 +67,17 @@ describe('frame from a rectangular plan', () => {
     assertFrame(11000)
   })
 
+  it('uses the Z pair as through walls when the depth is greater', () => {
+    const store = garage()
+    expect(store.dispatch({ type: 'PLAN_FRAME_RESIZE', payload: { widthMm: 7000, depthMm: 10000 } }).success).toBe(true)
+    expect(store.dispatch({ type: 'PLAN_FRAME_BUILD', payload: {} }).success).toBe(true)
+    const doc = store.getSnapshot()
+    expect(doc.building.walls.map(wall => wall.lengthMm)).toEqual([6710, 10000, 6710, 10000])
+    const bounds = calculateWorldBounds(projectToScene(doc).elements)
+    expect(bounds.max.x - bounds.min.x).toBeCloseTo(7, 6)
+    expect(bounds.max.z - bounds.min.z).toBeCloseTo(10, 6)
+  })
+
   it('rejects a resize that cuts through a saved opening and identifies it', () => {
     const store = garage()
     expect(store.dispatch({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening: openings[2] } }).success).toBe(true)
@@ -77,21 +89,36 @@ describe('frame from a rectangular plan', () => {
     expect(store.exportJson()).toBe(before)
   })
 
-  it('fits the rotated framing at all four corners without colliding boards', () => {
+  it.each([true, false])('fits four corners without colliding boards (through walls on X: %s)', throughAlongX => {
     const store = garage()
+    if (!throughAlongX) {
+      expect(store.dispatch({ type: 'PLAN_FRAME_RESIZE', payload: { widthMm: 7000, depthMm: 10000 } }).success).toBe(true)
+    }
     for (const opening of openings) {
       expect(store.dispatch({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening } }).success).toBe(true)
     }
     expect(store.dispatch({ type: 'PLAN_FRAME_BUILD', payload: {} }).success).toBe(true)
     const { elements } = projectToScene(store.getSnapshot())
     const boards = elements.map(element => ({ element, box: calculateWorldBounds([element]) }))
-    const corners = ['plan-front', 'plan-right', 'plan-back', 'plan-left']
-    corners.forEach((wallId, index) => {
-      const nextWallId = corners[(index + 1) % corners.length]
-      const backing = boards.find(board => board.element.id === wallId + ':warm-corner-stud')!
-      const nextStud = boards.find(board => board.element.id === nextWallId + ':stud-01')!
+    const corners = throughAlongX ? [
+      ['plan-front', 'plan-right', false], ['plan-back', 'plan-right', true],
+      ['plan-back', 'plan-left', false], ['plan-front', 'plan-left', true],
+    ] as const : [
+      ['plan-right', 'plan-back', false], ['plan-left', 'plan-back', true],
+      ['plan-left', 'plan-front', false], ['plan-right', 'plan-front', true],
+    ] as const
+    const throughAxis = throughAlongX ? 'x' : 'z'
+    corners.forEach(([wallId, nextWallId, atStart]) => {
+      const backingId = wallId + ':warm-corner-stud' + (atStart ? '-start' : '')
+      const backing = boards.find(board => board.element.id === backingId)!
+      const studs = elements.filter(element => element.wallId === nextWallId && element.role === 'stud')
+        .sort((a, b) => a.position.x - b.position.x)
+      const endStud = studs[atStart ? studs.length - 1 : 0]
+      const nextStud = boards.find(board => board.element === endStud)!
       const contact = backing.box.clone().intersect(nextStud.box.clone().expandByScalar(1e-6))
       expect(contact.isEmpty()).toBe(false)
+      expect(contact.max[throughAxis] - contact.min[throughAxis]).toBeCloseTo(0.1, 5)
+      expect(contact.max.y - contact.min.y).toBeCloseTo(2.565, 5)
       const upperPlate = boards.find(board => board.element.id === nextWallId + ':plate-top-2')!
       const lowerPlate = boards.find(board => board.element.id === wallId + ':plate-top-1')!
       const lap = lowerPlate.box.clone().intersect(upperPlate.box.clone().expandByScalar(1e-6))
@@ -114,8 +141,14 @@ describe('frame from a rectangular plan', () => {
     expect(store.dispatch({ type: 'PLAN_FRAME_BUILD', payload: {} }).success).toBe(true)
     const before = store.exportJson()
     const stale = store.getSnapshot()
-    stale.building.walls[0].lengthMm = 600
-    stale.building.openings[0].positionUmm = 9999
+    // Version 0.1.13 shortened every panel by one depth and started it
+    // one depth after the outside corner. The authored opening stays put.
+    stale.building.walls.forEach((wall, index) => {
+      wall.lengthMm = index % 2 === 0 ? 9855 : 6855
+    })
+    stale.building.walls[0].origin.x = 145
+    stale.building.walls[2].origin.x = 9855
+    stale.building.openings[0].positionUmm = 655
     stale.assembly.elements = []
     expect(validateProject(stale).issues.some(issue => issue.code === 'PLAN_FRAME_OUT_OF_SYNC')).toBe(true)
     expect(store.importJson(JSON.stringify(stale)).success).toBe(true)

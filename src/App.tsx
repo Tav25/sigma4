@@ -94,6 +94,7 @@ export default function App() {
     [snapshot, elements],
   )
   const selectedOpening = allOpenings.find((o) => o.id === selectedOpeningId) ?? null
+  const planOpening = snapshot.building.floorPlan?.frame?.openings.find(opening => opening.id === selectedOpeningId)
   const selectedMarker = snapshot.building.markers.find(marker => marker.openingId === selectedOpeningId) ?? null
   const selected = elements.find((e) => e.id === selectedId) ?? null
   const validation = snapshot.validation
@@ -469,7 +470,7 @@ export default function App() {
               <div>Тип: {selectedOpening.type === 'garage-door' ? 'Гаражные секционные ворота' : selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
               {linkedFrame ? <>
                 <div>Размер: {selectedOpening.widthMm} × {selectedOpening.heightMm} мм</div>
-                <div>От наружного угла: {selectedOpening.positionXmm + wall.sectionMm.height} мм</div>
+                <div>От наружного угла: {planOpening?.positionUmm} мм</div>
               </> : <>
               {selectedOpening.type === 'garage-door' && (
                 <div style={{ margin: '8px 0', fontSize: 12 }}>

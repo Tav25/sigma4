@@ -23,6 +23,7 @@ interface PlanFrameSide {
   label: string
   start: PlanPoint
   end: PlanPoint
+  insetMm: number
 }
 
 export function rectangularFrameSides(plan: FloorPlan): PlanFrameSide[] {
@@ -35,10 +36,12 @@ export function rectangularFrameSides(plan: FloorPlan): PlanFrameSide[] {
   ]
   if (!corners.every(corner => plan.exterior.some(point =>
     point.xMm === corner.xMm && point.zMm === corner.zMm))) return []
+  const throughAlongX = maxX - minX >= maxZ - minZ
   const labels = ['Передняя (+Z)', 'Правая (+X)', 'Задняя (−Z)', 'Левая (−X)']
   return ['front', 'right', 'back', 'left'].map((name, index) => ({
     wallId: 'plan-' + name, label: labels[index],
     start: corners[index], end: corners[(index + 1) % 4],
+    insetMm: (index % 2 === 0) === throughAlongX ? 0 : DEPTH,
   }))
 }
 
@@ -92,19 +95,22 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
       reject('недопустимая ширина, высота или отметка низа проёма')
       continue
     }
-    // U is measured from the exterior corner. The panel starts one wall depth
-    // later and the opposite end reserves the existing California backing.
-    const margin = Math.max(135, sideFramingMm(opening) + FRAME_SECTION.width)
-    const endReserve = DEPTH + FRAME_SECTION.width + sideFramingMm(opening)
-    if (opening.positionUmm < DEPTH + margin ||
-      opening.positionUmm + opening.widthMm > sideLength(side) - endReserve) {
+    // U is authored from the outer corner, even when the panel is inset.
+    // Through walls reserve backing at both ends. Inset walls reserve their
+    // end studs as well as the depth of the perpendicular wall.
+    const framing = sideFramingMm(opening) + FRAME_SECTION.width
+    const margin = side.insetMm
+      ? side.insetMm + Math.max(135, framing)
+      : Math.max(135, DEPTH + framing)
+    if (opening.positionUmm < margin ||
+      opening.positionUmm + opening.widthMm > sideLength(side) - margin) {
       reject('проём не помещается между угловыми стойками выбранной стены')
     }
     const headerDepth = opening.type === 'garage-door' ? opening.garage?.lintelPreviewDepthMm ?? DEPTH : DEPTH
     if (opening.sillHeightMm + opening.heightMm + headerDepth > WALL_HEIGHT - 2 * FRAME_SECTION.width) {
       reject('недостаточно места по высоте для проёма и его перемычки')
     }
-    for (const issue of validateGarageOpening({ ...opening, positionUmm: opening.positionUmm - DEPTH })) {
+    for (const issue of validateGarageOpening({ ...opening, positionUmm: opening.positionUmm - side.insetMm })) {
       reject(issue.messageRu)
     }
   }
@@ -123,18 +129,37 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
   return issues
 }
 
-export function perimeterWallPairs(walls: readonly Wall[]): Array<[Wall, Wall]> {
-  return walls.map((wall, index) => [wall, walls[(index + 1) % walls.length]])
+export interface PerimeterCorner {
+  through: Wall
+  inset: Wall
+  throughStart: boolean
+}
+
+export function perimeterCorners(walls: readonly Wall[]): PerimeterCorner[] {
+  if (walls.length !== 4) return []
+  // Full-span panels are longer than the inset pair, including square plans.
+  const throughAlongX = walls[0].lengthMm > walls[1].lengthMm
+  return walls.map((wall, index) => {
+    const next = walls[(index + 1) % walls.length]
+    const wallIsThrough = (wall.orientation === 'x') === throughAlongX
+    return wallIsThrough
+      ? { through: wall, inset: next, throughStart: false }
+      : { through: next, inset: wall, throughStart: true }
+  })
 }
 
 export function projectPlanFrame(plan: FloorPlan, frame: PlanFrame):
   Pick<ProjectDocument['building'], 'walls' | 'openings' | 'connections'> {
-  const openings = frame.openings.map(opening => ({ ...opening, positionUmm: opening.positionUmm - DEPTH }))
-  const walls: Wall[] = rectangularFrameSides(plan).map((side, index) => {
-    const origin = planSidePoint(side, DEPTH)
+  const sides = rectangularFrameSides(plan)
+  const openings = frame.openings.map(opening => {
+    const side = sides.find(item => item.wallId === opening.wallId)
+    return { ...opening, positionUmm: opening.positionUmm - (side?.insetMm ?? 0) }
+  })
+  const walls: Wall[] = sides.map((side, index) => {
+    const origin = planSidePoint(side, side.insetMm)
     return {
       wallId: side.wallId, origin: { x: origin.xMm, y: 0, z: origin.zMm },
-      lengthMm: sideLength(side) - DEPTH, heightMm: WALL_HEIGHT,
+      lengthMm: sideLength(side) - 2 * side.insetMm, heightMm: WALL_HEIGHT,
       studSpacingMm: STUD_SPACING, thicknessMm: DEPTH, sectionMm: { ...FRAME_SECTION },
       orientation: index % 2 === 0 ? 'x' : 'z',
       ...(index >= 2 ? { reversed: true as const } : {}),

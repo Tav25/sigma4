@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.13')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.14')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -505,6 +505,10 @@ try {
 
   await page.getByTestId('plan-frame-build').click()
   await page.getByText('Количество стен: 4', { exact: true }).waitFor()
+  for (const [side, length] of [['front', 10000], ['right', 6710], ['back', 10000], ['left', 6710]]) {
+    assert.match(await page.getByTestId('wall-node-plan-' + side).locator(':scope > summary').textContent(),
+      new RegExp(length + ' мм'))
+  }
   await page.locator('.viewport[data-dimension-total-x="10000"][data-dimension-total-z="7000"]').waitFor()
   await page.locator('.viewport canvas').waitFor({ state: 'visible' })
   await page.screenshot({ path: dir + '/28-linked-garage-frame.png' })
@@ -525,7 +529,7 @@ try {
   assert.equal(linked.building.floorPlan.frame.built, true)
   assert.equal(linked.building.floorPlan.frame.openings.length, 3)
   assert.equal(linked.building.floorPlan.frame.openings.find(o => o.id === 'G01').positionUmm, 2000)
-  assert.equal(linked.building.walls.length, 4)
+  assert.deepEqual(linked.building.walls.map(wall => wall.lengthMm), [11000, 6710, 11000, 6710])
   assert.equal(linked.validation.valid, true)
 
   await page.reload({ waitUntil: 'networkidle' })

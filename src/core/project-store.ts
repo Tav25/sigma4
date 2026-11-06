@@ -10,9 +10,9 @@ import type {
 } from './project'
 import { validateProject, validateSourceParameters } from './frame-validator'
 import { generateWallModule } from './wall-module'
-import { connectRightCaliforniaCorner } from './corner-connection'
+import { connectPerimeterCorner, connectRightCaliforniaCorner } from './corner-connection'
 import { effectiveConnections } from './wall-topology'
-import { perimeterWallPairs, projectPlanFrame } from './plan-frame'
+import { perimeterCorners, projectPlanFrame } from './plan-frame'
 import { CURRENT_COORDINATE_SCHEMA, migrateLegacyWallOrigins } from './world-origin'
 
 const SW = 45
@@ -26,8 +26,8 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
   const elements = walls.flatMap((wall, index) =>
     generateWallModule(wall, doc.building.openings, { unprefixedIds: !linked && index === 0 }))
   if (linked) {
-    for (const [wall, next] of perimeterWallPairs(walls)) {
-      connectRightCaliforniaCorner(elements, wall, next, true)
+    for (const corner of perimeterCorners(walls)) {
+      connectPerimeterCorner(elements, corner)
     }
     return { elements }
   }
