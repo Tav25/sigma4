@@ -1143,7 +1143,12 @@ try {
   assert.equal(tJson.building.floorPlan.graph.edges.length,3)
   assert.equal(tJson.building.walls.length,6)
   assert.equal(tJson.validation.valid,true)
+  const tThrough=tJson.building.walls.find(w=>
+    w.wallId.startsWith('partition-') && w.orientation==='z')
+  assert.ok(tThrough,'The 9x6 T must create its continuous vertical partition')
+  assert.equal(tThrough.lengthMm,5710)
   assert.equal(tJson.assembly.elements.filter(e=>
+    e.wallId===tThrough.wallId &&
     e.elementId.includes(':partition-backing-')).length,3)
 
   console.log('SIGMA4 BROWSER PASS: v0.1.27 all straight/L/T/X joinery; v0.1.26 unified door framing with distinct nonbearing and bearing profiles; v0.1.25 continuous through-wall, two doors and internal T channel; v0.1.24 structural contact/overlap/support validation; v0.1.23 boundary-bound nodes and preserved openings on rectangle resize; v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
