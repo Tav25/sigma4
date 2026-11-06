@@ -168,7 +168,7 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
     ids.add(opening.id)
     const side = sides.find(item => item.wallId === opening.wallId)
     const reject = (message: string) => fail(opening.id + ': ' + message, [opening.id, opening.wallId])
-    for (const issue of validateOpeningHeaderInputs(opening,'endInsetMm' in side)) {
+    for (const issue of validateOpeningHeaderInputs(opening,!!side && 'endInsetMm' in side)) {
       fail(issue.messageRu,issue.affectedIds)
     }
     if (!side || !['window', 'door', 'garage-door'].includes(opening.type) ||

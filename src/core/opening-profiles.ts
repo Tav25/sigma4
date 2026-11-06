@@ -1,5 +1,6 @@
 import type { Opening, TimberElement, ValidationIssue, Wall } from './project'
 import type { WindowOpening } from './window'
+import type { TimberElement as PanelElement } from './timber'
 
 /** Stage 3: independent, explicit PREVIEW profiles — no silent span-table approvals. */
 export type HeaderProfileKind = 'bearing-double-preview' | 'nonbearing-flat' | 'garage-engineered-preview'
@@ -35,7 +36,7 @@ export function headerProfile(opening: Opening, wall: Pick<Wall,'wallId'|'sectio
  */
 export function applyLinkedHeaderProfile(
   panel: WindowOpening[], // authored openings, never mutated
-  elements: TimberElement[],
+  elements: PanelElement[],
   wall: Wall,
 ): void {
   const sw=wall.sectionMm.width, depth=wall.sectionMm.height
