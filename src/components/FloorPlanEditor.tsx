@@ -7,7 +7,7 @@ import {
   DEFAULT_EXTERIOR_THICKNESS_MM,
   type FloorPlan, type PlanPoint, type PlanInteriorWall,
 } from '../core/floor-plan'
-import { graphView, moveGraphEdge, moveGraphEdgeToDimension, moveGraphPoint, ensureWallGraph } from '../core/plan-graph'
+import { graphView, moveGraphEdge, moveGraphEdgeToDimension, moveGraphPoint } from '../core/plan-graph'
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
 
 const WIDTH = 1200

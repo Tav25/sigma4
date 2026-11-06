@@ -422,7 +422,7 @@ export class ProjectStore {
           }
           const errors = validateFloorPlan(candidate.building.floorPlan!)
           if (errors.length) return { success: false, errorCode: 'INVALID_INTERIOR_WALL', messageRu: errors[0] }
-          changedIds.push('building.floorPlan.interiorWalls[' + wall.id + ']')
+          changedIds.push('building.floorPlan.interiorWalls[' + command.payload.id + ']')
           break
         }
         case 'PLAN_REMOVE_INTERIOR_WALL': {
