@@ -116,7 +116,8 @@ describe('frame from a rectangular plan', () => {
       payload: { id: 'I002', side: 'negative', distanceMm: 4105 } })
     expect(move.success).toBe(true)
     const moved = store.getSnapshot()
-    expect(moved.building.walls[4].lengthMm).toBe(4205)
+    // The moved X-through arm still ends at the physical L centre, not 50 mm beyond it.
+    expect(moved.building.walls[4].lengthMm).toBe(4155)
     expect(planWallClearances(moved.building.floorPlan!, 'I002')?.negative?.distanceMm).toBe(4105)
     expect(moved.building.floorPlan?.frame?.openings).toEqual([door])
     const scene = projectToScene(moved)
