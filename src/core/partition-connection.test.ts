@@ -46,51 +46,75 @@ function assertNoPenetration(doc: ProjectDocument) {
 }
 
 describe('SIGMA4 exterior-to-interior stud receiver (top view)', () => {
-  it('builds paired transverse exterior backing under both interior partition endpoints', () => {
-    const doc = frameFor([
-      [pt(0, -3000), pt(4000, -3000)],
-      [pt(4000, -3000), pt(4000, 0)],
-    ])
-    const receivers = doc.assembly.elements.filter(element => element.elementId.includes(':partition-backing-'))
-    expect(receivers).toHaveLength(4)
-    expect(receivers.map(element => element.wallId).sort()).toEqual([
-      'plan-front', 'plan-front', 'plan-left', 'plan-left',
-    ])
-    const front = receivers.filter(e => e.wallId === 'plan-front').sort((a,b) => a.position.x-b.position.x)
-    expect(front.map(e => e.sectionMm)).toEqual([
-      {width:45,height:145},{width:45,height:145},
-    ])
-    expect(front.map(e => e.position.x)).toEqual([3972.5,4027.5])
-    expect(front.every(e => e.orientation.mode === 'y' && e.lengthMm === 2565)).toBe(true)
-    const branchEnd = doc.assembly.elements.find(e => e.wallId === 'partition-I002' &&
-      e.role === 'stud' && e.connectionIds.some(id => front.some(outer => outer.elementId === id)))
-    expect(branchEnd).toBeTruthy()
-    expect(front.every(e => e.connectionIds.includes(branchEnd!.elementId))).toBe(true)
 
-    // Physical contact, not just a logical link: the backing reaches the
-    // inside face of the exterior wall, where the green end stud terminates.
-    const projection = projectToScene(doc).elements
-    const tip = projection.find(e => e.id === branchEnd!.elementId)!
-    const tipBox = calculateWorldBounds([tip])
-    expect(front.every(e => {
-      const box = calculateWorldBounds(projection.filter(item => item.id === e.elementId))
-      const xOverlap = Math.min(box.max.x, tipBox.max.x) - Math.max(box.min.x, tipBox.min.x)
-      const yOverlap = Math.min(box.max.y, tipBox.max.y) - Math.max(box.min.y, tipBox.min.y)
-      return xOverlap > 0.001 && yOverlap > 1 &&
-        Math.abs(box.min.z - tipBox.max.z) < 1e-6
-    })).toBe(true)
+  it('builds a flatwise three-stud channel at each exterior T-junction', () => {
+    const doc=frameFor([
+      [pt(0,-3000),pt(4000,-3000)],
+      [pt(4000,-3000),pt(4000,0)],
+    ])
+    const receivers=doc.assembly.elements.filter(e=>e.elementId.includes(':partition-backing-'))
+    expect(receivers).toHaveLength(6)
+    expect(receivers.map(e=>e.wallId).sort()).toEqual([
+      'plan-front','plan-front','plan-front','plan-left','plan-left','plan-left',
+    ])
+    const front=receivers.filter(e=>e.wallId==='plan-front')
+    const left=front.find(e=>e.elementId.endsWith('-left'))!
+    const right=front.find(e=>e.elementId.endsWith('-right'))!
+    const flat=front.find(e=>e.elementId.endsWith('-flat'))!
+    expect([left.position.x,right.position.x,flat.position.x]).toEqual([3927.5,4072.5,3950])
+    expect([left.sectionMm,right.sectionMm,flat.sectionMm]).toEqual([
+      {width:45,height:145},{width:45,height:145},{width:45,height:100},
+    ])
+    expect(flat.position.z).toBe(-50)
+    expect(flat.orientation).toEqual({mode:'y',angle:0,roll:90})
+    expect(front.every(e=>e.lengthMm===2565)).toBe(true)
+    expect(left.connectionIds).toContain(flat.elementId)
+    expect(right.connectionIds).toContain(flat.elementId)
+    expect(flat.connectionIds).toEqual(expect.arrayContaining([left.elementId,right.elementId]))
+    const tip=doc.assembly.elements.find(e=>e.wallId==='partition-I002'&&
+      e.role==='stud'&&e.connectionIds.includes(flat.elementId))
+    expect(tip).toBeDefined()
+    expect(flat.connectionIds).toContain(tip!.elementId)
+    const projected=projectToScene(doc).elements
+    const world=(id:string)=>calculateWorldBounds(projected.filter(e=>e.id===id))
+    const sideLeft=world(left.elementId),sideRight=world(right.elementId)
+    const nailer=world(flat.elementId),end=world(tip!.elementId)
+    const delta=(a:typeof sideLeft,b:typeof sideLeft,axis:'x'|'y'|'z')=>
+      Math.min(a.max[axis],b.max[axis])-Math.max(a.min[axis],b.min[axis])
+    expect(delta(sideLeft,nailer,'x')).toBeCloseTo(0,6)
+    expect(delta(sideRight,nailer,'x')).toBeCloseTo(0,6)
+    expect(delta(nailer,end,'z')).toBeCloseTo(0,6)
+    expect(delta(nailer,end,'x')).toBeGreaterThan(90)
+    expect(delta(nailer,end,'y')).toBeGreaterThan(2500)
+    expect(nailer.max.z-nailer.min.z).toBeCloseTo(45,6)
+    expect(nailer.max.x-nailer.min.x).toBeCloseTo(100,6)
     assertNoPenetration(doc)
   })
 
-  it('replaces an ordinary 600-mm exterior stud when a junction lands on the grid', () => {
-    const doc = frameFor([[pt(4200, 0), pt(4200, -2000)]])
-    const members = doc.assembly.elements.filter(e => e.wallId === 'plan-front' && e.role === 'stud')
-    const positions = members.map(e => e.position.x)
-    expect(positions).not.toContain(4222.5) // old stud at authored x=4200 starts at 4200
-    expect(positions.filter(x => Math.abs(x - 4200) < 50)).toEqual([4172.5, 4227.5])
-    expect(doc.assembly.elements.filter(e => e.elementId.includes('plan-front:partition-backing-')))
-      .toHaveLength(2)
+  it('replaces the ordinary stud hidden in the receiving channel on a 600mm grid', () => {
+    const doc=frameFor([[pt(4200,0),pt(4200,-2000)]])
+    const front=doc.assembly.elements.filter(e=>e.wallId==='plan-front')
+    const group=front.filter(e=>e.elementId.includes(':partition-backing-'))
+    expect(group).toHaveLength(3)
+    expect(group.filter(e=>e.elementId.endsWith('-flat'))).toHaveLength(1)
+    expect(group.find(e=>e.elementId.endsWith('-left'))?.position.x).toBe(4127.5)
+    expect(group.find(e=>e.elementId.endsWith('-right'))?.position.x).toBe(4272.5)
+    expect(group.find(e=>e.elementId.endsWith('-flat'))?.position.x).toBe(4150)
+    expect(front.some(e=>e.elementId.startsWith('plan-front:stud-')&&
+      Math.abs(e.position.x-4222.5)<0.001)).toBe(false)
+    expect(doc.validation.valid).toBe(true)
     assertNoPenetration(doc)
+  })
+
+  it('rebuilds the same three-stud source geometry after JSON import',()=>{
+    const doc=frameFor([[pt(4200,0),pt(4200,-2000)]])
+    const before=doc.assembly.elements.filter(e=>e.elementId.includes(':partition-backing-'))
+    const store=createProjectStore(createProjectFromCurrentState({
+      projectId:'channel-reimport',length:6000,height:2700,spacing:600,openings:[],
+    }))
+    expect(store.importJson(JSON.stringify(doc)).success).toBe(true)
+    const after=store.getSnapshot().assembly.elements.filter(e=>e.elementId.includes(':partition-backing-'))
+    expect(after).toEqual(before)
   })
 
   it('understands a graph-split T node: both through arms continue, the branch is inset and supported', () => {

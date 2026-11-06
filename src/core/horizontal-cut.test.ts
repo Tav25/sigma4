@@ -84,7 +84,7 @@ describe('SIGMA4 0.1.18: real horizontal plane vs 3D solid',()=>{
     expect(timberCorners({...e,height:-2})).toEqual([])
     expect(buildHorizontalCut([],1000).pieces).toEqual([])
   })
-  it('slices the four new exterior receiving studs and the end stud from one project',()=>{
+  it('slices both three-stud exterior receiving channels and the end stud from one project',()=>{
     const store=createProjectStore(createProjectFromCurrentState({
       projectId:'cut-garage',length:6000,height:2700,spacing:600,openings:[],
     }))
@@ -100,8 +100,10 @@ describe('SIGMA4 0.1.18: real horizontal plane vs 3D solid',()=>{
     const elements=projectToScene(store.getSnapshot()).elements
     const cut=buildHorizontalCut(elements,1200)
     const receivers=cut.pieces.filter(p=>p.elementId.includes('partition-backing-'))
-    expect(receivers).toHaveLength(4)
+    expect(receivers).toHaveLength(6)
     expect(receivers.every(p=>p.areaMm2>0)).toBe(true)
+    expect(receivers.filter(p=>p.elementId.endsWith('-flat')).map(p=>p.areaMm2)).toEqual([4500,4500])
+    expect(receivers.filter(p=>!p.elementId.endsWith('-flat')).map(p=>p.areaMm2)).toEqual([6525,6525,6525,6525])
     expect(cut.pieces.some(p=>p.wallId.startsWith('partition-')&&p.role==='stud')).toBe(true)
     const high=buildHorizontalCut(elements,2650)
     expect(high.pieces.some(p=>p.role==='top-plate')).toBe(true)

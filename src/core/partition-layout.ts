@@ -87,14 +87,17 @@ export function partitionInside(plan: FloorPlan, side: PartitionSide, depth: num
 }
 
 /**
- * Materialise the exterior T receiver in the host wall, not in the free
- * 2D graph. Looking from above, two cross-depth studs (the orange pieces)
- * sit behind the interior partition's end stud (green). Together they
- * provide two distinct fastening surfaces inside the partition footprint.
+ * Larry Haun's three-stud channel, viewed in a horizontal stud-level cut.
  *
- * Existing regular studs in the same footprint are REPLACED, not overlapped;
- * this is essential when the junction falls on a standard 600 mm spacing.
- * Source walls and JSON graph nodes are never mutated.
+ * Two full-depth upright studs frame the incoming partition. Between their
+ * inner edges a third *flatwise* upright stud provides a continuous nailing
+ * surface flush with the INSIDE face of the exterior wall.
+ *
+ * A vertical stud's TimberElement position.x is the centre of its 45-mm
+ * footprint; a flatwise stud uses roll=90, so sectionMm.height is its span
+ * ALONG the host wall and sectionMm.width is its in-wall depth. Its x anchor
+ * is therefore the left edge, not the centre. This geometry is rebuilt from
+ * canonical wall / plan sources and must not be stored as authoring data.
  */
 export function addPartitionBacking(elements: TimberElement[], walls: readonly Wall[], side: PartitionSide): void {
   for (const { host, positionUmm, atStart } of partitionAttachments(side)) {
@@ -109,74 +112,104 @@ export function addPartitionBacking(elements: TimberElement[], walls: readonly W
     const branchStud = elements.find(element =>
       element.wallId === side.wallId && element.role === 'stud' &&
       Math.abs(element.position.x - branchEndU) < 0.001)
+    if (!branchStud) {
+      throw new Error('У перегородки отсутствует торцевая стойка в узле примыкания')
+    }
 
-    const connect = (support: TimberElement): void => {
-      if (!branchStud) return
-      if (!support.connectionIds.includes(branchStud.elementId)) support.connectionIds.push(branchStud.elementId)
-      if (!branchStud.connectionIds.includes(support.elementId)) branchStud.connectionIds.push(support.elementId)
+    const connect = (a: TimberElement, b: TimberElement): void => {
+      if (!a.connectionIds.includes(b.elementId)) a.connectionIds.push(b.elementId)
+      if (!b.connectionIds.includes(a.elementId)) b.connectionIds.push(a.elementId)
     }
 
     if (!isPartitionWall(wall.wallId)) {
-      // Two 45-mm studs, in plan, run across the exterior wall's 145-mm
-      // cavity. They sit under opposite halves of the partition end face.
-      // Maintain non-overlapping full-depth studs; for wider partitions
-      // the centre of the end member may remain unsupported (engineering
-      // verification remains explicitly NOT EVALUATED).
-      const offset = Math.max(width / 2, (side.thicknessMm - width) / 2)
-      const receivers = [u - offset, u + offset]
-      const supports: TimberElement[] = []
-      for (const [index, target] of receivers.entries()) {
-        if (target - width / 2 < 0 || target + width / 2 > wall.lengthMm)
-          throw new Error('Закладная примыкания выходит за длину наружной стены')
-        const ordinary = elements.filter(element =>
-          element.wallId === wall.wallId && element.role === 'stud' &&
-          Math.abs(element.position.x - target) < width - 0.001)
-        // The generated normal-spacing studs may be replaced only within
-        // their own host wall. Never cut a door's king/jack stud or another
-        // junction's backing.
-        let reused = ordinary.find(element => Math.abs(element.position.x - target) < 0.001)
-        if (!reused) {
-          for (const member of ordinary) {
-            if (member.elementId.includes(':partition-backing-'))
-              throw new Error('Пересекаются закладные соседних перегородок')
-            const at = elements.indexOf(member)
-            if (at >= 0) elements.splice(at, 1)
-          }
-          if (elements.some(element => element.wallId === wall.wallId &&
-            (element.role === 'king-stud' || element.role === 'jack-stud' ||
-              element.role === 'corner-backing' ||
-              element.elementId.includes(':partition-backing-')) &&
-            Math.abs(element.position.x - target) < width - 0.001))
-            throw new Error('Закладная примыкания пересекает другую конструктивную деталь')
-          reused = {
-            elementId: wall.wallId + ':partition-backing-' + side.wallId +
-              (atStart ? '-start' : '-end') + '-' + (index + 1),
-            wallId: wall.wallId,
-            role: 'stud',
-            lengthMm: studLength,
-            sectionMm: { ...wall.sectionMm },
-            position: { x: target, y: width, z: -height / 2 },
-            orientation: { mode: 'y', angle: 0, roll: 0 },
-            connectionIds: [],
-            generated: true,
-          }
-          elements.push(reused)
-        }
-        supports.push(reused)
+      // The partition depth is the clear opening between the two 45-mm
+      // exterior studs. E.g. partition 100 mm: stud centres u ±72.5 mm.
+      // The flat nailer spans exactly this opening and is 45 mm deep;
+      // it faces the partition at the inner face of the exterior wall.
+      const clearWidth = branch.sectionMm.height
+      const halfGap = clearWidth / 2
+      const halfStud = width / 2
+      const leftU = u - halfGap - halfStud
+      const rightU = u + halfGap + halfStud
+      const windowStart = leftU - halfStud
+      const windowEnd = rightU + halfStud
+      if (windowStart < 0 || windowEnd > wall.lengthMm) {
+        throw new Error('Трёхстоечный узел выходит за край наружной стены')
       }
-      supports.forEach(connect)
+      // Only remove standard layout studs, whose bodies would otherwise
+      // pierce the two new uprights or the flat nailer. Preserve all special
+      // studs (door framing, corners, prior receivers) and reject collisions.
+      const intersects = (a0: number, a1: number, b0: number, b1: number) =>
+        Math.min(a1, b1) - Math.max(a0, b0) > 0.0001
+      const isOrdinaryStud = (element: TimberElement) =>
+        element.wallId === wall.wallId &&
+        element.role === 'stud' &&
+        element.elementId.startsWith(wall.wallId + ':stud-')
+      const occupied = elements.filter(element =>
+        element.wallId === wall.wallId &&
+        (element.role === 'stud' || element.role === 'king-stud' ||
+          element.role === 'jack-stud' || element.role === 'corner-backing'))
+      for (const member of occupied) {
+        const rolled = member.orientation.mode === 'y' && Math.abs(member.orientation.roll) === 90
+        const begin = rolled
+          ? member.position.x + (member.orientation.roll > 0 ? 0 : -member.sectionMm.height)
+          : member.position.x - member.sectionMm.width / 2
+        const end = rolled
+          ? member.position.x + (member.orientation.roll > 0 ? member.sectionMm.height : 0)
+          : member.position.x + member.sectionMm.width / 2
+        if (!intersects(begin, end, windowStart, windowEnd)) continue
+        if (!isOrdinaryStud(member)) {
+          throw new Error('Трёхстоечный узел пересекает существующие элементы каркаса')
+        }
+        const index = elements.indexOf(member)
+        if (index >= 0) elements.splice(index, 1)
+      }
+
+      const baseId = wall.wallId + ':partition-backing-' + side.wallId +
+        (atStart ? '-start' : '-end')
+      const upright = (suffix: string, positionU: number): TimberElement => ({
+        elementId: baseId + '-' + suffix,
+        wallId: wall.wallId,
+        role: 'stud',
+        lengthMm: studLength,
+        sectionMm: { ...wall.sectionMm },
+        position: { x: positionU, y: width, z: -height / 2 },
+        orientation: { mode: 'y', angle: 0, roll: 0 },
+        connectionIds: [],
+        generated: true,
+      })
+      const left = upright('left', leftU)
+      const right = upright('right', rightU)
+      const flat: TimberElement = {
+        elementId: baseId + '-flat',
+        wallId: wall.wallId,
+        role: 'stud',
+        lengthMm: studLength,
+        sectionMm: { width, height: clearWidth },
+        // For mode=y, roll=90 maps local section HEIGHT to host +X and
+        // local section WIDTH to -Z. The resulting cross-section fills
+        // u±halfGap and sits in the innermost 45 mm of the host.
+        position: { x: u - halfGap, y: width, z: -height / 2 + width / 2 },
+        orientation: { mode: 'y', angle: 0, roll: 90 },
+        connectionIds: [],
+        generated: true,
+      }
+      elements.push(left, right, flat)
+      connect(left, flat)
+      connect(right, flat)
+      connect(flat, branchStud)
       continue
     }
 
-    // Internal T/X node: the through-axis already has end studs on BOTH
-    // collinear pieces. Use the existing stud as the receiving/blocking
-    // member; another one in the same place would penetrate timber.
+    // For interior T/X nodes, the canonical graph already splits the through
+    // wall. Reuse its end stud rather than inserting duplicate solids.
     const support = elements
       .filter(element => element.wallId === wall.wallId &&
         (element.role === 'stud' || element.role === 'king-stud'))
       .sort((a, b) => Math.abs(a.position.x - u) - Math.abs(b.position.x - u))[0]
-    if (!support || Math.abs(support.position.x - u) > width + 0.001)
+    if (!support || Math.abs(support.position.x - u) > width + 0.001) {
       throw new Error('У внутреннего Т-узла отсутствует опорная стойка')
-    connect(support)
+    }
+    connect(support, branchStud)
   }
 }

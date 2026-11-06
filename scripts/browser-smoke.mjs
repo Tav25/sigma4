@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.18')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.19')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -602,6 +602,14 @@ try {
   await page.getByTestId('frame-section-height').fill('2120')
   assert.ok(await section.getByTestId('frame-section-piece').count() > atDoorHeight)
   await page.screenshot({ path: dir + '/29-garage-partition-section.png' })
+  await section.getByTestId('frame-section-height').fill('1200')
+  await section.locator('[data-element-id*="partition-backing-"]').first().waitFor()
+  assert.equal(await section.locator('[data-element-id*="partition-backing-"]').count(),6)
+  assert.equal(await section.locator('[data-element-id$="-flat"]').count(),2)
+  const flatAreas=await section.locator('[data-element-id$="-flat"]').evaluateAll(
+    nodes=>nodes.map(node=>Number(node.getAttribute('data-area-mm2'))))
+  assert.equal(flatAreas.every(area=>Math.abs(area-4500)<0.001),true)
+  await page.screenshot({ path: dir + '/34-haun-three-stud-channel-1200.png' })
   // 0.1.17: the actual generated assembly (not only a drawn 2D symbol)
   // must contain two transverse receiving studs per outside T connection.
   await page.getByTestId('tab-plan').click()
@@ -609,13 +617,19 @@ try {
   await page.getByTestId('plan-export').click()
   const receiverDoc=JSON.parse(await readFile(await (await receiverDownload).path(),'utf8'))
   const receiving=receiverDoc.assembly.elements.filter(e=>e.elementId.includes(':partition-backing-'))
-  assert.equal(receiving.length,4)
+  assert.equal(receiving.length,6)
   const frontReceiving=receiving.filter(e=>e.wallId==='plan-front')
   const leftReceiving=receiving.filter(e=>e.wallId==='plan-left')
-  assert.equal(frontReceiving.length,2)
-  assert.equal(leftReceiving.length,2)
-  assert.equal(frontReceiving.every(e=>e.sectionMm.width===45&&e.sectionMm.height===145),true)
-  assert.equal(frontReceiving.every(e=>e.connectionIds.some(id=>id.startsWith('partition-'))),true)
+  assert.equal(frontReceiving.length,3)
+  assert.equal(leftReceiving.length,3)
+  assert.equal(frontReceiving.filter(e=>e.elementId.endsWith('-flat')).length,1)
+  const flatNailer=frontReceiving.find(e=>e.elementId.endsWith('-flat'))
+  assert.equal(flatNailer.sectionMm.width,45)
+  assert.equal(flatNailer.sectionMm.height,100)
+  assert.equal(flatNailer.orientation.roll,90)
+  assert.equal(frontReceiving.filter(e=>!e.elementId.endsWith('-flat')).every(
+    e=>e.sectionMm.width===45&&e.sectionMm.height===145),true)
+  assert.equal(flatNailer.connectionIds.some(id=>id.startsWith('partition-')),true)
   assert.equal(receiverDoc.validation.valid,true)
 
   // Direct 2D editing uses the selected host, a transient preview, and one
@@ -773,7 +787,7 @@ try {
   await mobile.screenshot({ path: dir + '/34-direct-openings-touch.png' })
   await mobile.close()
   assert.deepEqual(errors, [], 'Browser exceptions')
-  console.log('SIGMA4 BROWSER PASS: v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 two exterior partition receiving studs per joint, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  console.log('SIGMA4 BROWSER PASS: v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()
