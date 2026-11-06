@@ -142,7 +142,8 @@ export function validateAssemblyContacts(doc:ProjectDocument):ValidationIssue[] 
       // Inspect a pair once; the opposite end is still verified above.
       if(a.id>=b.id)continue
       if(a.id.includes(':plate-top-2')||b.id.includes(':plate-top-2')||
-        a.id.includes(':partition-backing-')||b.id.includes(':partition-backing-')){
+        a.id.includes(':partition-backing-')||b.id.includes(':partition-backing-')||
+        a.id.includes(':cross-backing-')||b.id.includes(':cross-backing-')){
         if(!boxesFaceContact(a,b)){
           issues.push(issue('STRUCTURAL_JOINT_NOT_TOUCHING','error',
             'Объявленное соединение не имеет контакта граней: '+a.id+' ↔ '+b.id+

@@ -39,9 +39,12 @@ export function partitionSides(plan: FloorPlan, exterior: PartitionHost[], depth
     const incident = [side, ...neighbours]
     const xArms = incident.filter(member => alongX(member))
     const zArms = incident.filter(member => !alongX(member))
-    // With four arms, X is the deterministic through-axis and both Z arms
-    // terminate at its outer faces. With three arms the two collinear arms
-    // are the through-wall. This avoids perpendicular stud/plate collisions.
+    // A physical X has a continuous X run and two Z butt arms. The
+    // continuous perpendicular host takes priority over endpoint counts.
+    const continuous=perpendicular.find(other=>
+      !samePlanPoint(point,other.start) && !samePlanPoint(point,other.end))
+    if(continuous) return {trim:continuous.thicknessMm/2,host:continuous}
+    // The authored graph may still contain a T split into two arms.
     const throughX = xArms.length >= 2
     const throughZ = zArms.length >= 2 && !throughX
     if (throughX || throughZ) {
@@ -51,11 +54,11 @@ export function partitionSides(plan: FloorPlan, exterior: PartitionHost[], depth
       return { trim: carriers[0].thicknessMm / 2, host: carriers[0] }
     }
 
-    // A simple L corner keeps the existing, proven end-to-end joint layout.
-    const through = perpendicular.find(other => !samePlanPoint(point, other.start) && !samePlanPoint(point, other.end))
-    if (through) return { trim: through.thicknessMm / 2, host: through }
+    // At an interior L, the X-axis arm is the first-course through-wall;
+    // the Z arm butts against its face. The second course will reverse this
+    // joint and overlap the corner; don't extend a negative-length wall.
     const host = perpendicular[0]
-    return { trim: !alongX(side) ? host.thicknessMm / 2 : -host.thicknessMm / 2 }
+    return alongX(side) ? {trim:0} : {trim:host.thicknessMm/2,host}
   }
   return sides.map(side => {
     const start = joint(side, side.start), end = joint(side, side.end)
@@ -99,8 +102,13 @@ export function partitionInside(plan: FloorPlan, side: PartitionSide, depth: num
  * is therefore the left edge, not the centre. This geometry is rebuilt from
  * canonical wall / plan sources and must not be stored as authoring data.
  */
-export function addPartitionBacking(elements: TimberElement[], walls: readonly Wall[], side: PartitionSide): void {
+export function addPartitionBacking(
+  elements: TimberElement[], walls: readonly Wall[], side: PartitionSide,
+  crossPoints: ReadonlySet<string> = new Set(),
+): void {
   for (const { host, positionUmm, atStart } of partitionAttachments(side)) {
+    const contact=atStart?side.start:side.end
+    if(crossPoints.has(contact.xMm+':'+contact.zMm))continue
     const wall = walls.find(item => item.wallId === host.wallId)
     const branch = walls.find(item => item.wallId === side.wallId)
     if (!wall || !branch) continue
@@ -232,4 +240,73 @@ export function addPartitionBacking(elements: TimberElement[], walls: readonly W
     }
     connect(support, branchStud)
   }
+}
+
+
+/**
+ * Four-arm X receiver: ONE through wall with two edge uprights and two
+ * flatwise nailers facing the opposite butt-wall approaches.
+ * The middle pair occupies opposite faces of the 100mm host depth:
+ * there is no duplicated stud, hidden 3D overlap or unsupported centre seam.
+ */
+export function addCrossBacking(
+  elements: TimberElement[], walls: readonly Wall[], partitions: readonly PartitionSide[],
+  point:PlanPoint,
+): void {
+  const x=partitions.find(side=>
+    alongX(side)&&pointOnPlanSegment(point,side.start,side.end)&&
+    !samePlanPoint(point,side.start)&&!samePlanPoint(point,side.end))
+  const branches=partitions.filter(side=>
+    !alongX(side)&&(samePlanPoint(point,side.start)||samePlanPoint(point,side.end)))
+  if(!x||branches.length!==2)
+    throw Error('X-узел требует одну сквозную стену по X и две торцевые ветви по Z')
+  const wall=walls.find(w=>w.wallId===x.wallId)
+  if(!wall)throw Error('Не найдена сквозная стена X-узла')
+  const width=wall.sectionMm.width,depth=wall.sectionMm.height
+  if(depth<2*width)throw Error('X-узел: толщина стены недостаточна для двух плоских крепёжных досок')
+  if(branches.some(side=>side.thicknessMm!==branches[0].thicknessMm))
+    throw Error('X-узел: разные толщины примыкающих перегородок')
+  const clear=branches[0].thicknessMm
+  const u=sideOffset(x,point)-sideOffset(x,{xMm:wall.origin.x,zMm:wall.origin.z})
+  const half=clear/2, studHalf=width/2
+  if(u-half-width<0||u+half+width>wall.lengthMm)
+    throw Error('X-узел слишком близко к торцу сквозной стены')
+  const prefix=wall.wallId+':cross-backing-'+point.xMm+'_'+point.zMm
+  const height=wall.heightMm-3*width
+  const member=(suffix:string,xPos:number,zPos:number,flat:boolean):TimberElement=>({
+    elementId:prefix+'-'+suffix,wallId:wall.wallId,role:'stud',
+    lengthMm:height,
+    sectionMm: flat?{width,height:clear}:{...wall.sectionMm},
+    position:{x:xPos,y:width,z:zPos},
+    orientation:{mode:'y',angle:0,roll:flat?90:0},
+    connectionIds:[],generated:true,
+  })
+  const left=member('left',u-half-studHalf,-depth/2,false)
+  const right=member('right',u+half+studHalf,-depth/2,false)
+  const near=member('flat-a',u-half,-depth/2+width/2,true)
+  const far=member('flat-b',u-half,depth/2-width/2,true)
+  const connect=(a:TimberElement,b:TimberElement)=>{
+    if(!a.connectionIds.includes(b.elementId))a.connectionIds.push(b.elementId)
+    if(!b.connectionIds.includes(a.elementId))b.connectionIds.push(a.elementId)
+  }
+  for(const flat of [near,far]){connect(left,flat);connect(right,flat)}
+  for(const branchSide of branches){
+    const atStart=samePlanPoint(branchSide.start,point)
+    const branch=walls.find(w=>w.wallId===branchSide.wallId)
+    if(!branch)throw Error('Отсутствует примыкающая стена X-узла')
+    const studU=atStart?width/2:branch.lengthMm-width/2
+    const post=elements.find(e=>e.wallId===branch.wallId&&e.role==='stud'&&
+      Math.abs(e.position.x-studU)<0.001)
+    if(!post)throw Error('Нет торцевой стойки примыкающей стены X-узла')
+    // Host local normal (Z) follows the global 2D normal: x->+X
+    // corresponds to host -Z; the two approaches choose opposite faces.
+    const outgoing=atStart?branchSide.end:branchSide.start
+    const approach=outgoing.zMm-point.zMm
+    const facingNegative=(wall.reversed?-approach:approach)<0
+    connect(post,facingNegative?near:far)
+  }
+  const ids=[left,right,near,far]
+  if(ids.some(e=>elements.some(old=>old.elementId===e.elementId)))
+    throw Error('Повторный X-узел '+prefix)
+  elements.push(...ids)
 }

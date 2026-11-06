@@ -56,8 +56,10 @@ function mandatoryStations(elements: readonly TimberElement[], wall: Wall, openi
   // The two full-depth studs of the Haun channel delimit the flatwise nailer.
   // We deliberately do not place ordinary studs inside this mandatory package.
   const receivers = new Map<string, { left?: number; right?: number }>()
-  for (const member of own.filter(e => e.elementId.includes(':partition-backing-'))) {
-    const match = member.elementId.match(/^(.*:partition-backing-.*)-(left|right)$/)
+  for (const member of own.filter(e =>
+    e.elementId.includes(':partition-backing-') ||
+    e.elementId.includes(':cross-backing-'))) {
+    const match = member.elementId.match(/^(.*:(?:partition|cross)-backing-.*)-(left|right)$/)
     if (!match) continue
     const slot = receivers.get(match[1]) ?? {}
     slot[match[2] as 'left' | 'right'] = member.position.x

@@ -12,7 +12,8 @@ import { validateProject, validateSourceParameters } from './frame-validator'
 import { generateWallModule } from './wall-module'
 import { connectPerimeterCorner, connectRightCaliforniaCorner } from './corner-connection'
 import { effectiveConnections } from './wall-topology'
-import { addPartitionBacking, isPartitionWall, type PartitionSide } from './partition-layout'
+import { addPartitionBacking, addCrossBacking, isPartitionWall, type PartitionSide } from './partition-layout'
+import { physicalCrossNodes } from './structural-runs'
 import { connectTopPlateLaps } from './top-plate-laps'
 import { detailLinkedStuds } from './stud-detailing'
 import { perimeterCorners, planStructuralFrameSides, projectPlanFrame } from './plan-frame'
@@ -36,7 +37,12 @@ export function generateAssemblyFromDocument(doc: ProjectDocument): Assembly {
     const plan = doc.building.floorPlan!
     const sides = planStructuralFrameSides(plan)
     const partitions = sides.filter((side): side is PartitionSide => 'endInsetMm' in side)
-    for (const side of partitions) addPartitionBacking(elements, walls, side)
+    // Four-arm junctions are one shared physical receiver, not two
+    // overlapping T packages. Establish them before ordinary stud layout.
+    const crosses = physicalCrossNodes(plan)
+    const crossPoints=new Set(crosses.map(p=>p.xMm+':'+p.zMm))
+    for (const point of crosses) addCrossBacking(elements,walls,partitions,point)
+    for (const side of partitions) addPartitionBacking(elements,walls,side,crossPoints)
     connectTopPlateLaps(elements, walls, partitions)
     // Phase 2: only now fill bays between corners, king/jack posts, and
     // the already-constructed three-stud receivers. Never infer framing

@@ -147,7 +147,10 @@ describe('SIGMA4 v0.1.20: Haun top-plate lapping at junctions',()=>{
   it('joins 4-arm X at one centre seam, with 2 through and 2 butt upper caps',()=>{
     const {doc}=frame([[point(0,-3000),point(10000,-3000)],
       [point(4000,0),point(4000,-7000)]])
-    expect(doc.building.walls.filter(w=>w.wallId.startsWith('partition-'))).toHaveLength(4)
+    // X has four editable graph arms but three physical walls:
+    // one continuous X-axis through-run and two opposing Z butt walls.
+    expect(doc.building.floorPlan!.graph!.edges.filter(e=>e.id.startsWith('I'))).toHaveLength(4)
+    expect(doc.building.walls.filter(w=>w.wallId.startsWith('partition-'))).toHaveLength(3)
     expect(doc.validation.valid).toBe(true)
     assertNoUpperCollisions(doc)
     assertRealUpperJoin(doc)

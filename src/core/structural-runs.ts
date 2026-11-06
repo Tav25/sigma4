@@ -5,9 +5,9 @@ import type { FloorPlan, PlanInteriorWall, PlanPoint } from './floor-plan'
  * Haun-style physical framing runs.
  *
  * Graph edges are EDITING entities: a tee node splits an edge for precise
- * selection, but does NOT necessarily split the carpentered wall. Merge only
- * the two COLLINEAR arms of a three-arm T node, and only if both have the
- * same thickness. Never merge through an X node (4 arms) or a corner.
+ * selection, but does NOT necessarily split the carpentered wall. Merge the collinear arms of a T, and choose the X-axis as the single
+ * through-run at a four-arm X; all graph edges remain individually editable.
+ * Only matching-thickness, opposite-direction collinear arms may merge.
  *
  * This is derived geometry. Graph IDs and authored door wallIds remain intact.
  */
@@ -44,17 +44,34 @@ export function physicalPartitionRuns(plan:FloorPlan):PhysicalPartitionRuns {
       nodes.set(k,at)
     }
   })
-  for(const indexes of nodes.values()){
-    if(indexes.length!==3)continue
+  for(const [nodeKey,indexes] of nodes){
+    if(indexes.length!==3 && indexes.length!==4)continue
+    const [x,z]=nodeKey.split(':').map(Number)
     const pairs: [number,number][]=[]
-    for(let a=0;a<3;a++)for(let b=a+1;b<3;b++){
+    for(let a=0;a<indexes.length;a++)for(let b=a+1;b<indexes.length;b++){
       const wa=authored[indexes[a]],wb=authored[indexes[b]]
       if(wa.thicknessMm!==wb.thicknessMm||horizontal(wa)!==horizontal(wb))continue
-      // Equal axis and same coordinate guarantee true collinearity.
-      if(horizontal(wa)?wa.start.zMm===wb.start.zMm:wa.start.xMm===wb.start.xMm)
-        pairs.push([indexes[a],indexes[b]])
+      if(horizontal(wa)?wa.start.zMm!==wb.start.zMm:wa.start.xMm!==wb.start.xMm)
+        continue
+      const h=horizontal(wa)
+      const other=(wall:PlanInteriorWall)=>{
+        const v= h ? x : z
+        const p=axisValue(wall.start,h),q=axisValue(wall.end,h)
+        return p===v?q-v:p-v
+      }
+      if(other(wa)*other(wb)<0)pairs.push([indexes[a],indexes[b]])
     }
-    if(pairs.length===1)join(...pairs[0])
+    if(indexes.length===3 && pairs.length===1)join(...pairs[0])
+    if(indexes.length===4){
+      const xPairs=pairs.filter(([a,b])=>horizontal(authored[a])&&horizontal(authored[b]))
+      const zArms=indexes.filter(i=>!horizontal(authored[i]))
+      // The cross's X run remains unbroken; the two Z branches butt to
+      // opposite faces of that run. A second through-wall would intersect it.
+      if(xPairs.length===1 && zArms.length===2 &&
+        authored[indexes[0]].thicknessMm===authored[indexes[1]].thicknessMm &&
+        indexes.every(i=>authored[i].thicknessMm===authored[indexes[0]].thicknessMm))
+        join(...xPairs[0])
+    }
   }
   const groups=new Map<number,number[]>()
   authored.forEach((_,i)=>{
@@ -89,6 +106,16 @@ export function physicalPartitionRuns(plan:FloorPlan):PhysicalPartitionRuns {
   return {walls,ownerBySegment,segmentsByRun}
 }
 
+/** X points have exactly four incident graph edges (two per axis). */
+export function physicalCrossNodes(plan:FloorPlan):PlanPoint[] {
+  if(!plan.graph)return []
+  const edges=graphView(plan).interiorWalls
+  return plan.graph.nodes.filter(node=>{
+    const around=edges.filter(e=>same(e.start,node)||same(e.end,node))
+    return around.length===4 && around.filter(e=>horizontal(e)).length===2 &&
+      around.filter(e=>!horizontal(e)).length===2
+  }).map(node=>({xMm:node.xMm,zMm:node.zMm}))
+}
 
 /**
  * A geometric contact validator alone cannot tell whether the WRONG set of
@@ -165,6 +192,30 @@ export function validatePhysicalThroughRuns(
         'Т-узел '+node.id+': отсутствует трёхстоечный приёмный канал '+
         throughId+' ← '+branchId,[throughId,branchId,node.id])
     }
+  }
+  // Crosses: the physical X through-run retains its first top plate;
+  // one receiver (2 uprights + 2 opposite flat nailers) is shared by
+  // both Z butt arms. Do not accept two overlapping 3-stud packages.
+  for(const node of physicalCrossNodes(plan)){
+    const run=runs.walls.find(w=>horizontal(w)&&
+      w.start.zMm===node.zMm &&
+      node.xMm>Math.min(w.start.xMm,w.end.xMm) &&
+      node.xMm<Math.max(w.start.xMm,w.end.xMm))
+    if(!run) {
+      bad('HAUN_X_THROUGH_WALL_MISSING',
+        'X-узел: отсутствует сквозная горизонтальная стена',
+        [node.xMm+':'+node.zMm])
+      continue
+    }
+    const id='partition-'+run.id+':cross-backing-'+node.xMm+'_'+node.zMm
+    for(const suffix of ['-left','-right','-flat-a','-flat-b']){
+      if(!elements.some(e=>e.elementId===id+suffix))
+        bad('HAUN_X_RECEIVER_MISSING','X-узел: отсутствует деталь '+id+suffix,
+          [id+suffix])
+    }
+    if(elements.filter(e=>e.elementId.startsWith(id+'-')).length!==4)
+      bad('HAUN_X_RECEIVER_COUNT','X-узел должен содержать ровно четыре элемента',
+        [id])
   }
   return issues
 }
