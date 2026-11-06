@@ -60,7 +60,8 @@ function openCapChannel(
         elementId: el.elementId + '-channel-' + junctionKey,
         position: { ...el.position, x: b },
         lengthMm: right,
-        connectionIds: [...el.connectionIds],
+        // A split creates a NEW physical piece, not a copy of its old joints.
+        connectionIds: [],
       }
       if (elements.some(other => other.elementId === next.elementId))
         throw Error('Повторяющийся элемент верхней обвязки')
@@ -184,5 +185,31 @@ export function connectTopPlateLaps(
     }
     for (const branch of branches) for (const host of hostCaps) link(branch, host)
     if (branches.length === 2) link(branches[0], branches[1])
+  }
+
+  // The perimeter's second plate was initially linked by
+  // connectPerimeterCorner(), BEFORE its T channels were cut. Every split
+  // changes the ownership of the end piece. Do not retain the old links on
+  // cloned pieces: reconstruct four outer-corner pairs from the physically
+  // ordered wall modules. Interior T/X links, added above, are untouched.
+  const outer=walls.slice(0,4)
+  const perimeterIds=new Set(outer.map(w=>w.wallId))
+  const outsideSecond=elements.filter(e=>perimeterIds.has(e.wallId) &&
+    isCap(e,e.wallId))
+  for(const cap of outsideSecond){
+    cap.connectionIds=cap.connectionIds.filter(otherId=>
+      !outsideSecond.some(other=>other.elementId===otherId&&
+        other.wallId!==cap.wallId))
+  }
+  for(let i=0;i<outer.length;i++){
+    const a=outer[i],b=outer[(i+1)%outer.length]
+    const aPieces=outsideSecond.filter(e=>e.wallId===a.wallId)
+    const bPieces=outsideSecond.filter(e=>e.wallId===b.wallId)
+    const end=aPieces.sort((l,r)=>
+      (r.position.x+r.lengthMm)-(l.position.x+l.lengthMm))[0]
+    const start=bPieces.sort((l,r)=>l.position.x-r.position.x)[0]
+    if(!end||!start)throw Error('Нет второго верхнего слоя для наружного угла '+
+      a.wallId+' — '+b.wallId)
+    link(end,start)
   }
 }

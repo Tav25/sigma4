@@ -145,7 +145,9 @@ export function validateAssemblyContacts(doc:ProjectDocument):ValidationIssue[] 
         a.id.includes(':partition-backing-')||b.id.includes(':partition-backing-')){
         if(!boxesFaceContact(a,b)){
           issues.push(issue('STRUCTURAL_JOINT_NOT_TOUCHING','error',
-            'Объявленное соединение не имеет контакта граней: '+a.id+' ↔ '+b.id,
+            'Объявленное соединение не имеет контакта граней: '+a.id+' ↔ '+b.id+
+            '; пересечение X/Y/Z, мм = '+
+            AXES.map(axis=>intersection(a,b,axis).toFixed(2)).join(' / '),
             [a.id,b.id]))
         }
       }
