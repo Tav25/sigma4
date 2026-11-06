@@ -80,17 +80,17 @@ describe('SIGMA4 0.1.28: anchored wall length',()=>{
     expect(store.getRevision()).toBe(rev)
     expect(store.exportJson()).toBe(before)
   })
-  it('preserves legacy wall structure without creating graph source',()=>{
+  it('preserves the legacy source format; invalid detached ends still require validation',()=>{
     const store=create()
-    expect(store.dispatch({type:'PLAN_ADD_INTERIOR_WALL',payload:{wall:{
-      id:'I008',start:p(1200,-1500),end:p(3500,-1500),thicknessMm:100,
-    }}}).success).toBe(true)
-    const plan=store.getSnapshot().building.floorPlan!
-    const resized=resizePlanWallLength(plan,'I008',3000,'start')
+    // Legacy walls must initially be anchored at BOTH ends to the exterior.
+    const plan={...store.getSnapshot().building.floorPlan!,interiorWalls:[{
+      id:'I008',start:p(0,-1500),end:p(10000,-1500),thicknessMm:100,
+    }]}
+    const resized=resizePlanWallLength(plan,'I008',9000,'start')
     expect(resized.graph).toBeUndefined()
     expect(resized.interiorWalls[0]).toMatchObject({
-      start:p(1200,-1500),end:p(4200,-1500),
+      start:p(0,-1500),end:p(9000,-1500),
     })
-    expect(plan.interiorWalls[0].end).toEqual(p(3500,-1500))
+    expect(plan.interiorWalls[0].end).toEqual(p(10000,-1500))
   })
 })
