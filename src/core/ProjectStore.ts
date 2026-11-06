@@ -369,6 +369,12 @@ export class ProjectStore {
           } else if (command.type === 'PLAN_FRAME_ENABLE_PARTITIONS') {
             frame.partitions = true
           } else {
+            // One click builds the entire authored plan, including interior
+            // partitions. Without this, through-wall validation fails because
+            // only four exterior wall modules were projected.
+            if ((plan.graph?.edges.length ?? 0) > 0 || plan.interiorWalls.length > 0) {
+              frame.partitions = true
+            }
             frame.built = true
           }
           plan.exteriorThicknessMm ??= FRAME_SECTION.height

@@ -1099,6 +1099,53 @@ try {
 
 
 
+  // S22.1: reproduce user screenshot (9 x 6, through 6m, T arm 3m).
+  // Do NOT press "Enable partitions" before the single Build click.
+  await page.reload({waitUntil:'networkidle'})
+  await page.getByTestId('plan-add-exact').click()
+  for(const length of ['9','6','9']){
+    await page.getByTestId('plan-length-input').fill(length)
+    await page.getByTestId('plan-add-exact').click()
+  }
+  await page.getByTestId('plan-close').click()
+  const tClick=async(xMm,zMm)=>{
+    const pt=await page.getByTestId('plan-canvas').evaluate((svg,p)=>{
+      const circle=i=>svg.querySelector('[data-testid="plan-point-'+i+'"] circle')
+      const a=circle(0),b=circle(1),c=circle(2)
+      if(!a||!b||!c)throw Error('Missing 9 x 6 corners')
+      const x0=Number(a.getAttribute('cx')),y0=Number(a.getAttribute('cy'))
+      const dx=Number(b.getAttribute('cx'))-x0
+      const dy=Number(c.getAttribute('cy'))-y0
+      const q=new DOMPoint(x0+dx*p.xMm/9000,y0+dy*(-p.zMm)/6000)
+        .matrixTransform(svg.getScreenCTM())
+      return {x:q.x,y:q.y}
+    },{xMm,zMm})
+    await page.mouse.click(pt.x,pt.y)
+  }
+  await page.getByTestId('plan-toolbar-wall').click()
+  await tClick(3000,0)
+  await tClick(3000,-6000)
+  await page.keyboard.press('Enter')
+  await tClick(0,-3000)
+  await tClick(3000,-3000)
+  await page.keyboard.press('Enter')
+  assert.equal((await page.getByTestId('plan-wall-count').textContent()).trim(),'3')
+  await page.getByTestId('plan-frame-auto-partitions').waitFor()
+  await page.screenshot({path:dir+'/44-user-9x6-T-before-auto-build.png'})
+  await page.getByTestId('plan-frame-build').click()
+  await page.getByText('Количество стен: 6',{exact:true}).waitFor()
+  await page.screenshot({path:dir+'/45-user-9x6-T-built-3D.png'})
+  await page.getByTestId('tab-plan').click()
+  const tExport=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const tJson=JSON.parse(await readFile(await (await tExport).path(),'utf8'))
+  assert.equal(tJson.building.floorPlan.frame.partitions,true)
+  assert.equal(tJson.building.floorPlan.graph.edges.length,3)
+  assert.equal(tJson.building.walls.length,6)
+  assert.equal(tJson.validation.valid,true)
+  assert.equal(tJson.assembly.elements.filter(e=>
+    e.elementId.includes(':partition-backing-')).length,3)
+
   console.log('SIGMA4 BROWSER PASS: v0.1.27 all straight/L/T/X joinery; v0.1.26 unified door framing with distinct nonbearing and bearing profiles; v0.1.25 continuous through-wall, two doors and internal T channel; v0.1.24 structural contact/overlap/support validation; v0.1.23 boundary-bound nodes and preserved openings on rectangle resize; v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {

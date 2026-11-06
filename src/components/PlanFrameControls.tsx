@@ -103,6 +103,10 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
         apply({ type: 'PLAN_FRAME_RESIZE', payload: { widthMm, depthMm } })
       }}>Применить габариты</button>
       {!!(plan.graph?.edges.length || plan.interiorWalls.length) && !plan.frame?.partitions &&
+        <p className="plan-guidance" data-testid="plan-frame-auto-partitions">
+          Кнопка «Построить каркас» автоматически включает все нарисованные перегородки.
+        </p>}
+      {!!(plan.graph?.edges.length || plan.interiorWalls.length) && !plan.frame?.partitions &&
         <button type="button" className="plan-button plan-secondary" data-testid="plan-frame-enable-partitions"
           onClick={() => apply({ type: 'PLAN_FRAME_ENABLE_PARTITIONS', payload: {} })}>
           Включить перегородки в каркас
