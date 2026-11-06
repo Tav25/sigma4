@@ -60,11 +60,18 @@ export interface GarageDoorSpec {
   jackStudsPerSide: number
 }
 
+export interface DoorSwing {
+  hinge: 'start' | 'end'
+  side: 'left' | 'right'
+}
+
 export interface Opening {
   id: string
   wallId: string
   type: 'window' | 'door' | 'garage-door'
   garage?: GarageDoorSpec
+  /** 2D door symbol, relative to the authored direction of the host wall. */
+  swing?: DoorSwing
   positionUmm: number
   widthMm: number
   heightMm: number

@@ -1,6 +1,6 @@
 import { planBounds, type FloorPlan, type PlanPoint } from './floor-plan'
-import { PARTITION_MIN_DEPTH, partitionAttachments, partitionInside, partitionSides, type PartitionHost, type PartitionSide } from './partition-layout'
-import { validateGarageOpening } from './garage-door'
+import { PARTITION_MIN_DEPTH, isPartitionWall, partitionAttachments, partitionInside, partitionSides, type PartitionHost, type PartitionSide } from './partition-layout'
+import { defaultGarageDoorSpec, GARAGE_DOOR_PRESETS, validateGarageOpening } from './garage-door'
 import type { Opening, ProjectDocument, ValidationIssue, Wall } from './project'
 
 export interface PlanFrame {
@@ -23,7 +23,7 @@ function sideFramingMm(opening: Opening): number {
   return (count + 1) * FRAME_SECTION.width
 }
 
-interface PlanFrameSide extends PartitionHost {
+interface ExteriorFrameSide extends PartitionHost {
   wallId: string
   label: string
   start: PlanPoint
@@ -31,7 +31,9 @@ interface PlanFrameSide extends PartitionHost {
   insetMm: number
 }
 
-export function rectangularFrameSides(plan: FloorPlan): PlanFrameSide[] {
+export type PlanFrameSide = ExteriorFrameSide | PartitionSide
+
+export function rectangularFrameSides(plan: FloorPlan): ExteriorFrameSide[] {
   if (!plan.closed || plan.exterior.length !== 4) return []
   const { minX, maxX, minZ, maxZ } = planBounds(plan.exterior)
   if (maxX - minX < MIN_FRAME_SIDE_MM || maxZ - minZ < MIN_FRAME_SIDE_MM) return []
@@ -57,13 +59,46 @@ export function planSidePoint(side: PartitionHost, offsetMm: number): PlanPoint 
   }
 }
 
-function sideLength(side: PartitionHost): number {
+export function planSideLength(side: PartitionHost): number {
   return Math.abs(side.end.xMm - side.start.xMm) + Math.abs(side.end.zMm - side.start.zMm)
 }
 
-export function planFrameOpeningSides(plan: FloorPlan): Array<PlanFrameSide | PartitionSide> {
+export function planFrameOpeningSides(plan: FloorPlan, includeDraftPartitions = false): PlanFrameSide[] {
   const exterior = rectangularFrameSides(plan)
-  return [...exterior, ...(plan.frame?.partitions ? partitionSides(plan, exterior, DEPTH) : [])]
+  if (!exterior.length) return []
+  return [...exterior, ...(plan.frame?.partitions || includeDraftPartitions ? partitionSides(plan, exterior, DEPTH) : [])]
+}
+
+export const PLAN_OPENING_PRESETS = [
+  { value: 'window', label: 'Окно', prefix: 'W', widthMm: 1200, heightMm: 1200, sillHeightMm: 900 },
+  { value: 'door', label: 'Дверь', prefix: 'D', widthMm: 900, heightMm: 2100, sillHeightMm: 0 },
+  { value: 'garage-door', prefix: 'G', ...GARAGE_DOOR_PRESETS[0], label: 'Ворота', sillHeightMm: 0 },
+] as const
+
+export function nextPlanOpeningId(openings: readonly Opening[], type: Opening['type']): string {
+  const prefix = PLAN_OPENING_PRESETS.find(preset => preset.value === type)!.prefix
+  let next = 1
+  while (openings.some(opening => opening.id === prefix + String(next).padStart(2, '0'))) next++
+  return prefix + String(next).padStart(2, '0')
+}
+
+export function planOpeningPreset(type: Opening['type'], wallId: string, id: string): Opening {
+  const { widthMm, heightMm, sillHeightMm } = PLAN_OPENING_PRESETS.find(preset => preset.value === type)!
+  return { id, wallId, type, positionUmm: 0, widthMm, heightMm, sillHeightMm,
+    ...(type === 'garage-door' ? { garage: defaultGarageDoorSpec() } : {}) }
+}
+
+/** One authored edit shared by the pointer preview and the store. */
+export function withPlanOpening(plan: FloorPlan, opening: Opening): FloorPlan {
+  const frame = plan.frame ?? { built: false, openings: [] }
+  const openings = [...frame.openings]
+  const index = openings.findIndex(item => item.id === opening.id)
+  if (index < 0) openings.push(opening)
+  else openings[index] = opening
+  return {
+    ...plan, exteriorThicknessMm: plan.exteriorThicknessMm ?? DEPTH,
+    frame: { ...frame, openings, ...(isPartitionWall(opening.wallId) ? { partitions: true } : {}) },
+  }
 }
 
 export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
@@ -88,9 +123,9 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
     fail('Для связанного каркаса установите толщину наружной стены 145 мм')
   }
   const partitions = frame.partitions ? partitionSides(plan, exterior, DEPTH) : []
-  const sides: Array<PlanFrameSide | PartitionSide> = [...exterior, ...partitions]
+  const sides: PlanFrameSide[] = [...exterior, ...partitions]
   for (const partition of partitions) {
-    const length = sideLength(partition) - partition.insetMm - partition.endInsetMm
+    const length = planSideLength(partition) - partition.insetMm - partition.endInsetMm
     if (partition.thicknessMm < PARTITION_MIN_DEPTH || length < 2 * FRAME_SECTION.width ||
       !partitionInside(plan, partition, DEPTH)) {
       fail(partition.label + ': проверьте положение и толщину каркаса от 89 мм', [partition.wallId])
@@ -98,7 +133,7 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
     for (const { host, positionUmm } of partitionAttachments(partition)) {
       const exteriorHost = exterior.some(side => side.wallId === host.wallId)
       const reserve = (exteriorHost ? DEPTH : 0) + FRAME_SECTION.width + partition.thicknessMm / 2
-      if (positionUmm < reserve || positionUmm > sideLength(host) - reserve) {
+      if (positionUmm < reserve || positionUmm > planSideLength(host) - reserve) {
         fail(partition.label + ': примыкание слишком близко к углу', [partition.wallId, host.wallId])
       }
       for (const opening of frame.openings) {
@@ -124,6 +159,10 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
       reject('укажите стену, тип и целые размеры в мм')
       continue
     }
+    if (opening.swing !== undefined && (opening.type !== 'door' || !opening.swing ||
+      !['start', 'end'].includes(opening.swing.hinge) || !['left', 'right'].includes(opening.swing.side))) {
+      reject('укажите корректную сторону петель и открывания двери')
+    }
     if (opening.widthMm < 300 || opening.heightMm < 300 ||
       (opening.type === 'window' ? opening.sillHeightMm < 300 : opening.sillHeightMm !== 0)) {
       reject('недопустимая ширина, высота или отметка низа проёма')
@@ -133,7 +172,7 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
       const panelU = opening.positionUmm - side.insetMm
       if (opening.type !== 'door' || opening.garage || opening.sillHeightMm !== 0 ||
         panelU < 2 * FRAME_SECTION.width ||
-        opening.positionUmm + opening.widthMm > sideLength(side) - side.endInsetMm - 2 * FRAME_SECTION.width ||
+        opening.positionUmm + opening.widthMm > planSideLength(side) - side.endInsetMm - 2 * FRAME_SECTION.width ||
         opening.heightMm > WALL_HEIGHT - 2 * FRAME_SECTION.width) {
         reject('дверь не помещается в ненесущую перегородку')
       }
@@ -151,7 +190,7 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
       ? side.insetMm + Math.max(135, framing)
       : Math.max(135, DEPTH + framing)
     if (opening.positionUmm < margin ||
-      opening.positionUmm + opening.widthMm > sideLength(side) - margin) {
+      opening.positionUmm + opening.widthMm > planSideLength(side) - margin) {
       reject('проём не помещается между угловыми стойками выбранной стены')
     }
     const headerDepth = opening.type === 'garage-door' ? opening.garage?.lintelPreviewDepthMm ?? DEPTH : DEPTH
@@ -215,7 +254,7 @@ export function projectPlanFrame(plan: FloorPlan, frame: PlanFrame):
       wallId: side.wallId,
       origin: { x: origin.xMm + (orientation === 'z' ? (reversed ? -half : half) : 0), y: 0,
         z: origin.zMm + (orientation === 'x' ? (reversed ? -half : half) : 0) },
-      lengthMm: sideLength(side) - side.insetMm - (partition ? side.endInsetMm : side.insetMm),
+      lengthMm: planSideLength(side) - side.insetMm - (partition ? side.endInsetMm : side.insetMm),
       heightMm: WALL_HEIGHT, studSpacingMm: partition ? 400 : STUD_SPACING, thicknessMm: thickness,
       sectionMm: { ...FRAME_SECTION, height: thickness }, orientation,
       ...(reversed ? { reversed: true as const } : {}),

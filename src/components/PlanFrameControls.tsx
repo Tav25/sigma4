@@ -1,18 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { CommandResult, ProjectCommand } from '../core/ProjectStore'
 import { decimalMetersToMm, planBounds, type FloorPlan } from '../core/floor-plan'
-import { defaultGarageDoorSpec, GARAGE_DOOR_PRESETS } from '../core/garage-door'
-import { MIN_FRAME_SIDE_MM, planFrameOpeningSides } from '../core/plan-frame'
+import {
+  MIN_FRAME_SIDE_MM, PLAN_OPENING_PRESETS, nextPlanOpeningId, planFrameOpeningSides, planOpeningPreset,
+} from '../core/plan-frame'
 import { isPartitionWall } from '../core/partition-layout'
 import type { Opening } from '../core/project'
 
 export type PlanFramePick = { wallId: string; offsetMm: number } | { opening: Opening }
 
-const openingTypes = [
-  { value: 'window', label: 'Окно', prefix: 'W', widthMm: 1200, heightMm: 1200, sillHeightMm: 900 },
-  { value: 'door', label: 'Дверь', prefix: 'D', widthMm: 900, heightMm: 2100, sillHeightMm: 0 },
-  { value: 'garage-door', prefix: 'G', ...GARAGE_DOOR_PRESETS[0], label: 'Ворота', sillHeightMm: 0 },
-] as const
 const fields = [
   { name: 'positionUmm', label: 'От начала стены, мм' },
   { name: 'widthMm', label: 'Ширина, мм' },
@@ -21,7 +17,7 @@ const fields = [
 ] as const
 
 const emptyOpenings: Opening[] = []
-const doorDefaults = { type: 'door', widthMm: 900, heightMm: 2100, sillHeightMm: 0, garage: undefined } as const
+const doorDefaults = { type: 'door', widthMm: 900, heightMm: 2100, sillHeightMm: 0, garage: undefined, swing: undefined } as const
 
 interface Props {
   plan: FloorPlan
@@ -51,6 +47,10 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
   }, [width, depth])
 
   useEffect(() => {
+    if (!picking) setDraft(null)
+  }, [picking])
+
+  useEffect(() => {
     if (pick && 'opening' in pick) {
       setDraft(pick.opening)
     } else if (pick) {
@@ -70,28 +70,24 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
   }
 
   const changeType = (value: Opening['type']) => {
-    const type = openingTypes.find(item => item.value === value)!
     setDraft(previous => previous && ({
-      id: previous.id, wallId: previous.wallId, positionUmm: previous.positionUmm,
-      type: type.value, widthMm: type.widthMm, heightMm: type.heightMm, sillHeightMm: type.sillHeightMm,
-      ...(type.value === 'garage-door' ? { garage: defaultGarageDoorSpec() } : {}),
+      ...planOpeningPreset(value, previous.wallId, previous.id), positionUmm: previous.positionUmm,
+      ...(value === previous.type && previous.swing ? { swing: previous.swing } : {}),
     }))
   }
 
   const save = () => {
     if (!draft) return
-    const prefix = openingTypes.find(item => item.value === draft.type)!.prefix
-    let next = 1
-    while (openings.some(opening => opening.id === prefix + String(next).padStart(2, '0'))) next++
-    const id = editing?.id ?? prefix + String(next).padStart(2, '0')
-    const { wallId, type, positionUmm, widthMm, heightMm, sillHeightMm, garage } = draft
-    const opening = { id, wallId, type, positionUmm, widthMm, heightMm, sillHeightMm, ...(garage ? { garage } : {}) }
-    if (apply({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening } })) setDraft(null)
+    const id = editing?.id ?? nextPlanOpeningId(openings, draft.type)
+    if (apply({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening: { ...draft, id } } })) setDraft(null)
   }
 
   return <section className="plan-tool-section" aria-label="Каркас по плану">
     <strong className="plan-section-title">Каркас по плану</strong>
     {!sides.length ? <p className="plan-guidance">Для генерации нужен замкнутый прямоугольник из четырёх углов.</p> : <>
+      <button type="button" className="plan-button plan-primary" data-testid="plan-frame-build" onClick={() => {
+        if (plan.frame?.built || apply({ type: 'PLAN_FRAME_BUILD', payload: {} })) onBuilt()
+      }}>{plan.frame?.built ? 'Открыть каркас 3D' : 'Построить каркас'}</button>
       <div className="plan-frame-fields">
         <label>Габарит X, м<input data-testid="plan-frame-width" inputMode="decimal"
           value={widthDraft} onChange={event => setWidthDraft(event.target.value)} /></label>
@@ -111,20 +107,24 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
           onClick={() => apply({ type: 'PLAN_FRAME_ENABLE_PARTITIONS', payload: {} })}>
           Включить перегородки в каркас
         </button>}
+      <details className="plan-manual-openings">
+        <summary data-testid="plan-manual-openings">Точный ввод проёмов</summary>
       <div className="plan-frame-fields">
         <button type="button" className="plan-button plan-secondary" data-testid="plan-frame-add-opening"
           onClick={() => {
             if (!picking) onPick()
-            setDraft({ id: '', wallId: sides[0].wallId, type: 'window',
-              positionUmm: 800, widthMm: 1200, heightMm: 1200, sillHeightMm: 900 })
+            setDraft({ ...planOpeningPreset('window', sides[0].wallId, ''), positionUmm: 800 })
           }}>+ Проём</button>
         <button type="button" className="plan-button plan-text" aria-pressed={picking}
           data-testid="plan-frame-pick" onClick={onPick}>Выбрать на плане</button>
       </div>
       {openings.map(opening => <button key={opening.id} type="button"
         className="plan-button plan-text" data-testid={'plan-frame-edit-' + opening.id}
-        onClick={() => setDraft(opening)}>
-        {opening.id} · {openingTypes.find(type => type.value === opening.type)?.label} · {opening.widthMm} мм
+        onClick={() => {
+          if (!picking) onPick()
+          setDraft(opening)
+        }}>
+        {opening.id} · {PLAN_OPENING_PRESETS.find(type => type.value === opening.type)?.label} · {opening.widthMm} мм
       </button>)}
       {draft && <div className="plan-frame-form">
         <label>Стена<select data-testid="plan-frame-opening-wall" value={draft.wallId}
@@ -136,7 +136,7 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
         </select></label>
         <label>Тип<select data-testid="plan-frame-opening-type" value={draft.type}
           onChange={event => changeType(event.target.value as Opening['type'])}>
-          {openingTypes.filter(type => !isPartitionWall(draft.wallId) || type.value === 'door').map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+          {PLAN_OPENING_PRESETS.filter(type => !isPartitionWall(draft.wallId) || type.value === 'door').map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
         </select></label>
         <p className="plan-guidance">Отступ измеряется по стрелке от начала линии стены до начала проёма.</p>
         <div className="plan-frame-fields">
@@ -157,10 +157,8 @@ export function PlanFrameControls({ plan, pick, picking, onPick, onCommand, onIs
             if (apply({ type: 'PLAN_FRAME_REMOVE_OPENING', payload: { openingId: editing.id } })) setDraft(null)
           }}>Удалить проём</button>}
       </div>}
+      </details>
       {error && <div className="plan-error" role="alert" data-testid="plan-frame-error">{error}</div>}
-      <button type="button" className="plan-button plan-primary" data-testid="plan-frame-build" onClick={() => {
-        if (plan.frame?.built || apply({ type: 'PLAN_FRAME_BUILD', payload: {} })) onBuilt()
-      }}>{plan.frame?.built ? 'Открыть каркас 3D' : 'Построить каркас'}</button>
       <p className="plan-guidance">Наружные стены · 45 × 145 мм · высота 2700 мм · шаг 600 мм.</p>
       {!plan.frame?.built && <p className="plan-guidance">Связанный каркас заменит текущую модель во вкладке 3D. Действие можно отменить.</p>}
       {plan.frame?.partitions && <p className="plan-guidance">

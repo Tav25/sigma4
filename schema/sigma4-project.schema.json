@@ -240,6 +240,15 @@
                 "type": "number",
                 "minimum": 0
               },
+              "swing": {
+                "type": "object",
+                "required": ["hinge", "side"],
+                "additionalProperties": false,
+                "properties": {
+                  "hinge": { "enum": ["start", "end"] },
+                  "side": { "enum": ["left", "right"] }
+                }
+              },
               "garage": {
                 "type": "object",
                 "required": [

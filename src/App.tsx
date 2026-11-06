@@ -333,7 +333,7 @@ export default function App() {
       {workspace === 'plan' ? (
         <ErrorBoundary>
           <FloorPlanEditor plan={snapshot.building.floorPlan}
-            onCommand={dispatch} onExport={exportJson}
+            onCommand={dispatch} onExport={exportJson} onUndo={undo} onRedo={redo}
             onImport={() => document.getElementById('import-file')?.click()}
             onFrameBuilt={() => setWorkspace('frame')} />
         </ErrorBoundary>

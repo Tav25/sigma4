@@ -130,6 +130,34 @@ describe('frame from a rectangular plan', () => {
     expect(store.exportJson()).toBe(json)
   })
 
+  it('moves a hosted opening atomically, rejects conflicts and preserves its exact 3D position', () => {
+    const store = garage()
+    const window = openings[0]
+    const door: Opening = { ...openings[1], wallId: 'plan-front', positionUmm: 2600,
+      swing: { hinge: 'end', side: 'right' } }
+    for (const opening of [window, door]) {
+      expect(store.dispatch({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening } }).success).toBe(true)
+    }
+    expect(store.dispatch({ type: 'PLAN_FRAME_BUILD', payload: {} }).success).toBe(true)
+    const before = store.exportJson()
+    const revision = store.getRevision()
+    const move = (positionUmm: number) => store.dispatch({
+      type: 'PLAN_FRAME_MOVE_OPENING', payload: { openingId: door.id, positionUmm },
+    })
+    expect(move(1800).success).toBe(false)
+    expect(move(150).success).toBe(false)
+    expect(store.getRevision()).toBe(revision)
+    expect(store.exportJson()).toBe(before)
+    expect(move(2900).success).toBe(true)
+    expect(store.getRevision()).toBe(revision + 1)
+    const doc = store.getSnapshot()
+    expect(doc.building.floorPlan?.frame?.openings).toEqual([window, { ...door, positionUmm: 2900 }])
+    const projected = projectToScene(doc).sceneOpenings.find(item => item.id === door.id)!
+    expect(openingLocalToWorld(projected, projected.positionXmm, 0, 72.5)).toEqual({ x: 2900, y: 0, z: 0 })
+    expect(store.undo().success).toBe(true)
+    expect(store.exportJson()).toBe(before)
+  })
+
   it('rejects a resize that cuts through a saved opening and identifies it', () => {
     const store = garage()
     expect(store.dispatch({ type: 'PLAN_FRAME_SAVE_OPENING', payload: { opening: openings[2] } }).success).toBe(true)

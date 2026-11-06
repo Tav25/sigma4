@@ -14,7 +14,7 @@ import { effectiveConnections, reflowConnections } from './wall-topology'
 import { addGraphPoint, addGraphSegment, splitGraphEdge, deleteGraphEdge,
   deleteGraphPoint, moveGraphPoint, changeGraphEdge, moveGraphEdge,
   moveGraphEdgeToDimension } from './plan-graph'
-import { FRAME_SECTION, MIN_FRAME_SIDE_MM, rectangularFrameSides } from './plan-frame'
+import { FRAME_SECTION, MIN_FRAME_SIDE_MM, rectangularFrameSides, withPlanOpening } from './plan-frame'
 import { emptyFloorPlan, validateFloorPlan, moveInteriorWallWithDependents,
   moveWallToClearance, planBounds, PLAN_LIMIT_MM, type PlanPoint, type PlanInteriorWall } from './floor-plan'
 
@@ -23,6 +23,7 @@ export type ProjectCommand =
   | { type: 'PLAN_ADD_POINT'; payload: { point: PlanPoint } }
   | { type: 'PLAN_MOVE_POINT'; payload: { index: number; point: PlanPoint } }
   | { type: 'PLAN_FRAME_SAVE_OPENING'; payload: { opening: Opening } }
+  | { type: 'PLAN_FRAME_MOVE_OPENING'; payload: { openingId: string; positionUmm: number } }
   | { type: 'PLAN_FRAME_REMOVE_OPENING'; payload: { openingId: string } }
   | { type: 'PLAN_FRAME_ENABLE_PARTITIONS'; payload: Record<string, never> }
   | { type: 'PLAN_FRAME_BUILD'; payload: Record<string, never> }
@@ -317,6 +318,7 @@ export class ProjectStore {
           break
         }
         case 'PLAN_FRAME_SAVE_OPENING':
+        case 'PLAN_FRAME_MOVE_OPENING':
         case 'PLAN_FRAME_REMOVE_OPENING':
         case 'PLAN_FRAME_ENABLE_PARTITIONS':
         case 'PLAN_FRAME_BUILD':
@@ -341,13 +343,23 @@ export class ProjectStore {
             break
           }
 
+          if (command.type === 'PLAN_FRAME_SAVE_OPENING' || command.type === 'PLAN_FRAME_MOVE_OPENING') {
+            let opening: Opening
+            if (command.type === 'PLAN_FRAME_SAVE_OPENING') {
+              opening = this.deepClone(command.payload.opening)
+            } else {
+              const { openingId, positionUmm } = command.payload
+              const previous = plan.frame?.openings.find(item => item.id === openingId)
+              if (!previous) return { success: false, errorCode: 'OPENING_NOT_FOUND', messageRu: 'Проём не найден' }
+              opening = { ...previous, positionUmm }
+            }
+            candidate.building.floorPlan = withPlanOpening(plan, opening)
+            changedIds.push('building.floorPlan.frame')
+            break
+          }
+
           const frame = plan.frame ?? { built: false, openings: [] }
-          if (command.type === 'PLAN_FRAME_SAVE_OPENING') {
-            const opening = this.deepClone(command.payload.opening)
-            const index = frame.openings.findIndex(item => item.id === opening.id)
-            if (index < 0) frame.openings.push(opening)
-            else frame.openings[index] = opening
-          } else if (command.type === 'PLAN_FRAME_REMOVE_OPENING') {
+          if (command.type === 'PLAN_FRAME_REMOVE_OPENING') {
             frame.openings = frame.openings.filter(item => item.id !== command.payload.openingId)
           } else if (command.type === 'PLAN_FRAME_ENABLE_PARTITIONS') {
             frame.partitions = true
