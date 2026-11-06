@@ -1,5 +1,6 @@
 
 import { createTimberElement } from './timber'
+import { doorFrameMembers, doorProfile, doorBottomPlates } from './door-frame'
 import type { GarageDoorSpec, HeaderPreviewSpec, HeaderDesignLoads } from './project'
 import type { TimberElement } from './timber'
 import { generateWallPanel } from './wall'
@@ -291,49 +292,11 @@ export function applyDoorOpening(elements: TimberElement[], door: WindowOpening)
     result.push(e)
   }
 
-  // king studs (full height)
-  const kingLen = wallHeight - SW * 3
-  result.push(createTimberElement({
-    id: door.id + '-king-left', role: 'king-stud', length: kingLen, width: SW, height: SH,
-    position: { x: ox - studsPerSide * SW - SW / 2, y: SW, z: -SH / 2 },
-    orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
-  }))
-  result.push(createTimberElement({
-    id: door.id + '-king-right', role: 'king-stud', length: kingLen, width: SW, height: SH,
-    position: { x: openingRight + studsPerSide * SW + SW / 2, y: SW, z: -SH / 2 },
-    orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
-  }))
-
-  // Side supports: a provisional layout, not a calculated capacity.
-  const jackLen = openingTop - SW
-  for (let i = 0; i < studsPerSide; i++) {
-    result.push(createTimberElement({
-      id: door.id + (i === 0 ? '-jack-left' : '-jack-left-' + (i + 1)),
-      role: 'jack-stud', length: jackLen, width: SW, height: SH,
-      position: { x: ox - SW / 2 - i * SW, y: SW, z: -SH / 2 },
-      orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
-    }))
-    result.push(createTimberElement({
-      id: door.id + (i === 0 ? '-jack-right' : '-jack-right-' + (i + 1)),
-      role: 'jack-stud', length: jackLen, width: SW, height: SH,
-      position: { x: openingRight + SW / 2 + i * SW, y: SW, z: -SH / 2 },
-      orientation: { mode: 'y', angle: 0, roll: 0 }, material: 'wood',
-    }))
-  }
-
-  // header: two boards, length 990, Y 2100-2245, Z split
-  const headerLen = ow + 2 * SW * studsPerSide
-  const headerRole = garage ? 'garage-lintel-preview' : 'header'
-  result.push(createTimberElement({
-    id: door.id + '-header-1', role: headerRole, length: headerLen, width: SW, height: headerDepth,
-    position: { x: ox - studsPerSide * SW, y: openingTop, z: -50 },
-    orientation: { mode: 'x', angle: 0, roll: 0 }, material: 'wood',
-  }))
-  result.push(createTimberElement({
-    id: door.id + '-header-2', role: headerRole, length: headerLen, width: SW, height: headerDepth,
-    position: { x: ox - studsPerSide * SW, y: openingTop, z: 50 },
-    orientation: { mode: 'x', angle: 0, roll: 0 }, material: 'wood',
-  }))
+  // Common framing engine; exterior and partition use distinct profiles.
+  // The legacy exterior construction is retained byte-for-byte in geometry.
+  result.push(...doorFrameMembers(door, {
+    widthMm: SW, depthMm: SH, wallHeightMm: wallHeight, topLayers: 2,
+  }, doorProfile(door, false, SH)))
 
   // cripple-top (two studs at 3300 and 3600 for control model; for general, use removed opening studs)
     const crippleTopLen = (wallHeight - SW * 2) - (openingTop + headerDepth)
@@ -380,39 +343,12 @@ export function generateWallWithOpenings(params: WallPanelParams, openings: Wind
     }
   }
 
-  // if any door, rebuild bottom plates (split around doors)
-  const doors = openings.filter((o) => o.type === 'door' || o.type === 'garage-door')
+  // One shared bottom-plate segmentation for every doorway profile.
+  // Keep exterior historical IDs for stable round-trip assemblies.
+  const doors = openings.filter(o => o.type === 'door' || o.type === 'garage-door')
   if (doors.length > 0) {
-    // remove existing bottom-plate elements
-    elements = elements.filter((e) => e.role !== 'bottom-plate')
-    // create segments
-    const doorRanges = doors.map((d) => [d.positionXmm, d.positionXmm + d.widthMm] as [number, number]).sort((a, b) => a[0] - b[0])
-    let prevEnd = 0
-    for (let di = 0; di < doorRanges.length; di++) {
-      const [ds, de] = doorRanges[di]
-      if (ds > prevEnd) {
-        const len = ds - prevEnd
-        // The gap BEFORE the first door is 'left'. Every gap between
-        // two doors is 'mid-N'. Only the gap AFTER the final door may
-        // be 'right'. Never label an interior gap as 'right' or the
-        // tail segment will reuse its elementId.
-        const segId = di === 0 ? 'plate-bottom-left' : `plate-bottom-mid-${di}`
-        elements.push(createTimberElement({
-          id: segId, role: 'bottom-plate', length: len, width: SW, height: SH,
-          position: { x: prevEnd, y: SW / 2, z: -SH / 2 },
-          orientation: { mode: 'x', angle: 0, roll: 90 }, material: 'wood',
-        }))
-      }
-      prevEnd = de
-    }
-    if (prevEnd < params.length) {
-      const len = params.length - prevEnd
-      elements.push(createTimberElement({
-        id: 'plate-bottom-right', role: 'bottom-plate', length: len, width: SW, height: SH,
-        position: { x: prevEnd, y: SW / 2, z: -SH / 2 },
-        orientation: { mode: 'x', angle: 0, roll: 90 }, material: 'wood',
-      }))
-    }
+    elements = elements.filter(e => e.role !== 'bottom-plate')
+    elements.push(...doorBottomPlates(params, doors, 'exterior'))
   }
 
   return { id: 'wall-with-openings', elements }

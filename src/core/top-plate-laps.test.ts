@@ -135,7 +135,9 @@ describe('SIGMA4 v0.1.20: Haun top-plate lapping at junctions',()=>{
     const {doc}=frame([[point(0,-3000),point(10000,-3000)],
       [point(4000,0),point(4000,-3000)]])
     const ids=doc.building.walls.filter(w=>w.wallId.startsWith('partition-')).map(w=>w.wallId)
-    expect(ids).toHaveLength(3)
+    // An authored T contains three editable graph edges, but only TWO
+    // physical wall runs: the collinear arms form one continuous through-wall.
+    expect(ids).toHaveLength(2)
     const transverse=doc.building.walls.find(w=>w.orientation==='z'&&ids.includes(w.wallId))!
     const transverseCap=upper(doc).find(e=>e.wallId===transverse.wallId)!
     expect(transverseCap.lengthMm).toBe(transverse.lengthMm+145+100)
