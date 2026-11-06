@@ -109,7 +109,7 @@ describe('frame from a rectangular plan', () => {
         Math.min(part.box.max[axis], other.box.max[axis]) - Math.max(part.box.min[axis], other.box.min[axis]) > 1e-6))
       expect(collisions.map(item => item.element.id)).toEqual([])
     }
-    expect(initial.assembly.elements.filter(e => e.elementId.includes(':partition-backing-'))).toHaveLength(2)
+    expect(initial.assembly.elements.filter(e => e.elementId.includes(':partition-backing-'))).toHaveLength(4)
     const move = store.dispatch({ type: 'PLAN_SET_INTERIOR_CLEARANCE',
       payload: { id: 'I002', side: 'negative', distanceMm: 4105 } })
     expect(move.success).toBe(true)

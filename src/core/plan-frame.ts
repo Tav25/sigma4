@@ -133,7 +133,19 @@ export function validatePlanFrame(plan: FloorPlan): ValidationIssue[] {
     for (const { host, positionUmm } of partitionAttachments(partition)) {
       const exteriorHost = exterior.some(side => side.wallId === host.wallId)
       const reserve = (exteriorHost ? DEPTH : 0) + FRAME_SECTION.width + partition.thicknessMm / 2
-      if (positionUmm < reserve || positionUmm > planSideLength(host) - reserve) {
+      // A graph-created T or X junction is exactly at the end of TWO
+      // collinear source segments. It is NOT a physical unsupported wall end.
+      // The neighbouring segment supplies the other half of the through wall.
+      const hostLength = planSideLength(host)
+      const p = planSidePoint(host, positionUmm)
+      const isCollinearContinuation = !exteriorHost &&
+        (positionUmm === 0 || positionUmm === hostLength) &&
+        partitions.some(other => other.wallId !== host.wallId &&
+          (other.start.zMm === other.end.zMm) === (host.start.zMm === host.end.zMm) &&
+          ((other.start.xMm === p.xMm && other.start.zMm === p.zMm) ||
+           (other.end.xMm === p.xMm && other.end.zMm === p.zMm)))
+      if (!isCollinearContinuation &&
+        (positionUmm < reserve || positionUmm > hostLength - reserve)) {
         fail(partition.label + ': примыкание слишком близко к углу', [partition.wallId, host.wallId])
       }
       for (const opening of frame.openings) {
