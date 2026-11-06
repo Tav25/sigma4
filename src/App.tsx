@@ -559,6 +559,13 @@ export default function App() {
             <div style={{ color: hasErrors ? '#cc0000' : '#006600', marginTop: 4 }}>
               Валидация: {validation?.valid ? 'OK' : 'ОШИБКИ'}
             </div>
+            {linkedFrame && <div data-testid="structural-validator-summary" style={{ marginTop: 4 }}>
+              Геометрический контроль каркаса: {validation?.issues.filter(i =>
+                i.code.startsWith('STRUCTURAL_') && i.severity === 'error').length ?? 0} ошибок
+              <div style={{ fontSize: 11, opacity: 0.8 }}>
+                Проверяются контакты, пересечения и опоры досок.
+              </div>
+            </div>}
             {linkedFrame && <div>Инженерный расчёт: не выполнен</div>}
             {snapshot.building.openings.some(o => o.type === 'garage-door') && (
               <div style={{ color: '#a25a00', marginTop: 4 }}>

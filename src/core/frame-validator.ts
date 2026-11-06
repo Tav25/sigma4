@@ -7,6 +7,7 @@ import type {
 import { canFitCornerFraming, rightCornerOrigin } from './corner'
 import { effectiveConnections, validateWallTopology } from './wall-topology'
 import { validateGarageOpening, garageEngineeringNotices } from './garage-door'
+import { validateAssemblyContacts } from './frame-structural-validator'
 import { validateOpeningHeaderInputs, verifyOpeningFraming, verifyHeaderLoadInputs } from './opening-profiles'
 import { wallMidplaneOrigin } from './world-origin'
 import { validateFloorPlan } from './floor-plan'
@@ -480,6 +481,9 @@ export function validateGeometry(doc: ProjectDocument | null | undefined): Valid
     })
   })
 
+  // S18: independent world-space contact, collision and support validation
+  // after legacy geometry/opening checks. This never mutates authored JSON.
+  issues.push(...validateAssemblyContacts(doc))
   return issues
 }
 

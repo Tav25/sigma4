@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.23')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.24')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -947,7 +947,18 @@ try {
     nwBuilt.building.floorPlan.frame.openings.find(o=>o.id==='D01').wallId)
   assert.equal(s17.building.floorPlan.frame.openings.find(o=>o.id==='W01').headerPreview.depthMm,235)
   await page.screenshot({path:dir+'/39-stage4-resize-bound-partition-10x7.png'})
-  console.log('SIGMA4 BROWSER PASS: v0.1.23 boundary-bound nodes and preserved openings on rectangle resize; v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
+  // S18 — real built 3D assembly must have no reported contact/collision
+  // failures, but must still remain "engineering not evaluated".
+  assert.equal(s17.validation.issues.filter(i=>
+    i.code.startsWith('STRUCTURAL_') && i.severity==='error').length,0)
+  assert.equal(s17.validation.engineeringStatus,'not_evaluated')
+  await page.getByTestId('tab-frame').click()
+  await page.getByTestId('structural-validator-summary').waitFor()
+  assert.match(await page.getByTestId('structural-validator-summary').textContent(),
+    /0 ошибок/)
+  await page.screenshot({path:dir+'/40-stage5-structural-contact-validation.png'})
+
+  console.log('SIGMA4 BROWSER PASS: v0.1.24 structural contact/overlap/support validation; v0.1.23 boundary-bound nodes and preserved openings on rectangle resize; v0.1.22 structural opening profiles, supported headers and load demand UI; v0.1.21 feature-first stud detailing around openings and Haun channels; northwest screenshot 9x6 T room and D01 UI regression; v0.1.20 Haun overlapping upper plates at exterior T and interior L, real horizontal sections; v0.1.19 Haun 3-stud channels (two full-depth + one flat nailer), verified in cut; v0.1.18 true horizontal cuts of ALL boards at different elevations; v0.1.17 T/X junction topology, T/X topology; legacy 3D, free graph plan, linked 2D-to-3D garage, resize, JSON roundtrip, partition doors, horizontal section and direct 2D opening editing on desktop and touch')
 
 } finally {
   await browser?.close()
