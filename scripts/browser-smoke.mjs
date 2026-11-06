@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.22')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.23')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
