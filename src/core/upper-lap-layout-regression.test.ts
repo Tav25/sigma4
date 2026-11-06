@@ -7,7 +7,7 @@ import { projectToScene } from '../scene/project-to-scene'
 import type { Opening } from './project'
 
 const p=(xMm:number,zMm:number)=>({xMm,zMm})
-function reproduce(reverse=false,door=false){
+function reproduce(reverse=false,door=false,style:'whole'|'upper-first'|'lower-first'|'branch-first'='whole'){
   const store=createProjectStore(createProjectFromCurrentState({
     projectId:'9x6-northwest-tee',projectName:'Northwest room 3x3.25',
     length:6000,height:2700,spacing:600,openings:[],
@@ -19,10 +19,16 @@ function reproduce(reverse=false,door=false){
   expect(store.dispatch({type:'PLAN_CLOSE',payload:{}}).success).toBe(true)
   // The screenshot: northwest room, wall x=3000 continues from back (Z=-6000)
   // across the T-junction at Z=-3250 all the way to the front wall Z=0.
-  const edges=reverse
-    ? [[p(3000,0),p(3000,-6000)],[p(3000,-3250),p(0,-3250)]]
-    : [[p(3000,-6000),p(3000,0)],[p(0,-3250),p(3000,-3250)]]
-  for(const [start,end] of edges){
+  const full=[p(3000,-6000),p(3000,0)]
+  const upper=[p(3000,-6000),p(3000,-3250)]
+  const lower=[p(3000,-3250),p(3000,0)]
+  const branch=[p(0,-3250),p(3000,-3250)]
+  const oriented=(segment:ReturnType<typeof p>[])=>reverse?segment.slice().reverse():segment
+  const sequence=style==='whole'?[full,branch]:
+    style==='upper-first'?[upper,lower,branch]:
+    style==='lower-first'?[lower,branch,upper]:
+    [branch,lower,upper]
+  for(const [start,end] of sequence.map(oriented)){
     const r=store.dispatch({type:'PLAN_GRAPH_ADD_EDGE',payload:{start,end,thicknessMm:100}})
     expect(r.success,r.messageRu).toBe(true)
   }
@@ -61,4 +67,14 @@ describe('SIGMA4: upper plate laps on screenshot 9x6 / 3x3.25 northwest room',()
   it('supports upper-left room T and door D01',()=>reproduce(false,true))
   it('supports reversed vertical and horizontal construction order',()=>reproduce(true,false))
   it('supports reversed construction order with door D01',()=>reproduce(true,true))
+  it.each(['upper-first','lower-first','branch-first'] as const)(
+    'builds separately drawn walls (%s) with door, both directions',(style)=>{
+      reproduce(false,true,style)
+      reproduce(true,true,style)
+    })
+  it.each(['upper-first','lower-first','branch-first'] as const)(
+    'builds separately drawn walls (%s) without door, both directions',(style)=>{
+      reproduce(false,false,style)
+      reproduce(true,false,style)
+    })
 })
