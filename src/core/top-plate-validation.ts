@@ -14,7 +14,7 @@
  * All measurements use derived, materialized boards; NEVER alter source JSON.
  */
 import { planStructuralFrameSides } from './plan-frame'
-import { isPartitionWall, partitionAttachments, type PartitionSide } from './partition-layout'
+import { partitionAttachments, type PartitionSide } from './partition-layout'
 import { physicalTimberBoxes, boxesFaceContact, type StructuralBox } from './frame-structural-validator'
 import type { ProjectDocument, TimberElement, ValidationIssue, Wall } from './project'
 import type { PlanPoint } from './floor-plan'

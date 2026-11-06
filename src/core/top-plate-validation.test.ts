@@ -39,7 +39,7 @@ const divide=(doc:ReturnType<typeof make>,original:TimberElement,at:number)=>{
 const t=[[p(4000,0),p(4000,-7000)],[p(0,-3500),p(4000,-3500)]] as const
 const x=[[p(0,-3500),p(10000,-3500)],[p(4000,0),p(4000,-7000)]] as const
 describe('SIGMA4: materialized double top plate laps and IRC 610 mm splice offset',()=>{
-  it.each([t,x] as const)('accepts actual T/X upper laps without inventing 610 mm overhang at crossing',segments=>{
+  it.each([{name:'T',segments:t},{name:'X',segments:x}])('accepts actual $name upper laps without inventing 610 mm overhang',({segments})=>{
     const doc=make(segments)
     expect(validateTopPlateLaps(doc)).toEqual([])
     expect(doc.validation.valid).toBe(true)
