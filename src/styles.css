@@ -590,3 +590,8 @@ body,
   .plan-toolbar {max-height:118px;overflow-y:auto}
   .plan-toolbar .plan-grid-select {margin-left:0}
 }
+
+/* The floating wall-action surface must not block dimension editing under its empty space.
+   Its actionable child buttons remain interactive and keyboard accessible. */
+.plan-wall-actions {pointer-events:none}
+.plan-wall-actions button {pointer-events:auto}
