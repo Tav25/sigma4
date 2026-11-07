@@ -1173,11 +1173,12 @@ try {
   assert.equal((await page.getByTestId('plan-wall-count').textContent()).trim(),'3')
   // S26: the same derived net room areas appear in 2D before building,
   // with independently switchable fills and labels.
-  assert.equal((await page.getByTestId('plan-room-total').getAttribute('data-area-m2')),'48,74')
+  const roomTotalBeforeBuild=await page.getByTestId('plan-room-total').getAttribute('data-area-m2')
+  assert.equal(roomTotalBeforeBuild,'48,88')
   assert.equal(await page.locator('[data-testid^="plan-room-label-R"]').count(),3)
-  assert.match(await page.getByTestId('plan-room-label-R01').textContent(),/7,84/)
-  assert.match(await page.getByTestId('plan-room-label-R02').textContent(),/7,84/)
-  assert.match(await page.getByTestId('plan-room-label-R03').textContent(),/33,06/)
+  assert.match(await page.getByTestId('plan-room-label-R01').textContent(),/7,87/)
+  assert.match(await page.getByTestId('plan-room-label-R02').textContent(),/7,87/)
+  assert.match(await page.getByTestId('plan-room-label-R03').textContent(),/33,15/)
   await page.screenshot({path:dir+'/46-room-area-2d-three-rooms.png'})
   await page.getByTestId('plan-room-fill-toggle').click()
   assert.equal(await page.locator('[data-testid^="plan-room-fill-R"]').count(),0)
@@ -1193,10 +1194,10 @@ try {
   await page.getByText('Количество стен: 6',{exact:true}).waitFor()
   await page.locator('.viewport[data-room-count="3"]').waitFor()
   assert.equal(await page.locator('.viewport').getAttribute('data-room-label-style'),'planar-vector-dimensions')
-  // The frame construction makes the authored exterior framing thickness
-  // 145mm (a 2x6 stud) whereas draft floor plan defaults to a 150mm strip.
-  // Both modes must agree on the UPDATED canonical model, not stale values.
-  assert.equal(await page.locator('.viewport').getAttribute('data-room-total-m2'),'48.88')
+  // 2D and 3D now use the same default 145 mm exterior depth from the outset:
+  // building the frame must NOT change the room area.
+  assert.equal(await page.locator('.viewport').getAttribute('data-room-total-m2'),
+    Number(roomTotalBeforeBuild.replace(',','.')).toFixed(2))
   assert.match(await page.getByTestId('frame-room-summary').textContent(),/48,88/)
   await page.screenshot({path:dir+'/49-room-area-engineering-vector-iso.png'})
   await page.getByRole('button',{name:'Вид сверху'}).click()
