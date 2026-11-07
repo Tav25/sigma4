@@ -93,6 +93,30 @@ describe('SIGMA4 S16: explicit opening profiles, supports and load demands',()=>
     expect(store.importJson(before).success).toBe(true)
     expect(store.exportJson()).toBe(before)
   })
+  it('validates the physical window sill and the short studs under it',()=>{
+    const opening:Opening={id:'W01',wallId:'plan-front',type:'window',
+      positionUmm:2250,widthMm:1200,heightMm:1000,sillHeightMm:900,
+    }
+    const {doc}=framed([opening])
+    const wall=doc.building.walls.find(w=>w.wallId===opening.wallId)!
+    expect(verifyOpeningFraming(opening,wall,doc.assembly.elements)).toEqual([])
+    const sill=find(doc,'plan-front:W01-sill')
+    const detached=structuredClone(doc)
+    detached.assembly.elements=detached.assembly.elements.filter(e=>e.elementId!==sill.elementId)
+    expect(verifyOpeningFraming(opening,wall,detached.assembly.elements).map(x=>x.code))
+      .toContain('OPENING_SILL_GEOMETRY_INVALID')
+    const shifted=structuredClone(doc)
+    shifted.assembly.elements.find(e=>e.elementId===sill.elementId)!.position.y+=15
+    expect(verifyOpeningFraming(opening,wall,shifted.assembly.elements).map(x=>x.code))
+      .toContain('OPENING_SILL_GEOMETRY_INVALID')
+    const below=structuredClone(doc)
+    const cripple=below.assembly.elements.find(e=>
+      e.elementId.startsWith('plan-front:W01-cripple-bottom-layout-'))!
+    expect(cripple).toBeDefined()
+    cripple.lengthMm-=25
+    expect(verifyOpeningFraming(opening,wall,below.assembly.elements).map(x=>x.code))
+      .toContain('OPENING_BOTTOM_CRIPPLE_INVALID')
+  })
   it('preserves 2 jack supports and safety notices for 8-foot garage door',()=>{
     const opening:Opening={id:'G01',wallId:'plan-back',type:'garage-door',
       positionUmm:2200,widthMm:2438,heightMm:2134,sillHeightMm:0,

@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.28')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.30')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -700,6 +700,12 @@ try {
   assert.equal(await ghost.getAttribute('data-invalid'), 'false')
   await clickGarage(2400, 0)
   assert.equal(await page.getByTestId('plan-frame-opening-W01').getAttribute('data-offset-mm'), '1800')
+  // S30: direct inspector edits the actual authored preview framing profile.
+  await page.getByTestId('plan-frame-opening-W01').click()
+  await page.getByTestId('plan-opening-profile').waitFor()
+  await page.getByTestId('plan-opening-profile-depth').fill('235')
+  await page.getByTestId('plan-opening-profile-jacks').fill('2')
+  await page.getByTestId('plan-opening-inspector').getByRole('button',{name:'Применить'}).click()
 
   const beforeCollision = await revision()
   await clickGarage(4000, 0)
@@ -802,6 +808,11 @@ try {
   const authored = direct.building.floorPlan.frame.openings
   assert.equal(authored.length, 3)
   assert.deepEqual(authored.find(opening => opening.id === 'D01').swing, { hinge: 'end', side: 'right' })
+  assert.deepEqual(authored.find(opening => opening.id === 'W01').headerPreview,
+    {depthMm:235,jackStudsPerSide:2})
+  assert.equal(direct.assembly.elements.find(e=>e.elementId==='plan-front:W01-header-1')
+    .sectionMm.height,235)
+  assert.ok(direct.assembly.elements.some(e=>e.elementId==='plan-front:W01-jack-left-2'))
   const physicalDoor = direct.building.openings.find(opening => opening.id === 'D01')
   const physicalWall = direct.building.walls.find(wall => wall.wallId === physicalDoor.wallId)
   assert.equal(physicalWall.origin.x + physicalDoor.positionUmm, 1537)
