@@ -17,6 +17,7 @@ import { deriveFloorRooms,formatRoomArea,ROOM_COLORS,totalRoomAreaM2,type FloorR
 import type { Opening } from '../core/project'
 import { usePlanOpenings } from './usePlanOpenings'
 import { OpeningCut, PlanOpeningDimensions, PlanOpeningSymbol, closestPointOnSide } from './PlanOpeningGraphics'
+import { exteriorDimensionNormal, planGridMetrics, roomLabelKind, zoomPlanAround } from '../core/plan-visualization'
 import { PlanOpeningInspector, PlanWallActions, PlanWallSelection } from './PlanSelection'
 import { PlanFrameControls, type PlanFramePick } from './PlanFrameControls'
 
@@ -132,6 +133,7 @@ export function FloorPlanEditor({
   const clearances = selectedInterior && tool === 'select'
     ? planWallClearances(visiblePlan, selectedInterior.id) : null
   const px = zoom * BASE_PX_PER_METRE
+  const gridMetrics = planGridMetrics(px, snapMm)
   const originX = OFFSET_X + pan.x
   const originY = OFFSET_Y + pan.y
   const xy = (p: PlanPoint) => ({
@@ -607,9 +609,17 @@ export function FloorPlanEditor({
     }
     apply({ type: 'PLAN_MOVE_POINT', payload: { index: selectedIndex, point: { xMm, zMm } } })
   }
+  // Zoom around the cursor: its world coordinate remains stationary.
+  const zoomAt = (anchor: { x: number; y: number }, factor: number) => {
+    const next = zoomPlanAround(zoom, pan, anchor, factor, BASE_PX_PER_METRE,
+      { x: OFFSET_X, y: OFFSET_Y })
+    setZoom(next.zoom)
+    setPan(next.pan)
+  }
   const wheel = (event: WheelEvent<SVGSVGElement>) => {
     if (event.ctrlKey) return
-    setZoom(previous => Math.min(2.8, Math.max(0.32, previous * (event.deltaY < 0 ? 1.10 : 0.91))))
+    event.preventDefault()
+    zoomAt(svgFromEvent(event), event.deltaY < 0 ? 1.10 : 1 / 1.10)
   }
   const pointerDown = (event: PointerEvent<SVGSVGElement>) => {
     if (event.shiftKey || event.button === 1) {
@@ -1147,15 +1157,15 @@ export function FloorPlanEditor({
             </select>
           </label>
           <div className="plan-zoom-tools">
-            <button type="button" title="Уменьшить масштаб" onClick={() => setZoom(s => Math.max(0.32,s/1.15))}>−</button>
+            <button type="button" title="Уменьшить масштаб" onClick={() => zoomAt({ x: WIDTH / 2, y: HEIGHT / 2 }, 1 / 1.15)}>−</button>
             <span data-testid="plan-zoom">{Math.round(zoom*100)}%</span>
-            <button type="button" title="Увеличить масштаб" onClick={() => setZoom(s => Math.min(2.8,s*1.15))}>+</button>
+            <button type="button" title="Увеличить масштаб" onClick={() => zoomAt({ x: WIDTH / 2, y: HEIGHT / 2 }, 1.15)}>+</button>
             <button type="button" data-testid="plan-fit" title="Показать весь план" onClick={fitView}>Весь план</button>
           </div>
         </div>
         <div className="plan-canvas-wrap">
           <svg ref={svgRef} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="plan-canvas"
-            data-testid="plan-canvas" role="group" aria-label="Чертёж здания в метрах"
+            data-testid="plan-canvas" data-grid-step-mm={snapMm} role="group" aria-label="Чертёж здания в метрах"
             data-mode={placement ? 'placement' : preview ? 'opening-drag' : tool}
             onClick={onCanvasClick} onPointerDown={pointerDown} onPointerMove={pointerMove}
             onPointerUp={pointerUp} onPointerCancel={pointerUp}
@@ -1180,8 +1190,9 @@ export function FloorPlanEditor({
                 <path d="M0,0 L8,4 L0,8 Z" fill="#14777b" />
               </marker>
               <pattern id="plan-small-grid" x={originX} y={originY}
-                width={px/4} height={px/4} patternUnits="userSpaceOnUse">
-                <path d={`M ${px/4} 0 L 0 0 0 ${px/4}`} fill="none" stroke="#e4eaf1" strokeWidth="0.8"/>
+                width={gridMetrics.minorPx} height={gridMetrics.minorPx} patternUnits="userSpaceOnUse">
+                <path d={`M ${gridMetrics.minorPx} 0 L 0 0 0 ${gridMetrics.minorPx}`}
+                  fill="none" stroke="#e4ebef" strokeWidth=".75"/>
               </pattern>
               <pattern id="plan-big-grid" x={originX} y={originY}
                 width={px} height={px} patternUnits="userSpaceOnUse">
@@ -1190,7 +1201,7 @@ export function FloorPlanEditor({
             </defs>
             <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="#fcfdff" />
             {gridVisible && <>
-              <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-small-grid)" pointerEvents="none" data-testid="plan-grid-small"/>
+              {gridMetrics.showMinor && <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-small-grid)" pointerEvents="none" data-testid="plan-grid-small"/>}
               <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-big-grid)" pointerEvents="none" data-testid="plan-grid-big"/>
             </>}
             <line x1={originX} y1={0} x2={originX} y2={HEIGHT}
@@ -1199,7 +1210,7 @@ export function FloorPlanEditor({
               stroke="#b8cadd" strokeWidth="1.8" pointerEvents="none"/>
             <text x={WIDTH-32} y={originY-14} className="plan-axis-label" textAnchor="end">+X →</text>
             <text x={originX+14} y={22} className="plan-axis-label">−Z ↑</text>
-            {plan.closed && <polygon points={fill} fill="#d9eafa" fillOpacity=".42" stroke="none" pointerEvents="none"/>}
+            {plan.closed && <polygon points={fill} fill="#dce7ed" fillOpacity=".32" stroke="none" pointerEvents="none"/>}
             {showRoomFill && visibleRooms.map((room,i)=>
               <g key={'room-floor-'+room.id} data-room-id={room.id}
                 data-testid={'plan-room-fill-'+room.id}
@@ -1210,7 +1221,7 @@ export function FloorPlanEditor({
                     width={(rect.maxXmm-rect.minXmm)*px/1000}
                     height={(rect.maxZmm-rect.minZmm)*px/1000}
                     fill={ROOM_COLORS[i%ROOM_COLORS.length]}
-                    fillOpacity={selectedRoomId===room.id ? 0.40 : 0.28}
+                    fillOpacity={selectedRoomId===room.id ? 0.30 : 0.16}
                     stroke="none"
                     pointerEvents={tool==='select'&&!placement?'all':'none'}
                     onClick={event=>{
@@ -1225,7 +1236,7 @@ export function FloorPlanEditor({
             {exteriorWallStrips(plan).map((strip,i)=>
               <polygon key={'outer-strip-'+i} data-testid={'plan-exterior-strip-'+i}
                 points={strip.map(p=>{const q=xy(p);return q.x+','+q.y}).join(' ')}
-                fill="#50697d" fillOpacity=".78" stroke="none" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
+                fill="#526978" stroke="#304858" strokeWidth=".7" fillOpacity=".88" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
             )}
             {edges.map(edge => {
               const a=xy(edge.from),b=xy(edge.to)
@@ -1233,13 +1244,12 @@ export function FloorPlanEditor({
               const length=Math.hypot(dx,dy)
               const norm={x:-dy/length,y:dx/length}
               const center={x:(a.x+b.x)/2,y:(a.y+b.y)/2}
-              const boundingCenter={x:(bounds.minX+bounds.maxX)/2,
-                z:(bounds.minZ+bounds.maxZ)/2}
-              const centerScreen=xy({xMm:boundingCenter.x,zMm:boundingCenter.z})
-              const dot=(center.x-centerScreen.x)*norm.x+(center.y-centerScreen.y)*norm.y
-              const side=dot>=0?1:-1
-              const offset=norm.x*26*side, offsetY=norm.y*26*side
-              const labelX=center.x+offset, labelY=center.y+offsetY
+              // Winding, not the bounding-box centre, determines the outside of concave walls.
+              const outside=plan.closed
+                ? exteriorDimensionNormal(points,edge.index)
+                : { x: norm.x, y: norm.y }
+              const labelX=center.x+outside.x*49, labelY=center.y+outside.y*49
+              const dimensionVisible=!plan.closed || length>=90
               const rotation=Math.abs(dx)<Math.abs(dy)?-90:0
               const label=meters(planDistanceMm(edge.from,edge.to))+' м'
               const hasOpeningDimensions = annotatedSide && !('thicknessMm' in annotatedSide) &&
@@ -1249,11 +1259,18 @@ export function FloorPlanEditor({
                   edge.from.zMm === annotatedSide.start.zMm))
               return <g key={edge.index} pointerEvents="none">
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="plan-wall-line" style={{strokeWidth:plan.closed?2.5:8}} mask="url(#plan-opening-cuts)" />
-                {!hasOpeningDimensions && <>
-                <line x1={a.x+norm.x*17*side} y1={a.y+norm.y*17*side}
-                  x2={b.x+norm.x*17*side} y2={b.y+norm.y*17*side} className="plan-dimension-line"/>
-                <g transform={`translate(${labelX} ${labelY}) rotate(${rotation})`}>
-                  <rect x={-40} y={-11} width={80} height={22} rx={5} fill="white" stroke="#dbe6ef" />
+                {!hasOpeningDimensions && dimensionVisible && <>
+                <line x1={a.x+outside.x*32} y1={a.y+outside.y*32}
+                  x2={b.x+outside.x*32} y2={b.y+outside.y*32} className="plan-dimension-line"/>
+                {plan.closed && <>
+                  <line x1={a.x+outside.x*8} y1={a.y+outside.y*8}
+                    x2={a.x+outside.x*39} y2={a.y+outside.y*39} className="plan-dimension-witness"/>
+                  <line x1={b.x+outside.x*8} y1={b.y+outside.y*8}
+                    x2={b.x+outside.x*39} y2={b.y+outside.y*39} className="plan-dimension-witness"/>
+                </>}
+                <g data-testid={'plan-outer-dimension-'+edge.index}
+                  transform={`translate(${labelX} ${labelY}) rotate(${rotation})`}>
+                  <rect x={-40} y={-11} width={80} height={22} rx={3} className="plan-dimension-box"/>
                   <text y={5} textAnchor="middle" className="plan-dimension-text">{label}</text>
                 </g>
                 </>}
@@ -1348,7 +1365,9 @@ export function FloorPlanEditor({
             {showRoomLabels && visibleRooms.map(room=>{
               const pos=xy(room.center)
               const selected=room.id===selectedRoomId
+              const density=roomLabelKind(room,px)
               return <g key={'room-label-'+room.id}
+                data-label-density={density}
                 data-testid={'plan-room-label-'+room.id}
                 data-area-m2={formatRoomArea(room.areaM2)}
                 className={'plan-room-label'+(selected?' plan-room-selected':'')}
@@ -1364,12 +1383,20 @@ export function FloorPlanEditor({
                   event.preventDefault();event.stopPropagation()
                   clearSelection();onSelectRoom(room.id)
                 }}>
-                <rect x={pos.x-49} y={pos.y-23} width={98} height={43}
-                  rx={7} className="plan-room-label-background"/>
-                <text x={pos.x} y={pos.y-6} textAnchor="middle"
-                  className="plan-room-name">{room.label}</text>
-                <text x={pos.x} y={pos.y+12} textAnchor="middle"
-                  className="plan-room-area">{formatRoomArea(room.areaM2)} м²</text>
+                <title>{room.label}: {formatRoomArea(room.areaM2)} м²</title>
+                {density==='marker'
+                  ? <circle cx={pos.x} cy={pos.y} r={selected?10:7}
+                      className="plan-room-mini-marker"/>
+                  : <>
+                    <rect x={pos.x-(density==='full'?58:41)}
+                      y={pos.y-(density==='full'?22:14)}
+                      width={density==='full'?116:82} height={density==='full'?44:28}
+                      rx={5} className="plan-room-label-background"/>
+                    {density==='full' && <text x={pos.x} y={pos.y-6} textAnchor="middle"
+                      className="plan-room-name">{room.label}</text>}
+                    <text x={pos.x} y={pos.y+(density==='full'?12:5)} textAnchor="middle"
+                      className="plan-room-area">{formatRoomArea(room.areaM2)} м²</text>
+                  </>}
               </g>
             })}
             {shownOpenings.map(opening => {
@@ -1482,7 +1509,7 @@ export function FloorPlanEditor({
             {activeNodes.map(node=>{
               const loc=xy(node)
               return <g key={'graph-'+node.id} data-testid={'plan-graph-node-'+node.id}
-                className="plan-graph-node"
+                className="plan-graph-node" data-idle={tool==='select' && selectedGraphNodeId!==node.id && !placement}
                 onClick={e=>{
                   if(ignoreClick.current){ignoreClick.current=false;e.stopPropagation();return}
                   if (placement) return
@@ -1507,7 +1534,7 @@ export function FloorPlanEditor({
             {points.map((point,i) => {
               const loc=xy(point)
               return <g key={i} data-testid={`plan-point-${i}`}
-                className="plan-vertex" onClick={event => {if (!placement) { event.stopPropagation(); selectPoint(i) }}}>
+                className={'plan-vertex'+(plan.closed && selectedIndex!==i ? ' plan-vertex-idle' : '')} onClick={event => {if (!placement) { event.stopPropagation(); selectPoint(i) }}}>
                 <circle cx={loc.x} cy={loc.y} r={i===0?12:9}
                   fill={i===0?'#18a98b':selectedIndex===i?'#ffab40':'#ffffff'}
                   stroke={i===0?'#0f6f60':'#234765'} strokeWidth={3}/>
@@ -1536,7 +1563,9 @@ export function FloorPlanEditor({
                 placementLabel + ' · Клик или Enter — поставить · Esc — отменить'}
               {placement && <button type="button" onClick={cancelOpeningEdit} aria-label="Отменить размещение">×</button>}
             </div>}
-          <div className="plan-canvas-hint">{plan.closed
+          <div className="plan-canvas-hint">{gridVisible && !gridMetrics.showMinor
+            ? 'Привязка '+snapMm+' мм · мелкая сетка скрыта на этом масштабе · '
+            : ''}{plan.closed
             ?(tool==='interior'||tool==='turn'
               ?(interiorStart ? 'Клик — следующий участок · Enter — закончить · Esc — выйти'
                 : 'Укажите начало стены на сетке или существующей стене')

@@ -225,7 +225,9 @@ body,
 .plan-canvas-wrap {position:relative;flex:1;min-height:0;background:#fcfdff}
 .plan-canvas {display:block;width:100%;height:100%;touch-action:none;cursor:crosshair;user-select:none}
 .plan-wall-line {stroke:#193a50;stroke-width:8;stroke-linecap:round;vector-effect:non-scaling-stroke}
-.plan-dimension-line {stroke:#4281aa;stroke-width:1.6;vector-effect:non-scaling-stroke}
+.plan-dimension-line {stroke:#607f92;stroke-width:1.25;vector-effect:non-scaling-stroke}
+.plan-dimension-witness {stroke:#8ea2b0;stroke-width:.9;vector-effect:non-scaling-stroke}
+.plan-dimension-box {fill:#fcfdff;fill-opacity:.92;stroke:#d9e2e8;stroke-width:.8}
 .plan-dimension-text {font:700 14px system-ui,-apple-system,'Segoe UI',sans-serif;fill:#235978}
 .plan-node-label {font:700 12px system-ui,-apple-system,'Segoe UI',sans-serif;fill:#234d65;paint-order:stroke;stroke:#fff;stroke-width:3}
 .plan-axis-label {font:700 13px system-ui,-apple-system,'Segoe UI',sans-serif;fill:#8aa2b6}
@@ -506,7 +508,9 @@ body,
   outline:2px solid #128a82;outline-offset:2px;
 }
 .plan-room-label {cursor:pointer}
-.plan-room-label-background {fill:rgba(255,255,255,.94);stroke:#b8cbd3;stroke-width:1}
+.plan-room-label-background {fill:rgba(255,255,255,.91);stroke:#c4d0d6;stroke-width:.9}
+.plan-room-mini-marker {fill:#fff;stroke:#2a7e90;stroke-width:2;cursor:pointer}
+.plan-room-label.plan-room-selected .plan-room-mini-marker {fill:#dff5ef;stroke:#129477;stroke-width:3}
 .plan-room-name {font:600 10px system-ui,-apple-system,'Segoe UI',sans-serif;fill:#547080}
 .plan-room-area {font:800 14px system-ui,-apple-system,'Segoe UI',sans-serif;fill:#24465a}
 .plan-room-label.plan-room-selected .plan-room-label-background {
@@ -520,3 +524,15 @@ body,
   .plan-toolbar .plan-grid-toggle {padding:5px}
   .plan-bottom .plan-measure-panel>div {padding:3px 5px}
 }
+
+/* SIGMA4 0.1.35: unobstructed plan geometry and discoverable edit nodes. */
+.plan-vertex-idle > circle:first-child,.plan-vertex-idle > text {opacity:0}
+.plan-vertex-idle:hover > circle:first-child,.plan-vertex-idle:hover > text,
+.plan-vertex-idle:focus-within > circle:first-child,.plan-vertex-idle:focus-within > text {opacity:1}
+.plan-graph-node[data-idle="true"] > circle:first-child {opacity:0}
+.plan-graph-node[data-idle="true"]:hover > circle:first-child,
+.plan-graph-node[data-idle="true"]:focus-within > circle:first-child {opacity:1}
+.plan-room-label[data-label-density="compact"] .plan-room-area {font-size:12px}
+.plan-room-label[data-label-density="marker"] {cursor:pointer}
+.plan-canvas {background:#fbfdfe}
+.plan-interior-hit:hover {stroke:rgba(15,123,149,.20)}

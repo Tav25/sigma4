@@ -327,7 +327,7 @@ function validateInteriorPlan(plan: FloorPlan): string[] {
 
 
 /** Width of an interior wall is measured around its centreline. */
-export const DEFAULT_EXTERIOR_THICKNESS_MM = 150
+export const DEFAULT_EXTERIOR_THICKNESS_MM = 145 // Same default as FRAME_SECTION.height; explicit project widths remain authoritative.
 
 /** Signed area in mm²; negative polygons follow clockwise screen-space winding. */
 export function planSignedArea2(points: PlanPoint[]): number {

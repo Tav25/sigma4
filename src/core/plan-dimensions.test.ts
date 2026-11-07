@@ -62,10 +62,10 @@ describe('SIGMA4 0.1.11 metric drawing and dependent wall edits',()=>{
     const moved=moveInteriorWallWithDependents(model(),'I001',8000)!
     expect(validateFloorPlan(moved).length).toBeGreaterThan(0)
   })
-  it('draws 150mm outside wall bands to the inside and respects custom width',()=>{
+  it('draws 145mm default outside wall bands inward and respects custom width',()=>{
     const m=model()
     expect(exteriorWallStrips(m)[0]).toEqual([
-      p(0,0),p(10000,0),p(10000,-150),p(0,-150),
+      p(0,0),p(10000,0),p(10000,-145),p(0,-145),
     ])
     m.exteriorThicknessMm=200
     expect(exteriorWallStrips(m)[0][2].zMm).toBe(-200)
