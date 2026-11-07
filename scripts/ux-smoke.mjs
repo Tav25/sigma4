@@ -76,6 +76,7 @@ try {
   assert.match(await page.getByTestId('ui-engineering-status').textContent(), /не рассчитана/)
   assert.ok(await page.getByTestId('ui-geometry-status').isVisible())
   assert.ok(await page.getByTestId('ui-demo-status').isVisible())
+  await page.getByTestId('tab-frame').click()
   const treeGroup = page.getByTestId('frame-tree-section')
   const toggle = treeGroup.locator('.ui-inspector-toggle')
   await toggle.click()
@@ -99,6 +100,7 @@ try {
   assert.notEqual(await sectionUi.getByTestId('frame-section-svg').getAttribute('viewBox'), beforeFocus)
   await page.screenshot({ path: dir + '/ui03-07-section.png' })
   await page.getByTestId('frame-section-toggle').click()
+  await page.getByTestId('tab-plan').click()
 
   // Preserve the exact workspace view when switching between 2D and 3D.
   await page.locator('button[title="Увеличить масштаб"]').click()
