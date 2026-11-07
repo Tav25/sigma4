@@ -832,6 +832,13 @@ try {
 
   await page.getByTestId('plan-frame-build').click()
   await page.getByText('Количество стен: 6', { exact: true }).waitFor()
+  // UI-04: an opening selected in linked 3D opens its canonical 2D inspector.
+  await page.getByTestId('tree-opening-W01').click()
+  await page.getByTestId('frame-edit-opening-in-plan').click()
+  await page.getByTestId('plan-opening-inspector').waitFor()
+  assert.match(await page.getByTestId('plan-opening-inspector').textContent(), /W01/)
+  assert.equal(await page.getByTestId('tab-plan').getAttribute('aria-selected'), 'true')
+  await page.getByTestId('tab-frame').click()
   const directDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const direct = JSON.parse(await readFile(await (await directDownload).path(), 'utf8'))
