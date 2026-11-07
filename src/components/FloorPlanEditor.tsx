@@ -393,13 +393,17 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
    */
   const nudgeSelectedWall = (offsetMm:number) => {
     if(!selectedInterior || !Number.isInteger(offsetMm) || !offsetMm)return
-    let candidate:FloorPlan
+    let candidate:FloorPlan|null
     try {
       candidate=plan.graph
         ?moveGraphEdge(plan,selectedInterior.id,offsetMm)
         :moveInteriorWallWithDependents(plan,selectedInterior.id,offsetMm)
     } catch(error) {
       setLocalError(error instanceof Error?error.message:'Недопустимое перемещение стены')
+      return
+    }
+    if(!candidate){
+      setLocalError('Эту стену нельзя переместить, сохранив соединения')
       return
     }
     if(apply({type:'PLAN_MOVE_INTERIOR_WALL',payload:{
