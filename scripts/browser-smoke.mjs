@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.30')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.31')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -683,6 +683,14 @@ try {
     await targetPage.getByTestId('plan-close').click()
   }
   await drawDirectGarage(page)
+  // S24: a visibility-only grid toggle never edits the canonical 2D model.
+  const gridToggle=page.getByTestId('plan-grid-toggle')
+  assert.equal(await gridToggle.getAttribute('aria-pressed'),'true')
+  await gridToggle.click()
+  assert.equal(await gridToggle.getAttribute('aria-pressed'),'false')
+  assert.equal(await page.getByTestId('plan-grid-small').count(),0)
+  await gridToggle.click()
+  assert.equal(await gridToggle.getAttribute('aria-pressed'),'true')
   const hoverGarage = async (xMm, zMm, steps = 4) => {
     const point = await garagePoint(xMm, zMm)
     await page.mouse.move(point.x, point.y, { steps })
@@ -753,6 +761,12 @@ try {
   assert.equal((await page.getByTestId('plan-wall-count').textContent()).trim(), '2')
   await page.getByTestId('plan-toolbar-select').click()
   await clickGarage(2000, -3000)
+  // S24: nudge the selected partition and undo without moving its T end alone.
+  const wallBeforeNudge=await revision()
+  await page.getByTestId('plan-wall-nudge-positive').click()
+  assert.equal(await revision(),wallBeforeNudge+1)
+  await page.keyboard.press('Control+z')
+  await clickGarage(2000,-3000)
   assert.equal(await wallActions.getAttribute('data-wall-id'), 'partition-I001')
   assert.equal(await wallActions.getByTestId('plan-add-window').count(), 0)
   assert.equal(await wallActions.getByTestId('plan-add-garage-door').count(), 0)
@@ -764,6 +778,15 @@ try {
   assert.equal(await door.getAttribute('data-offset-mm'), '1200')
   await door.locator('.plan-door-arc').waitFor()
   await page.getByTestId('plan-opening-inspector').waitFor()
+  // Keyboard nudge is measured along the authored direction (right=+25 mm).
+  await page.keyboard.press('ArrowRight')
+  assert.equal(await door.getAttribute('data-offset-mm'),'1225')
+  await page.keyboard.press('Control+z')
+  assert.equal(await door.getAttribute('data-offset-mm'),'1200')
+  await page.getByTestId('plan-opening-nudge-plus').click()
+  assert.equal(await door.getAttribute('data-offset-mm'),'1225')
+  await page.keyboard.press('Control+z')
+  assert.equal(await door.getAttribute('data-offset-mm'),'1200')
 
   const beforeDrag = await revision()
   await hoverGarage(1650, -3000)

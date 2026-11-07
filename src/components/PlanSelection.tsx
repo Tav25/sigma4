@@ -163,6 +163,17 @@ export function PlanOpeningInspector({ opening, side, onSave, onRemove }: {
       {partition && opening.type === 'door' && <p className="plan-guidance">
         Ненесущая перегородка: плоская перемычка без jack-стоек.
       </p>}
+      <div className="plan-nudge-actions" role="group" aria-label="Точная корректировка положения проёма">
+        <button type="button" className="plan-button plan-secondary"
+          data-testid="plan-opening-nudge-minus"
+          disabled={opening.positionUmm<25}
+          onClick={()=>onSave({...opening,positionUmm:opening.positionUmm-25})}>−25 мм</button>
+        <button type="button" className="plan-button plan-secondary"
+          data-testid="plan-opening-nudge-plus"
+          disabled={opening.positionUmm+opening.widthMm+25>planSideLength(side)}
+          onClick={()=>onSave({...opening,positionUmm:opening.positionUmm+25})}>+25 мм</button>
+      </div>
+      <p className="plan-muted">Стрелки двигают проём вдоль выбранной стены: 25 мм, Shift — 100 мм, Alt — 1 мм.</p>
       {opening.type === 'door' && <div className="plan-frame-fields plan-swing-actions">
         <button type="button" data-testid="plan-door-flip-hinge"
           onClick={() => onSave({ ...opening, swing: { ...swing, hinge: swing.hinge === 'start' ? 'end' : 'start' } })}>
