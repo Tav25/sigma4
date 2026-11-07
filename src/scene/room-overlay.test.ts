@@ -1,12 +1,12 @@
 import {describe,expect,it} from 'vitest'
 import {roomFloorPlanes} from './room-overlay'
 import {deriveFloorRooms} from '../core/rooms'
-import {emptyFloorPlan} from '../core/floor-plan'
+import {emptyFloorPlan,type FloorPlan} from '../core/floor-plan'
 import {addGraphSegment} from '../core/plan-graph'
 const p=(xMm:number,zMm:number)=>({xMm,zMm})
 describe('SIGMA4 0.1.33: 3D floor overlays use the same derived 2D dimensions',()=>{
   it('projects 9×6 T-room areas into exact world metres',()=>{
-    let plan={...emptyFloorPlan(),closed:true,
+    let plan:FloorPlan={...emptyFloorPlan(),closed:true,
       exterior:[p(0,0),p(9000,0),p(9000,-6000),p(0,-6000)],
       exteriorThicknessMm:150}
     plan=addGraphSegment(plan,p(3000,0),p(3000,-6000),100)

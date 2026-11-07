@@ -1210,7 +1210,7 @@ export function FloorPlanEditor({
                     width={(rect.maxXmm-rect.minXmm)*px/1000}
                     height={(rect.maxZmm-rect.minZmm)*px/1000}
                     fill={ROOM_COLORS[i%ROOM_COLORS.length]}
-                    fillOpacity={selectedRoomId===room.id?.40:.28}
+                    fillOpacity={selectedRoomId===room.id ? 0.40 : 0.28}
                     stroke="none"
                     pointerEvents={tool==='select'&&!placement?'all':'none'}
                     onClick={event=>{
