@@ -59,6 +59,8 @@ try {
     assert.equal(frameSecondary[key], planSecondary[key], 'Mismatched secondary button ' + key)
   }
   await page.getByTestId('frame-section-toggle').click()
+  // Compare default states, not the hover state left by Playwright's last click.
+  await page.mouse.move(1050, 800)
   const sectionSecondary = await styleOf('[data-testid="frame-section-toggle"]')
   assert.equal(sectionSecondary.background, planSecondary.background)
   assert.equal(sectionSecondary.radius, planSecondary.radius)
