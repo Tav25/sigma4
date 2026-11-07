@@ -81,7 +81,7 @@ try {
   await tree.getByTestId('tree-board-warm-corner-stud').click()
   await page.getByText('Свойства детали').waitFor()
   await page.getByText('Количество элементов: 46').waitFor()
-  await page.getByText('Валидация: OK').waitFor()
+  await page.getByTestId('ui-geometry-status').getByText('Проверка модели: без ошибок').waitFor()
   await page.locator('.viewport canvas').waitFor({ state: 'visible' })
   // S06.5.1: measurements exist only on the XZ ground plane.
   // Only numerals appear in the viewport; no floating information panel.
@@ -141,7 +141,7 @@ try {
     buffer: Buffer.from(JSON.stringify(exported)),
   }])
   await page.getByText('Rev: 2').waitFor()
-  await page.getByText('Валидация: OK').waitFor()
+  await page.getByTestId('ui-geometry-status').getByText('Проверка модели: без ошибок').waitFor()
   const secondDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const rebuilt = JSON.parse(await readFile(await (await secondDownload).path(), 'utf8'))
@@ -154,7 +154,7 @@ try {
   await tree.getByTestId('tree-opening-W03').waitFor()
   await page.getByRole('button', { name: 'Добавить дверь' }).click()
   await tree.getByTestId('tree-opening-D01').waitFor()
-  await page.getByText('Валидация: OK').waitFor()
+  await page.getByTestId('ui-geometry-status').getByText('Проверка модели: без ошибок').waitFor()
   const sideDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const side = JSON.parse(await readFile(await (await sideDownload).path(), 'utf8'))
@@ -172,7 +172,7 @@ try {
     await tree.getByTestId('wall-node-wall-' + String(n).padStart(3, '0')).waitFor()
     await page.getByText('Количество стен: ' + n).waitFor()
   }
-  await page.getByText('Валидация: OK').waitFor()
+  await page.getByTestId('ui-geometry-status').getByText('Проверка модели: без ошибок').waitFor()
   const nineDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const nine = JSON.parse(await readFile(await (await nineDownload).path(), 'utf8'))
@@ -215,7 +215,7 @@ try {
   await tree.getByTestId('tree-opening-G01').waitFor()
   await page.getByText('Свойства гаражных ворот (G01)').waitFor()
   await page.getByText('НЕ проверены', { exact: false }).waitFor()
-  await page.getByText('Валидация: OK').waitFor()
+  await page.getByTestId('ui-geometry-status').getByText('Проверка модели: без ошибок').waitFor()
   const garageDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const garageProject = JSON.parse(await readFile(await (await garageDownload).path(), 'utf8'))
@@ -240,7 +240,7 @@ try {
   await page.getByTestId('add-garage-door').click()
   await page.getByText('Свойства гаражных ворот (G01)').waitFor()
   await page.getByText('Гаражные ворота: расчёт несущей перемычки', { exact: false }).waitFor()
-  await page.getByText('Валидация: OK').waitFor()
+  await page.getByTestId('ui-geometry-status').getByText('Проверка модели: без ошибок').waitFor()
   const focusedDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
   const focused = JSON.parse(await readFile(await (await focusedDownload).path(), 'utf8'))
@@ -292,7 +292,7 @@ try {
     ['wall-002:plate-bottom-right', 5730, 6270],
   ])
   assert.equal(new Set(mixed.assembly.elements.map(e => e.elementId)).size, mixed.assembly.elements.length)
-  await page.getByText('Валидация: OK').waitFor()
+  await page.getByTestId('ui-geometry-status').getByText('Проверка модели: без ошибок').waitFor()
   await page.getByRole('button', { name: 'Сбросить вид' }).click()
   await page.waitForTimeout(450)
   await page.screenshot({ path: dir + '/07-garage-window-and-door-fixed.png' })

@@ -136,7 +136,7 @@ export default function App() {
   const hasErrors = validation && !validation.valid
   const validationErrors = validation?.issues.filter(issue => issue.severity === 'error') ?? []
   const structuralErrorCount = validationErrors.filter(issue => issue.code.startsWith('STRUCTURAL_')).length
-  const demo3D = !linkedFrame && !snapshot.building.floorPlan?.closed
+  const demo3D = !linkedFrame && !recoveredLocalProject && revision === 0 && !snapshot.building.floorPlan?.closed
 
   const dispatch = (command: ProjectCommand) => {
     const result = store.dispatch(command)
@@ -395,7 +395,9 @@ export default function App() {
               <button type="button" className="plan-button plan-secondary" onClick={() => setWorkspace('plan')}>
                 Редактировать план
               </button>
-            </> : 'Демонстрационный 3D-каркас. Он не связан с пустым планом 2D. Чтобы построить свой проект, начните с периметра в режиме «План 2D».'}
+            </> : demo3D
+               ? 'Демонстрационный 3D-каркас. Он не связан с пустым планом 2D. Чтобы построить свой проект, начните с периметра в режиме «План 2D».'
+               : 'Самостоятельный 3D-каркас. Для связанного каркаса постройте контур в режиме «План 2D».'}
           </div>
           {showSection && <div className="ui-sidebar-notice" data-testid="frame-section-context">
             <strong>Режим горизонтального разреза</strong>
