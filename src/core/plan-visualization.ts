@@ -30,7 +30,7 @@ export function planGridMetrics(pxPerMetre: number, snapMm: number) {
 /** Keep the world-space point below the cursor fixed across zoom changes. */
 export function zoomPlanAround(
   zoom: number, pan: Point, anchor: Point, factor: number,
-  basePxPerMetre: number, offset: Point,
+  offset: Point,
 ): { zoom: number; pan: Point } {
   const nextZoom = Math.min(2.8, Math.max(0.32, zoom * factor))
   const ratio = nextZoom / zoom

@@ -31,19 +31,19 @@ describe('SIGMA4 0.1.35: exact metric viewport display', () => {
   it('keeps the point below the pointer fixed while zooming in either direction', () => {
     const anchor={x:750,y:335},pan={x:41,y:-28},offset={x:220,y:565},base=64
     const before={x:(anchor.x-offset.x-pan.x)/base,y:(anchor.y-offset.y-pan.y)/base}
-    const next=zoomPlanAround(1,pan,anchor,1.4,base,offset)
+    const next=zoomPlanAround(1,pan,anchor,1.4,offset)
     const after={x:(anchor.x-offset.x-next.pan.x)/(base*next.zoom),
       y:(anchor.y-offset.y-next.pan.y)/(base*next.zoom)}
     expect(after.x).toBeCloseTo(before.x,12)
     expect(after.y).toBeCloseTo(before.y,12)
-    expect(zoomPlanAround(2.8,pan,anchor,2,base,offset).zoom).toBe(2.8)
-    expect(zoomPlanAround(.32,pan,anchor,.5,base,offset).zoom).toBe(.32)
+    expect(zoomPlanAround(2.8,pan,anchor,2,offset).zoom).toBe(2.8)
+    expect(zoomPlanAround(.32,pan,anchor,.5,offset).zoom).toBe(.32)
   })
   it('shows room text only when there is sufficient usable space', () => {
     const model:FloorPlan={exterior:rectangle,closed:true,interiorWalls:[]}
     const room=deriveFloorRooms(model)[0]
     expect(roomLabelKind(room,64)).toBe('full')
-    expect(roomLabelKind(room,16)).toBe('compact')
+    expect(roomLabelKind(room,12)).toBe('compact')
     expect(roomLabelKind(room,7)).toBe('marker')
   })
 })

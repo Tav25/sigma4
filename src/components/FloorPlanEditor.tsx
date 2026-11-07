@@ -611,7 +611,7 @@ export function FloorPlanEditor({
   }
   // Zoom around the cursor: its world coordinate remains stationary.
   const zoomAt = (anchor: { x: number; y: number }, factor: number) => {
-    const next = zoomPlanAround(zoom, pan, anchor, factor, BASE_PX_PER_METRE,
+    const next = zoomPlanAround(zoom, pan, anchor, factor,
       { x: OFFSET_X, y: OFFSET_Y })
     setZoom(next.zoom)
     setPan(next.pan)
