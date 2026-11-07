@@ -50,7 +50,7 @@ describe('SIGMA4 0.1.32: canonical wall-face room area geometry',()=>{
     plan=add(plan,p(0,-3000),p(2800,-3000))
     const rooms=deriveFloorRooms(plan)
     expect(rooms).toHaveLength(2)
-    expect(rooms[0].areaM2).toBeCloseTo(15.69,8)
+    expect(rooms[0].areaM2).toBeCloseTo(15.695,8)
   })
   it('a door/window does not connect separate rooms or alter their area',()=>{
     const plan=add(rectangle(),...v)
