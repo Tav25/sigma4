@@ -478,3 +478,16 @@ body,
   .frame-section-summary {white-space:normal}
   .frame-section-zoom {right:12px;top:10px}
 }
+
+/* S24 / 0.1.31: precise CAD controls, independent of the source project JSON. */
+.plan-grid-toggle {
+  border:1px solid #c5d7e6;background:#fff;color:#24617c;
+  border-radius:7px;padding:7px 10px;cursor:pointer;white-space:nowrap;
+  font-size:12px;font-weight:650;min-height:32px;
+}
+.plan-grid-toggle[aria-pressed="false"] {background:#f3f6fa;color:#708191;border-style:dashed}
+.plan-grid-toggle:focus-visible,.plan-nudge-actions button:focus-visible {
+  outline:2px solid #1688ad;outline-offset:2px;
+}
+.plan-nudge-actions {display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
+.plan-nudge-actions .plan-button {width:auto;flex:1 1 90px;margin:0;white-space:normal}

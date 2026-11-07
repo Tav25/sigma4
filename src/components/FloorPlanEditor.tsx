@@ -9,6 +9,7 @@ import {
 } from '../core/floor-plan'
 import { addGraphPoint, addGraphSegment, graphView, moveGraphEdge, moveGraphEdgeToDimension, moveGraphPoint, resizePlanWallLength } from '../core/plan-graph'
 import { preservePlanOpeningAttachments } from '../core/plan-attachment-constraints'
+import { openingNudgeForArrow, wallNudgeForArrow } from '../core/plan-keyboard-nudge'
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
 import { planSidePoint, planFrameOpeningSides, planSideLength, validatePlanFrame, type PlanFrameSide } from '../core/plan-frame'
 import { sideOffset } from '../core/partition-layout'
@@ -54,6 +55,7 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
   const [direction, setDirection] = useState<Direction>('+x')
   const [exactLength, setExactLength] = useState('6')
   const [snapMm, setSnapMm] = useState(250)
+  const [gridVisible, setGridVisible] = useState(true)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [hover, setHover] = useState<PlanPoint | null>(null)
@@ -385,6 +387,31 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
     wallPointer.current={id:wall.id,pointerId:event.pointerId,startX:pos.x,
       startY:pos.y,offsetMm:0,moved:false,candidate:null}
     root.setPointerCapture(event.pointerId)
+  }
+  /** One validated ProjectStore command per nudge; shared junctions and
+   * attached openings are moved by the canonical geometry engine.
+   */
+  const nudgeSelectedWall = (offsetMm:number) => {
+    if(!selectedInterior || !Number.isInteger(offsetMm) || !offsetMm)return
+    let candidate:FloorPlan|null
+    try {
+      candidate=plan.graph
+        ?moveGraphEdge(plan,selectedInterior.id,offsetMm)
+        :moveInteriorWallWithDependents(plan,selectedInterior.id,offsetMm)
+    } catch(error) {
+      setLocalError(error instanceof Error?error.message:'Недопустимое перемещение стены')
+      return
+    }
+    if(!candidate){
+      setLocalError('Эту стену нельзя переместить, сохранив соединения')
+      return
+    }
+    if(apply({type:'PLAN_MOVE_INTERIOR_WALL',payload:{
+      id:selectedInterior.id,offsetMm,
+    }})){
+      const moved=graphView(candidate).interiorWalls.find(w=>w.id===selectedInterior.id)
+      if(moved) selectInteriorWall(moved)
+    }
   }
   const saveWallLength = () => {
     if (!selectedInterior) return
@@ -743,6 +770,36 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
         event.preventDefault()
         return
       }
+      // Orthogonal CAD nudging: 25 mm, Shift=100 mm, Alt=1 mm.
+      // Text/number inputs and active opening placement are excluded above.
+      if(plan.closed&&tool==='select'&&!placement&&!event.ctrlKey&&!event.metaKey &&
+        ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.code)){
+        const step=event.altKey?1:event.shiftKey?100:25
+        if(selectedOpening&&selectedWall){
+          const offset=openingNudgeForArrow(selectedWall,event.code,step)
+          if(offset!==null){
+            event.preventDefault()
+            openingTools.move(selectedOpening,selectedOpening.positionUmm+offset)
+            return
+          }
+        }else if(selectedInterior){
+          const offset=wallNudgeForArrow(selectedInterior,event.code,step)
+          if(offset!==null){
+            event.preventDefault()
+            nudgeSelectedWall(offset)
+            return
+          }
+        }else if(selectedGraphNode){
+          const dx=event.code==='ArrowLeft'?-step:event.code==='ArrowRight'?step:0
+          const dz=event.code==='ArrowUp'?-step:event.code==='ArrowDown'?step:0
+          const next={xMm:selectedGraphNode.xMm+dx,zMm:selectedGraphNode.zMm+dz}
+          event.preventDefault()
+          if(apply({type:'PLAN_GRAPH_MOVE_POINT',payload:{
+            id:selectedGraphNode.id,point:next,
+          }}))setNodeEdit({x:preciseMetres(next.xMm),z:preciseMetres(next.zMm)})
+          return
+        }
+      }
       if (plan.closed && !event.ctrlKey && !event.metaKey && !event.altKey &&
         (event.code === 'KeyV' || event.code === 'KeyW')) {
         event.preventDefault()
@@ -939,7 +996,18 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
           {selectedInterior && tool === 'select' && (
             <div className="plan-tool-section" data-testid="plan-selected-interior">
               <strong className="plan-section-title">Стена {selectedInterior.id}</strong>
-              <p className="plan-muted">Перетаскивайте стену мышью или нажмите размер между стенами на плане. Точные координаты оси также доступны ниже.</p>
+              <p className="plan-muted">Перемещайте стену мышью, стрелками клавиатуры или вводите точные размеры. Сдвиг перемещает связанные узлы; некорректное соединение блокируется.</p>
+              <div className="plan-nudge-actions" role="group" aria-label="Сдвинуть выбранную стену">
+                <button type="button" className="plan-button plan-secondary"
+                  data-testid="plan-wall-nudge-negative" onClick={()=>nudgeSelectedWall(-25)}>
+                  {selectedInterior.start.xMm===selectedInterior.end.xMm?'← X':'↑ Z'} −25 мм
+                </button>
+                <button type="button" className="plan-button plan-secondary"
+                  data-testid="plan-wall-nudge-positive" onClick={()=>nudgeSelectedWall(25)}>
+                  {selectedInterior.start.xMm===selectedInterior.end.xMm?'→ X':'↓ Z'} +25 мм
+                </button>
+              </div>
+              <p className="plan-muted">Стрелки: 25 мм · Shift + стрелка: 100 мм · Alt + стрелка: 1 мм.</p>
               {([
                 ['sx', 'Начало X, м'], ['sz', 'Начало Z, м'],
                 ['ex', 'Конец X, м'], ['ez', 'Конец Z, м'],
@@ -1045,6 +1113,10 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
                 split:'РАЗДЕЛЕНИЕ',erase:'УДАЛЕНИЕ ОТРЕЗКА',select:'РЕДАКТИРОВАНИЕ',
                 outline:'НАРУЖНЫЙ КОНТУР',frame:'ПРОЁМЫ'}[tool])
               :'НАРУЖНЫЙ КОНТУР'}</div>
+          <button type="button" className="plan-grid-toggle"
+            data-testid="plan-grid-toggle" aria-pressed={gridVisible}
+            title={gridVisible?'Скрыть сетку':'Показать сетку'}
+            onClick={()=>setGridVisible(v=>!v)}>Сетка</button>
           <label className="plan-grid-select">Шаг стен
             <select data-testid="plan-grid-step" value={snapMm}
               onChange={event => setSnapMm(Number(event.target.value))}>
@@ -1095,8 +1167,10 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
               </pattern>
             </defs>
             <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="#fcfdff" />
-            <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-small-grid)" pointerEvents="none" />
-            <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-big-grid)" pointerEvents="none" />
+            {gridVisible && <>
+              <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-small-grid)" pointerEvents="none" data-testid="plan-grid-small"/>
+              <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-big-grid)" pointerEvents="none" data-testid="plan-grid-big"/>
+            </>}
             <line x1={originX} y1={0} x2={originX} y2={HEIGHT}
               stroke="#b8cadd" strokeWidth="1.8" pointerEvents="none"/>
             <line x1={0} y1={originY} x2={WIDTH} y2={originY}

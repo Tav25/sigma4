@@ -79,18 +79,42 @@ export function PlanOpeningInspector({ opening, side, onSave, onRemove }: {
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
   const [sill, setSill] = useState('')
+  const [headerDepth, setHeaderDepth] = useState('')
+  const [jackCount, setJackCount] = useState('')
+  const partition = 'thicknessMm' in side
+  const garage = opening.type === 'garage-door'
+  const previewConfig = !partition && (garage || opening.type === 'window' || opening.type === 'door')
   useEffect(() => {
     setOffset(openingMetres(opening.positionUmm))
     setWidth(String(opening.widthMm))
     setHeight(String(opening.heightMm))
     setSill(String(opening.sillHeightMm))
+    setHeaderDepth(String(opening.type === 'garage-door'
+      ? opening.garage?.lintelPreviewDepthMm ?? 286
+      : opening.headerPreview?.depthMm ?? 145))
+    setJackCount(String(opening.type === 'garage-door'
+      ? opening.garage?.jackStudsPerSide ?? 2
+      : opening.headerPreview?.jackStudsPerSide ?? 1))
   }, [opening])
   const offsetMm = parseOpeningDimension(offset)
   const whole = (value: string) => /^\d+$/.test(value) ? Number(value) : NaN
   const widthMm = whole(width), heightMm = whole(height), sillHeightMm = whole(sill)
   const valid = offsetMm !== null && [widthMm, heightMm, sillHeightMm].every(Number.isSafeInteger)
-  const changed = valid && (offsetMm !== opening.positionUmm || widthMm !== opening.widthMm ||
-    heightMm !== opening.heightMm || sillHeightMm !== opening.sillHeightMm)
+  const depthMm = whole(headerDepth), jacksPerSide = whole(jackCount)
+  const validProfile = !previewConfig ||
+    (Number.isSafeInteger(depthMm) && depthMm >= 90 && depthMm <= 610 &&
+      Number.isSafeInteger(jacksPerSide) && jacksPerSide >= 1 && jacksPerSide <= 4)
+  const configuredDepth = garage
+    ? opening.garage?.lintelPreviewDepthMm ?? 286
+    : opening.headerPreview?.depthMm ?? 145
+  const configuredJacks = garage
+    ? opening.garage?.jackStudsPerSide ?? 2
+    : opening.headerPreview?.jackStudsPerSide ?? 1
+  const profileChanged = previewConfig && validProfile &&
+    (depthMm !== configuredDepth || jacksPerSide !== configuredJacks)
+  const changed = valid && validProfile &&
+    (offsetMm !== opening.positionUmm || widthMm !== opening.widthMm ||
+    heightMm !== opening.heightMm || sillHeightMm !== opening.sillHeightMm || profileChanged)
   const swing = opening.swing ?? DEFAULT_DOOR_SWING
   const title = PLAN_OPENING_PRESETS.find(item => item.value === opening.type)!.label
   return <section className="plan-selection-panel" data-testid="plan-opening-inspector" aria-label="Свойства проёма">
@@ -99,7 +123,12 @@ export function PlanOpeningInspector({ opening, side, onSave, onRemove }: {
     <span className="plan-selection-detail">{side.label}</span>
     <form className="plan-inspector-form" onSubmit={event => {
       event.preventDefault()
-      if (changed) onSave({ ...opening, positionUmm: offsetMm, widthMm, heightMm, sillHeightMm })
+      if (changed) onSave({
+        ...opening, positionUmm: offsetMm, widthMm, heightMm, sillHeightMm,
+        ...(profileChanged && (garage
+          ? { garage: { ...opening.garage!, lintelPreviewDepthMm: depthMm, jackStudsPerSide: jacksPerSide } }
+          : { headerPreview: { depthMm, jackStudsPerSide: jacksPerSide } })),
+      })
     }}>
       <label>От начала стены, м
         <input data-testid="plan-opening-inspector-offset" value={offset} inputMode="decimal"
@@ -113,6 +142,38 @@ export function PlanOpeningInspector({ opening, side, onSave, onRemove }: {
       </div>
       {opening.type === 'window' && <label>Подоконник от пола, мм<input inputMode="numeric" value={sill}
         onChange={event => setSill(event.target.value)} /></label>}
+      {previewConfig && <div className="plan-profile-editor" data-testid="plan-opening-profile">
+        <strong className="plan-section-title">Предварительная перемычка</strong>
+        <div className="plan-frame-fields">
+          <label>Высота перемычки, мм
+            <input data-testid="plan-opening-profile-depth" inputMode="numeric"
+              type="number" step="1" min="90" max="610" value={headerDepth}
+              aria-invalid={!Number.isSafeInteger(depthMm) || depthMm < 90 || depthMm > 610}
+              onChange={event => setHeaderDepth(event.target.value)}/>
+          </label>
+          <label>Jack-стоек с каждой стороны
+            <input data-testid="plan-opening-profile-jacks" inputMode="numeric"
+              type="number" step="1" min="1" max="4" value={jackCount}
+              aria-invalid={!Number.isSafeInteger(jacksPerSide) || jacksPerSide < 1 || jacksPerSide > 4}
+              onChange={event => setJackCount(event.target.value)}/>
+          </label>
+        </div>
+        <p className="plan-guidance">Это геометрия каркаса, не проверка несущей способности. Сечение и крепёж требуют расчёта по применимым нормам.</p>
+      </div>}
+      {partition && opening.type === 'door' && <p className="plan-guidance">
+        Ненесущая перегородка: плоская перемычка без jack-стоек.
+      </p>}
+      <div className="plan-nudge-actions" role="group" aria-label="Точная корректировка положения проёма">
+        <button type="button" className="plan-button plan-secondary"
+          data-testid="plan-opening-nudge-minus"
+          disabled={opening.positionUmm<25}
+          onClick={()=>onSave({...opening,positionUmm:opening.positionUmm-25})}>−25 мм</button>
+        <button type="button" className="plan-button plan-secondary"
+          data-testid="plan-opening-nudge-plus"
+          disabled={opening.positionUmm+opening.widthMm+25>planSideLength(side)}
+          onClick={()=>onSave({...opening,positionUmm:opening.positionUmm+25})}>+25 мм</button>
+      </div>
+      <p className="plan-muted">Стрелки двигают проём вдоль выбранной стены: 25 мм, Shift — 100 мм, Alt — 1 мм.</p>
       {opening.type === 'door' && <div className="plan-frame-fields plan-swing-actions">
         <button type="button" data-testid="plan-door-flip-hinge"
           onClick={() => onSave({ ...opening, swing: { ...swing, hinge: swing.hinge === 'start' ? 'end' : 'start' } })}>

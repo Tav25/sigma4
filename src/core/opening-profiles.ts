@@ -126,6 +126,33 @@ export function verifyOpeningFraming(opening:Opening,wall:Wall,assembly:readonly
       }
     }
   }
+  if(opening.type==='window'){
+    const sillBoard=get('sill')
+    if(!sillBoard || sillBoard.role!=='sill' ||
+      Math.abs(sillBoard.position.x-start)>EPS ||
+      Math.abs(sillBoard.position.y-(opening.sillHeightMm-sw/2))>EPS ||
+      Math.abs(sillBoard.lengthMm-opening.widthMm)>EPS ||
+      sillBoard.orientation.mode!=='x' || sillBoard.orientation.roll!==90 ||
+      sillBoard.sectionMm.width!==sw){
+      errors.push(issue('OPENING_SILL_GEOMETRY_INVALID','error',
+        'Подоконная доска '+opening.id+' отсутствует или не совпадает с проёмом'))
+    }
+    // Only inspect generated support members; CAD source stores no derived
+    // timber pieces. Bottom cripples must actually stand under the sill.
+    const bottomCripples=own.filter(e=>
+      e.role==='cripple-bottom' && e.elementId.startsWith(id('cripple-bottom-')))
+    for(const cripple of bottomCripples){
+      if(cripple.orientation.mode!=='y' ||
+        Math.abs(cripple.position.y-sw)>EPS ||
+        Math.abs(cripple.position.y+cripple.lengthMm-
+          (opening.sillHeightMm-sw))>EPS ||
+        cripple.position.x<start-sw/2-EPS ||
+        cripple.position.x>finish+sw/2+EPS){
+        errors.push(issue('OPENING_BOTTOM_CRIPPLE_INVALID','error',
+          'Короткая стойка '+cripple.elementId+' не поддерживает подоконную доску '+opening.id))
+      }
+    }
+  }
   if(specs.kind==='nonbearing-flat'){
     const flat=get('header')
     if(!flat||head.length!==0||
