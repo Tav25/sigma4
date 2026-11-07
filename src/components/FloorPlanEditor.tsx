@@ -116,7 +116,8 @@ export function FloorPlanEditor({
   const drawingSides = useMemo(() => wallPreview ? planFrameOpeningSides(wallPreview, true) : frameSides,
     [wallPreview, frameSides])
   const { selectedWall, selectedOpening, placement, placementWall, preview, wallPick } = openingTools
-  const openingInputActive = tool === 'select' || tool === 'frame'
+  const openingInputActive = (tool === 'select' || tool === 'frame') &&
+    !(planView==='framing' && plan.frame?.built && timberElements.length>0)
   const shownOpenings = (wallPreview?.frame?.openings ?? openingTools.openings).map(opening => opening.id === preview?.opening.id
     ? { ...opening, positionUmm: preview.error ? openingTools.lastValidPosition ?? opening.positionUmm : preview.opening.positionUmm }
     : opening)
@@ -245,7 +246,7 @@ export function FloorPlanEditor({
     revealInspector()
   }
   const beginOpeningDrag = (event: PointerEvent<SVGGElement>, opening: Opening) => {
-    if (tool !== 'select' || placement || !event.isPrimary || event.button !== 0 || event.shiftKey) return
+    if (tool !== 'select' || structuralVisible || placement || !event.isPrimary || event.button !== 0 || event.shiftKey) return
     const svg = svgRef.current, transform = svg?.getScreenCTM()
     if (!svg || !transform) return
     event.stopPropagation()
@@ -420,7 +421,7 @@ export function FloorPlanEditor({
     }
   }
   const beginWallDrag = (event: PointerEvent<SVGLineElement>, wall: PlanInteriorWall) => {
-    if (tool !== 'select' || placement || event.button !== 0 || event.shiftKey) return
+    if (tool !== 'select' || structuralVisible || placement || event.button !== 0 || event.shiftKey) return
     event.preventDefault()
     event.stopPropagation()
     const root=svgRef.current
@@ -901,7 +902,13 @@ export function FloorPlanEditor({
       <aside className="plan-controls" aria-label="Инструменты и построение">
         <div className="plan-eyebrow">SIGMA4 / ЧЕРТЁЖ 01</div>
         <h1>План этажа</h1>
-        {plan.closed && <nav className="plan-quick-tools" aria-label="Быстрые инструменты плана">
+        {structuralVisible && <div className="plan-selection-panel">
+          <strong>Каркас 2D</strong>
+          <span className="plan-selection-detail">Только просмотр физического сечения по высоте Y.</span>
+          <span className="plan-selection-detail">Показано: {structuralCut?.pieces.length??0} деталей</span>
+          <span className="plan-selection-detail">Для редактирования плана переключитесь в «Планировку».</span>
+        </div>}
+        {plan.closed && !structuralVisible && <nav className="plan-quick-tools" aria-label="Быстрые инструменты плана">
           <button type="button" title="Выбрать (V)" aria-pressed={tool==='select'} onClick={()=>activateTool('select')}>↖ <span>Выбор</span></button>
           <button type="button" title="Добавить стену (W)" aria-pressed={tool==='interior'} onClick={()=>activateTool('interior')}>▰ <span>Стена</span></button>
           <button type="button" title="Добавить точку" aria-pressed={tool==='point'} onClick={()=>activateTool('point')}>● <span>Точка</span></button>
@@ -942,7 +949,7 @@ export function FloorPlanEditor({
             )}
           </div>
         )}
-        {plan.closed && <>
+        {plan.closed && !structuralVisible && <>
           <div className="plan-complete" data-testid="plan-closed-status">
             <strong>Контур замкнут</strong>
             <button className="plan-button plan-secondary" type="button" data-testid="plan-reopen" disabled={hasFrameWork}
@@ -1056,7 +1063,7 @@ export function FloorPlanEditor({
       </aside>
       <main className="plan-drawing">
         <div className="plan-toolbar">
-          {plan.closed && <div className="plan-main-tools" role="group" aria-label="Инструменты плана">
+          {plan.closed && !structuralVisible && <div className="plan-main-tools" role="group" aria-label="Инструменты плана">
             <button type="button" data-testid="plan-toolbar-select" aria-keyshortcuts="V" aria-pressed={tool === 'select' && !placement}
               onClick={() => activateTool('select')}>
               <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" fill="none"
@@ -1185,7 +1192,7 @@ export function FloorPlanEditor({
                     stroke="none"
                     pointerEvents={tool==='select'&&!placement?'all':'none'}
                     onClick={event=>{
-                      if(tool!=='select'||placement)return
+                      if(tool!=='select'||placement||structuralVisible)return
                       event.stopPropagation()
                       clearSelection()
                       onSelectRoom(room.id)
@@ -1279,7 +1286,7 @@ export function FloorPlanEditor({
               const a = xy(w.start), b = xy(w.end)
               const active = (selectedInteriorId === w.id || selectedWall?.wallId === 'partition-' + w.id) && tool === 'select'
               const label = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-              return <g key={w.id} data-testid={'plan-internal-wall-' + w.id}
+              return <g key={w.id} pointerEvents={structuralVisible?'none':undefined} data-testid={'plan-internal-wall-' + w.id}
                 onClick={e=>{
                   if(ignoreClick.current){ignoreClick.current=false;e.stopPropagation();return}
                   if (tool === 'select' && !placement) {
@@ -1334,15 +1341,15 @@ export function FloorPlanEditor({
                 data-testid={'plan-room-label-'+room.id}
                 data-area-m2={formatRoomArea(room.areaM2)}
                 className={'plan-room-label'+(selected?' plan-room-selected':'')}
-                role={tool==='select'&&!placement?'button':undefined}
-                tabIndex={tool==='select'&&!placement?0:undefined}
-                pointerEvents={tool==='select'&&!placement?'visiblePainted':'none'}
+                role={tool==='select'&&!placement&&!structuralVisible?'button':undefined}
+                tabIndex={tool==='select'&&!placement&&!structuralVisible?0:undefined}
+                pointerEvents={tool==='select'&&!placement&&!structuralVisible?'visiblePainted':'none'}
                 onClick={event=>{
-                  if(tool!=='select'||placement)return
+                  if(tool!=='select'||placement||structuralVisible)return
                   event.stopPropagation();clearSelection();onSelectRoom(room.id)
                 }}
                 onKeyDown={event=>{
-                  if(tool!=='select'||(event.key!=='Enter'&&event.key!==' '))return
+                  if(tool!=='select'||structuralVisible||(event.key!=='Enter'&&event.key!==' '))return
                   event.preventDefault();event.stopPropagation()
                   clearSelection();onSelectRoom(room.id)
                 }}>
@@ -1472,7 +1479,7 @@ export function FloorPlanEditor({
             {activeNodes.map(node=>{
               const loc=xy(node)
               return <g key={'graph-'+node.id} data-testid={'plan-graph-node-'+node.id}
-                className="plan-graph-node" data-idle={tool==='select' && selectedGraphNodeId!==node.id && !placement}
+                className="plan-graph-node" pointerEvents={structuralVisible?'none':undefined} data-idle={tool==='select' && selectedGraphNodeId!==node.id && !placement}
                 onClick={e=>{
                   if(ignoreClick.current){ignoreClick.current=false;e.stopPropagation();return}
                   if (placement) return
@@ -1497,7 +1504,8 @@ export function FloorPlanEditor({
             {points.map((point,i) => {
               const loc=xy(point)
               return <g key={i} data-testid={`plan-point-${i}`}
-                className={'plan-vertex'+(plan.closed && selectedIndex!==i ? ' plan-vertex-idle' : '')} onClick={event => {if (!placement) { event.stopPropagation(); selectPoint(i) }}}>
+                className={'plan-vertex'+(plan.closed && selectedIndex!==i ? ' plan-vertex-idle' : '')}
+                pointerEvents={structuralVisible?'none':undefined} onClick={event => {if (!placement) { event.stopPropagation(); selectPoint(i) }}}>
                 <circle cx={loc.x} cy={loc.y} r={i===0?12:9}
                   fill={i===0?'#18a98b':selectedIndex===i?'#ffab40':'#ffffff'}
                   stroke={i===0?'#0f6f60':'#234765'} strokeWidth={3}/>
