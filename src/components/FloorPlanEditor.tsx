@@ -3,7 +3,7 @@ import {
   emptyFloorPlan, meters, planAreaM2, planBounds, planDistanceMm,
   planPerimeterMm, validateFloorPlan, decimalMetersToMm,
   snapPlanAnchor, planWallClearances,
-  moveInteriorWallWithDependents, moveWallToClearance, exteriorWallStrips,
+  moveInteriorWallWithDependents, moveWallToClearance,
   DEFAULT_EXTERIOR_THICKNESS_MM,
   type FloorPlan, type PlanPoint, type PlanInteriorWall,
 } from '../core/floor-plan'
@@ -19,6 +19,7 @@ import { usePlanOpenings } from './usePlanOpenings'
 import { OpeningCut, PlanOpeningDimensions, PlanOpeningSymbol, closestPointOnSide } from './PlanOpeningGraphics'
 import { exteriorDimensionNormal, planGridMetrics, roomLabelKind, zoomPlanAround } from '../core/plan-visualization'
 import { PlanOpeningInspector, PlanWallActions, PlanWallSelection } from './PlanSelection'
+import { planWallDrawing } from '../core/plan-wall-outline'
 import { PlanDraftingDimensions } from './PlanDraftingDimensions'
 import { PlanFrameControls, type PlanFramePick } from './PlanFrameControls'
 
@@ -126,6 +127,7 @@ export function FloorPlanEditor({
   const selectedInterior = viewPlan.interiorWalls.find(w => w.id === selectedInteriorId)
   const visiblePlan = graphView(wallPreview ?? plan)
   const visibleWalls = visiblePlan.interiorWalls
+  const wallDrawing = useMemo(()=>planWallDrawing(visiblePlan),[visiblePlan])
   const visibleRooms=useMemo(()=>wallPreview?deriveFloorRooms(wallPreview):rooms,
     [wallPreview,rooms])
   const activeNodes=(wallPreview??plan).graph?.nodes ?? []
@@ -1153,11 +1155,14 @@ export function FloorPlanEditor({
                 })}
               </g>
             )}
-            {exteriorWallStrips(plan).map((strip,i)=>
-              <polygon key={'outer-strip-'+i} data-testid={'plan-exterior-strip-'+i}
-                points={strip.map(p=>{const q=xy(p);return q.x+','+q.y}).join(' ')}
-                fill="url(#plan-wall-hatch)" stroke="#20262c" strokeWidth="1.8" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
-            )}
+            <g data-testid="plan-joined-walls" pointerEvents="none" mask="url(#plan-opening-cuts)">
+              <path fill="url(#plan-wall-hatch)" stroke="none" d={wallDrawing.rectangles.map(r=>{
+                const a=xy({xMm:r.minX,zMm:r.minZ}),b=xy({xMm:r.maxX,zMm:r.maxZ})
+                return `M ${a.x} ${a.y} H ${b.x} V ${b.y} H ${a.x} Z`
+              }).join(' ')}/>
+              <path fill="none" stroke="#20262c" strokeWidth="1.8" strokeLinecap="butt"
+                d={wallDrawing.edges.map(e=>{const a=xy(e.a),b=xy(e.b);return `M ${a.x} ${a.y} L ${b.x} ${b.y}`}).join(' ')}/>
+            </g>
             {edges.map(edge => {
               const a=xy(edge.from),b=xy(edge.to)
               const dx=b.x-a.x,dy=b.y-a.y
@@ -1178,7 +1183,7 @@ export function FloorPlanEditor({
                  (edge.from.zMm === edge.to.zMm && annotatedSide.start.zMm === annotatedSide.end.zMm &&
                   edge.from.zMm === annotatedSide.start.zMm))
               return <g key={edge.index} pointerEvents="none">
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="plan-wall-line" style={{strokeWidth:plan.closed?2.5:8}} mask="url(#plan-opening-cuts)" />
+                {!plan.closed && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="plan-wall-line" style={{strokeWidth:8}} mask="url(#plan-opening-cuts)" />}
                 {!hasOpeningDimensions && dimensionVisible && <>
                 <line x1={a.x+outside.x*32} y1={a.y+outside.y*32}
                   x2={b.x+outside.x*32} y2={b.y+outside.y*32} className="plan-dimension-line"/>
@@ -1261,13 +1266,9 @@ export function FloorPlanEditor({
                     splitAtWall(w,canvasWorldPoint(p))
                   }
                 }}>
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke={active ? '#087b95' : '#20262c'}
-                  strokeWidth={w.thicknessMm * px / 1000 + 2.5}
-                  strokeLinecap="butt" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke="url(#plan-wall-hatch)" strokeWidth={Math.max(1,w.thicknessMm * px / 1000 - .5)}
-                  strokeLinecap="butt" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
+                {active && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  stroke="#087b95" strokeOpacity=".3" strokeWidth={w.thicknessMm * px / 1000}
+                  pointerEvents="none" mask="url(#plan-opening-cuts)"/>}
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
                   stroke="transparent" strokeWidth={Math.max(18,w.thicknessMm * px / 1000)}
                   pointerEvents="stroke" onPointerDown={e=>beginWallDrag(e,w)}
