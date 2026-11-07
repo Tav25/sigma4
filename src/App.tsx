@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { HorizontalSection } from './components/HorizontalSection'
 import { SceneView } from './scene/SceneView'
 import { FloorPlanEditor } from './components/FloorPlanEditor'
+import { deriveFloorRooms,formatRoomArea,totalRoomAreaM2 } from './core/rooms'
 import { timberVolumeM3, type TimberElement as CoreTimberElement } from './core/timber'
 import { SafeNumberInput } from './components/SafeNumberInput'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -58,6 +59,9 @@ export default function App() {
   const [showSection, setShowSection] = useState(false)
   const [showEdges, setShowEdges] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
+  const [showRoomLabels,setShowRoomLabels] = useState(true)
+  const [showRoomFill,setShowRoomFill] = useState(true)
+  const [selectedRoomId,setSelectedRoomId] = useState<string|null>(null)
   const [commandError, setCommandError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -78,6 +82,8 @@ export default function App() {
 
   const wall = snapshot.building.walls.find(w => w.wallId === selectedWallId) ?? snapshot.building.walls[0]
   const linkedFrame = snapshot.building.floorPlan?.frame?.built === true
+  const rooms=useMemo(()=>deriveFloorRooms(snapshot.building.floorPlan),
+    [snapshot.building.floorPlan])
   const firstWall = snapshot.building.walls[0]
   const firstExteriorCorner = firstWall.orientation === 'x'
     ? firstWallExteriorLowerLeft(firstWall) : firstWall.origin
@@ -333,6 +339,10 @@ export default function App() {
       {workspace === 'plan' ? (
         <ErrorBoundary>
           <FloorPlanEditor plan={snapshot.building.floorPlan}
+            rooms={rooms} showRoomLabels={showRoomLabels} showRoomFill={showRoomFill}
+            selectedRoomId={selectedRoomId} onSelectRoom={setSelectedRoomId}
+            onShowRoomLabelsChange={setShowRoomLabels}
+            onShowRoomFillChange={setShowRoomFill}
             onCommand={dispatch} onExport={exportJson} onUndo={undo} onRedo={redo}
             onImport={() => document.getElementById('import-file')?.click()}
             onFrameBuilt={() => setWorkspace('frame')} />
@@ -442,6 +452,22 @@ export default function App() {
               ? <div>Наружные габариты: {Math.round(dimensions.overallXmm)} × {Math.round(dimensions.overallZmm)} мм</div>
               : <div>Соединения: {wallLinks.length}</div>}
           </div>
+          {linkedFrame && <div className="param-group" data-testid="frame-room-controls">
+            <strong>Площади помещений</strong>
+            <div data-testid="frame-room-summary" style={{fontSize:12,margin:'8px 0'}}>
+              {rooms.length} помещений · {formatRoomArea(totalRoomAreaM2(rooms))} м² чистой площади
+            </div>
+            <label className="room-control">
+              <input type="checkbox" data-testid="frame-room-label-toggle"
+                checked={showRoomLabels} onChange={event=>setShowRoomLabels(event.target.checked)} />
+              Показывать площади
+            </label>
+            <label className="room-control">
+              <input type="checkbox" data-testid="frame-room-fill-toggle"
+                checked={showRoomFill} onChange={event=>setShowRoomFill(event.target.checked)} />
+              Цветные зоны на полу
+            </label>
+          </div>}
           <div className="param-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
               <input type="checkbox" checked={showEdges} onChange={(e) => setShowEdges(e.target.checked)} />
@@ -603,6 +629,8 @@ export default function App() {
             ? <HorizontalSection elements={elements} />
             : <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
+              rooms={linkedFrame?rooms:[]} showRoomLabels={showRoomLabels}
+              showRoomFill={showRoomFill} selectedRoomId={selectedRoomId}
               openings={sceneOpenings} markers={markers} wallCount={snapshot.building.walls.length}
               dimensions={dimensions} showDimensions={showDimensions}
               selectedWindowId={selectedOpeningId}

@@ -491,3 +491,32 @@ body,
 }
 .plan-nudge-actions {display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
 .plan-nudge-actions .plan-button {width:auto;flex:1 1 90px;margin:0;white-space:normal}
+
+/* SIGMA4 0.1.33: room net floor zones and local area tags. */
+.plan-room-display-tools {display:flex;gap:4px;flex-wrap:nowrap;align-items:center}
+.plan-room-display-tools button {
+  border:1px solid #c5d7e6;background:#fff;color:#24617c;
+  border-radius:7px;padding:6px 9px;cursor:pointer;
+  font-size:11px;font-weight:700;min-height:32px;
+}
+.plan-room-display-tools button[aria-pressed="true"] {
+  background:#e5f7f2;color:#136852;border-color:#9bcfbd;
+}
+.plan-room-display-tools button:focus-visible,.plan-room-label:focus-visible {
+  outline:2px solid #128a82;outline-offset:2px;
+}
+.plan-room-label {cursor:pointer}
+.plan-room-label-background {fill:rgba(255,255,255,.94);stroke:#b8cbd3;stroke-width:1}
+.plan-room-name {font:600 10px system-ui,-apple-system,'Segoe UI',sans-serif;fill:#547080}
+.plan-room-area {font:800 14px system-ui,-apple-system,'Segoe UI',sans-serif;fill:#24465a}
+.plan-room-label.plan-room-selected .plan-room-label-background {
+  fill:#f0fcf8;stroke:#129477;stroke-width:2;
+}
+.room-control {display:flex;align-items:center;gap:8px;font-size:12px;margin-top:8px;color:#37566b}
+.room-control input {accent-color:#178b76}
+@media(max-width:700px){
+  .plan-room-display-tools {gap:2px}
+  .plan-room-display-tools button {font-size:10px;padding:5px;min-height:30px}
+  .plan-toolbar .plan-grid-toggle {padding:5px}
+  .plan-bottom .plan-measure-panel>div {padding:3px 5px}
+}

@@ -5,6 +5,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { generateTimberGeometry, boxCenterWorld, mmToMeters, type TimberElement } from '../core/timber'
 import { getWindowPositionBounds } from '../core/window'
 import type { SceneOpening3D } from './project-to-scene'
+import type { FloorRoom } from '../core/rooms'
+import { makeRoomOverlayGroup,disposeRoomOverlayGroup } from './room-overlay'
 import { openingLocalToWorld, openingWorldToLocalU, openingYaw } from './opening-geometry'
 import { calculateWorldBounds, topViewDistance } from './view-bounds'
 import type { DimensionLayout } from './dimension-model'
@@ -15,6 +17,10 @@ interface SceneViewProps {
   elements: TimberElement[]
   selectedId: string | null
   showEdges?: boolean
+  rooms:FloorRoom[]
+  showRoomLabels:boolean
+  showRoomFill:boolean
+  selectedRoomId:string|null
   openings: SceneOpening3D[]
   markers: OpeningMarker[]
   wallCount: number
@@ -43,6 +49,7 @@ interface WindowEntry {
 
 export function SceneView({
   elements, selectedId, showEdges = true,
+  rooms,showRoomLabels,showRoomFill,selectedRoomId,
   openings, markers, wallCount, dimensions, showDimensions, selectedWindowId, onWindowSelect,
   onWindowDragStart, onWindowDragPreview, onWindowDragEnd, onSelect,
 }: SceneViewProps) {
@@ -55,6 +62,7 @@ export function SceneView({
   const windowEntriesRef = useRef<Map<string, WindowEntry>>(new Map())
   const openingMarkerEntriesRef = useRef<Map<string, THREE.Mesh>>(new Map())
   const dimensionGroupRef = useRef<THREE.Group | null>(null)
+  const roomGroupRef = useRef<THREE.Group | null>(null)
   const originGroupRef = useRef<THREE.Group | null>(null)
   const dimensionsRef = useRef(dimensions)
   const showDimensionsRef = useRef(showDimensions)
@@ -419,6 +427,11 @@ export function SceneView({
         ;(mesh.material as THREE.Material).dispose()
       })
       openingMarkerEntriesRef.current.clear()
+      if (roomGroupRef.current) {
+        scene.remove(roomGroupRef.current)
+        disposeRoomOverlayGroup(roomGroupRef.current)
+        roomGroupRef.current=null
+      }
       if (dimensionGroupRef.current) {
         scene.remove(dimensionGroupRef.current)
         disposeDimensionGroup(dimensionGroupRef.current)
@@ -544,6 +557,31 @@ export function SceneView({
       scene.add(group)
     }
   }, [dimensions, showDimensions])
+
+  // Derived floor zones and camera-facing area labels. Never raycast these
+  // objects or make them an alternative source of room geometry.
+  useEffect(()=>{
+    const scene=sceneRef.current
+    if(!scene)return
+    if(roomGroupRef.current){
+      scene.remove(roomGroupRef.current)
+      disposeRoomOverlayGroup(roomGroupRef.current)
+      roomGroupRef.current=null
+    }
+    if(!rooms.length||(!showRoomLabels&&!showRoomFill))return
+    const group=makeRoomOverlayGroup(rooms,{
+      showLabels:showRoomLabels,showFill:showRoomFill,selectedRoomId,
+    })
+    scene.add(group)
+    roomGroupRef.current=group
+    return ()=>{
+      if(roomGroupRef.current===group){
+        scene.remove(group)
+        disposeRoomOverlayGroup(group)
+        roomGroupRef.current=null
+      }
+    }
+  },[rooms,showRoomLabels,showRoomFill,selectedRoomId])
 
   // reconcile window hit planes/outlines
   useEffect(() => {
@@ -689,7 +727,12 @@ export function SceneView({
       data-dimension-total-x={Math.round(dimensions.overallXmm)}
       data-dimension-total-z={Math.round(dimensions.overallZmm)}
       data-dimensions-visible={showDimensions ? 'true' : 'false'}
-      data-dimensions-plane="XZ">
+      data-dimensions-plane="XZ"
+      data-room-count={rooms.length}
+      data-room-total-m2={rooms.reduce((sum,room)=>sum+room.areaM2,0).toFixed(2)}
+      data-room-labels-visible={showRoomLabels?'true':'false'}
+      data-room-fill-visible={showRoomFill?'true':'false'}
+      data-selected-room={selectedRoomId??''}>
       <button type="button" className="reset-view" onClick={() => resetRef.current?.()}>
         Сбросить вид
       </button>

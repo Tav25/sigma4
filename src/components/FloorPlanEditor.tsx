@@ -13,6 +13,7 @@ import { openingNudgeForArrow, wallNudgeForArrow } from '../core/plan-keyboard-n
 import type { ProjectCommand, CommandResult } from '../core/ProjectStore'
 import { planSidePoint, planFrameOpeningSides, planSideLength, validatePlanFrame, type PlanFrameSide } from '../core/plan-frame'
 import { sideOffset } from '../core/partition-layout'
+import { deriveFloorRooms,formatRoomArea,ROOM_COLORS,totalRoomAreaM2,type FloorRoom } from '../core/rooms'
 import type { Opening } from '../core/project'
 import { usePlanOpenings } from './usePlanOpenings'
 import { OpeningCut, PlanOpeningDimensions, PlanOpeningSymbol, closestPointOnSide } from './PlanOpeningGraphics'
@@ -43,6 +44,13 @@ type DraftTool = 'outline'|'interior'|'turn'|'point'|'split'|'erase'|'select'|'f
 
 export interface FloorPlanEditorProps {
   plan?: FloorPlan
+  rooms: FloorRoom[]
+  showRoomLabels:boolean
+  showRoomFill:boolean
+  selectedRoomId:string|null
+  onSelectRoom:(id:string|null)=>void
+  onShowRoomLabelsChange:(value:boolean)=>void
+  onShowRoomFillChange:(value:boolean)=>void
   onCommand: (command: ProjectCommand) => CommandResult
   onExport: () => void
   onImport: () => void
@@ -51,7 +59,11 @@ export interface FloorPlanEditorProps {
   onRedo: () => void
 }
 
-export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImport, onFrameBuilt, onUndo, onRedo }: FloorPlanEditorProps) {
+export function FloorPlanEditor({
+  plan = EMPTY_PLAN, rooms, showRoomLabels, showRoomFill, selectedRoomId,
+  onSelectRoom, onShowRoomLabelsChange, onShowRoomFillChange,
+  onCommand, onExport, onImport, onFrameBuilt, onUndo, onRedo,
+}: FloorPlanEditorProps) {
   const [direction, setDirection] = useState<Direction>('+x')
   const [exactLength, setExactLength] = useState('6')
   const [snapMm, setSnapMm] = useState(250)
@@ -112,6 +124,8 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
   const selectedInterior = viewPlan.interiorWalls.find(w => w.id === selectedInteriorId)
   const visiblePlan = graphView(wallPreview ?? plan)
   const visibleWalls = visiblePlan.interiorWalls
+  const visibleRooms=useMemo(()=>wallPreview?deriveFloorRooms(wallPreview):rooms,
+    [wallPreview,rooms])
   const activeNodes=(wallPreview??plan).graph?.nodes ?? []
   const selectedGraphNode=plan.graph?.nodes.find(n=>n.id===selectedGraphNodeId)
   const innerJunctions = planInteriorJunctions(visiblePlan)
@@ -1113,6 +1127,14 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
                 split:'РАЗДЕЛЕНИЕ',erase:'УДАЛЕНИЕ ОТРЕЗКА',select:'РЕДАКТИРОВАНИЕ',
                 outline:'НАРУЖНЫЙ КОНТУР',frame:'ПРОЁМЫ'}[tool])
               :'НАРУЖНЫЙ КОНТУР'}</div>
+          <div className="plan-room-display-tools" role="group" aria-label="Отображение площадей">
+            <button type="button" data-testid="plan-room-label-toggle"
+              aria-pressed={showRoomLabels} title="Показать или скрыть площади помещений"
+              onClick={()=>onShowRoomLabelsChange(!showRoomLabels)}>Площади</button>
+            <button type="button" data-testid="plan-room-fill-toggle"
+              aria-pressed={showRoomFill} title="Показать или скрыть цветные зоны помещений"
+              onClick={()=>onShowRoomFillChange(!showRoomFill)}>Заливка</button>
+          </div>
           <button type="button" className="plan-grid-toggle"
             data-testid="plan-grid-toggle" aria-pressed={gridVisible}
             title={gridVisible?'Скрыть сетку':'Показать сетку'}
@@ -1178,6 +1200,28 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
             <text x={WIDTH-32} y={originY-14} className="plan-axis-label" textAnchor="end">+X →</text>
             <text x={originX+14} y={22} className="plan-axis-label">−Z ↑</text>
             {plan.closed && <polygon points={fill} fill="#d9eafa" fillOpacity=".42" stroke="none" pointerEvents="none"/>}
+            {showRoomFill && visibleRooms.map((room,i)=>
+              <g key={'room-floor-'+room.id} data-room-id={room.id}
+                data-testid={'plan-room-fill-'+room.id}
+                data-area-m2={formatRoomArea(room.areaM2)}>
+                {room.rectangles.map((rect,j)=>{
+                  const a=xy({xMm:rect.minXmm,zMm:rect.minZmm})
+                  return <rect key={j} x={a.x} y={a.y}
+                    width={(rect.maxXmm-rect.minXmm)*px/1000}
+                    height={(rect.maxZmm-rect.minZmm)*px/1000}
+                    fill={ROOM_COLORS[i%ROOM_COLORS.length]}
+                    fillOpacity={selectedRoomId===room.id?.40:.28}
+                    stroke="none"
+                    pointerEvents={tool==='select'&&!placement?'all':'none'}
+                    onClick={event=>{
+                      if(tool!=='select'||placement)return
+                      event.stopPropagation()
+                      clearSelection()
+                      onSelectRoom(room.id)
+                    }}/>
+                })}
+              </g>
+            )}
             {exteriorWallStrips(plan).map((strip,i)=>
               <polygon key={'outer-strip-'+i} data-testid={'plan-exterior-strip-'+i}
                 points={strip.map(p=>{const q=xy(p);return q.x+','+q.y}).join(' ')}
@@ -1299,6 +1343,33 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
                   textAnchor="middle" className="plan-inner-label" pointerEvents="none">
                   {meters(planDistanceMm(w.start,w.end))} м
                 </text>}
+              </g>
+            })}
+            {showRoomLabels && visibleRooms.map(room=>{
+              const pos=xy(room.center)
+              const selected=room.id===selectedRoomId
+              return <g key={'room-label-'+room.id}
+                data-testid={'plan-room-label-'+room.id}
+                data-area-m2={formatRoomArea(room.areaM2)}
+                className={'plan-room-label'+(selected?' plan-room-selected':'')}
+                role={tool==='select'&&!placement?'button':undefined}
+                tabIndex={tool==='select'&&!placement?0:undefined}
+                pointerEvents={tool==='select'&&!placement?'visiblePainted':'none'}
+                onClick={event=>{
+                  if(tool!=='select'||placement)return
+                  event.stopPropagation();clearSelection();onSelectRoom(room.id)
+                }}
+                onKeyDown={event=>{
+                  if(tool!=='select'||(event.key!=='Enter'&&event.key!==' '))return
+                  event.preventDefault();event.stopPropagation()
+                  clearSelection();onSelectRoom(room.id)
+                }}>
+                <rect x={pos.x-49} y={pos.y-23} width={98} height={43}
+                  rx={7} className="plan-room-label-background"/>
+                <text x={pos.x} y={pos.y-6} textAnchor="middle"
+                  className="plan-room-name">{room.label}</text>
+                <text x={pos.x} y={pos.y+12} textAnchor="middle"
+                  className="plan-room-area">{formatRoomArea(room.areaM2)} м²</text>
               </g>
             })}
             {shownOpenings.map(opening => {
@@ -1483,7 +1554,12 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
           <div className="plan-measure-panel" data-testid="plan-stats">
             <div><span>Габариты</span><strong data-testid="plan-dimensions">{meters(bounds.maxX-bounds.minX)} × {meters(bounds.maxZ-bounds.minZ)} м</strong></div>
             <div><span>{plan.closed?'Периметр':'Начерчено'}</span><strong data-testid="plan-perimeter">{meters(totalLength)} м</strong></div>
-            <div><span>Площадь</span><strong data-testid="plan-area">{plan.closed?planAreaM2(plan).toLocaleString('ru-RU',{maximumFractionDigits:2}):'—'} м²</strong></div>
+            <div><span>Площадь контура</span><strong data-testid="plan-area">{plan.closed?planAreaM2(plan).toLocaleString('ru-RU',{maximumFractionDigits:2}):'—'} м²</strong></div>
+            <div><span>Чистая площадь / помещения</span>
+              <strong data-testid="plan-room-total" data-area-m2={formatRoomArea(totalRoomAreaM2(visibleRooms))}>
+                {plan.closed?formatRoomArea(totalRoomAreaM2(visibleRooms))+' м² · '+visibleRooms.length:'—'}
+              </strong>
+            </div>
           </div>
           <span className="plan-bottom-right">Размеры в метрах · точность 1 мм</span>
         </div>

@@ -202,3 +202,8 @@ export function deriveFloorRooms(plan:FloorPlan|undefined):FloorRoom[] {
 }
 export const totalRoomAreaM2=(rooms:readonly FloorRoom[])=>
   rooms.reduce((sum,room)=>sum+room.areaM2,0)
+
+/** One restrained palette across both 2D and 3D; colors are NOT stored in JSON. */
+export const ROOM_COLORS=['#83c9b7','#a7b9de','#e6c791','#c3b3d9','#9bcbd4','#dbb7aa'] as const
+export const formatRoomArea=(m2:number)=>
+  m2.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})
