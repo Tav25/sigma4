@@ -358,6 +358,9 @@ try {
   assert.equal(await page.getByTestId('plan-close').isEnabled(), false)
   await page.getByTestId('plan-add-exact').click() // +X 6 m
   await page.getByTestId('plan-point-1').waitFor()
+  await page.getByTestId('plan-point-1').click()
+  await page.getByTestId('plan-selected-point').waitFor()
+  assert.equal(await page.getByTestId('plan-workspace').getAttribute('data-inspector'),'true')
   await page.getByTestId('plan-length-input').fill('4')
   await page.getByTestId('plan-add-exact').click() // -Z 4 m
   await page.getByTestId('plan-point-2').waitFor()

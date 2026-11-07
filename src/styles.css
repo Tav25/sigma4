@@ -538,7 +538,7 @@ body,
 .plan-interior-hit:hover {stroke:rgba(15,123,149,.20)}
 
 /* SIGMA4 0.1.36 — compact CAD tools, dedicated contextual inspector and exact 2D cut. */
-.plan-workspace[data-closed="true"] {
+.plan-workspace[data-inspector="true"] {
   grid-template-columns: minmax(220px,252px) minmax(0,1fr) minmax(238px,280px);
 }
 .plan-controls { padding:16px 14px 18px; }
@@ -577,16 +577,16 @@ body,
 .plan-structural-piece[data-selected="true"] {stroke:#e07a33;stroke-width:3}
 .plan-structural-layer {isolation:isolate}
 @media(max-width:1150px) {
-  .plan-workspace[data-closed="true"] {grid-template-columns: 222px minmax(0,1fr) 244px}
+  .plan-workspace[data-inspector="true"] {grid-template-columns: 222px minmax(0,1fr) 244px}
   .plan-inspector {padding:12px}
   .plan-toolbar {gap:5px}
   .plan-toolbar .plan-mode-mark {display:none}
 }
 @media(max-width:850px) {
-  .plan-workspace[data-closed="true"] {grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto auto}
-  .plan-workspace[data-closed="true"] .plan-drawing {grid-row:1;min-height:0}
-  .plan-workspace[data-closed="true"] .plan-inspector {grid-row:2;max-height:24vh;overflow:auto;border-left:none;border-top:1px solid #d5e2e9}
-  .plan-workspace[data-closed="true"] .plan-controls {grid-row:3;max-height:24vh;border-right:none;border-top:1px solid #d5e2e9}
+  .plan-workspace[data-inspector="true"] {grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto auto}
+  .plan-workspace[data-inspector="true"] .plan-drawing {grid-row:1;min-height:0}
+  .plan-workspace[data-inspector="true"] .plan-inspector {grid-row:2;max-height:24vh;overflow:auto;border-left:none;border-top:1px solid #d5e2e9}
+  .plan-workspace[data-inspector="true"] .plan-controls {grid-row:3;max-height:24vh;border-right:none;border-top:1px solid #d5e2e9}
   .plan-toolbar {max-height:118px;overflow-y:auto}
   .plan-toolbar .plan-grid-select {margin-left:0}
 }

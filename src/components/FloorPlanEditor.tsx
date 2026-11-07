@@ -896,7 +896,8 @@ export function FloorPlanEditor({
   }, [plan, interiorStart, interiorHover, interiorThickness])
 
   return (
-    <div className="plan-workspace" data-testid="plan-workspace" data-closed={plan.closed} data-view={structuralVisible?'framing':'layout'}>
+    <div className="plan-workspace" data-testid="plan-workspace" data-closed={plan.closed} data-inspector={plan.closed||selectedIndex!==null}
+      data-view={structuralVisible?'framing':'layout'}>
       <aside className="plan-controls" aria-label="Инструменты и построение">
         <div className="plan-eyebrow">SIGMA4 / ЧЕРТЁЖ 01</div>
         <h1>План этажа</h1>
@@ -1557,7 +1558,7 @@ export function FloorPlanEditor({
           <span className="plan-bottom-right">Размеры в метрах · точность 1 мм</span>
         </div>
       </main>
-      {plan.closed && <aside className="plan-inspector" data-testid="plan-inspector"
+      {(plan.closed||selectedIndex!==null) && <aside className="plan-inspector" data-testid="plan-inspector"
         ref={sidebarRef} aria-label="Свойства выбранного объекта">
         <div className="plan-inspector-title">Свойства объекта</div>
         {structuralVisible && selectedTimber && <section className="plan-selection-panel"
