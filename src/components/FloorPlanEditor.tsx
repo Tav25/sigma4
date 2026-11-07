@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEven
 import {
   emptyFloorPlan, meters, planAreaM2, planBounds, planDistanceMm,
   planPerimeterMm, validateFloorPlan, decimalMetersToMm,
-  snapPlanAnchor, planInteriorJunctions, planWallClearances,
+  snapPlanAnchor, planWallClearances,
   moveInteriorWallWithDependents, moveWallToClearance, exteriorWallStrips,
   DEFAULT_EXTERIOR_THICKNESS_MM,
   type FloorPlan, type PlanPoint, type PlanInteriorWall,
@@ -130,7 +130,6 @@ export function FloorPlanEditor({
     [wallPreview,rooms])
   const activeNodes=(wallPreview??plan).graph?.nodes ?? []
   const selectedGraphNode=plan.graph?.nodes.find(n=>n.id===selectedGraphNodeId)
-  const innerJunctions = planInteriorJunctions(visiblePlan)
   const clearances = selectedInterior && tool === 'select'
     ? planWallClearances(visiblePlan, selectedInterior.id) : null
   const px = zoom * BASE_PX_PER_METRE
@@ -1408,11 +1407,6 @@ export function FloorPlanEditor({
                     </div>
                   </foreignObject>}
               </g>
-            })}
-            {innerJunctions.map((p,i) => {
-              const pos=xy(p)
-              return <circle key={i} cx={pos.x} cy={pos.y} r={6}
-                fill="#ffe0ae" stroke="#a86622" strokeWidth={2} pointerEvents="none"/>
             })}
             {plan.closed && (tool === 'interior' || tool === 'turn') && interiorStart && (
               <g pointerEvents="none" className="plan-wall-draft" data-testid="plan-wall-draft"
