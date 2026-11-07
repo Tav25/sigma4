@@ -330,6 +330,9 @@ export function SceneView({
       if (dimensionGroupRef.current) {
         orientDimensionNumbers(dimensionGroupRef.current, camera)
       }
+      if (roomGroupRef.current) {
+        orientDimensionNumbers(roomGroupRef.current, camera)
+      }
       renderer.render(scene, camera)
     }
     animate()
@@ -558,7 +561,7 @@ export function SceneView({
     }
   }, [dimensions, showDimensions])
 
-  // Derived floor zones and camera-facing area labels. Never raycast these
+  // Derived floor zones and engineering planar vector area labels. Never raycast these
   // objects or make them an alternative source of room geometry.
   useEffect(()=>{
     const scene=sceneRef.current
@@ -731,6 +734,7 @@ export function SceneView({
       data-room-count={rooms.length}
       data-room-total-m2={rooms.reduce((sum,room)=>sum+room.areaM2,0).toFixed(2)}
       data-room-labels-visible={showRoomLabels?'true':'false'}
+      data-room-label-style="planar-vector-dimensions"
       data-room-fill-visible={showRoomFill?'true':'false'}
       data-selected-room={selectedRoomId??''}>
       <button type="button" className="reset-view" onClick={() => resetRef.current?.()}>

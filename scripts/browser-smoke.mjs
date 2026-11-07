@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.33')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.34')
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
@@ -1185,11 +1185,15 @@ try {
   await page.getByTestId('plan-frame-build').click()
   await page.getByText('Количество стен: 6',{exact:true}).waitFor()
   await page.locator('.viewport[data-room-count="3"]').waitFor()
+  assert.equal(await page.locator('.viewport').getAttribute('data-room-label-style'),'planar-vector-dimensions')
   // The frame construction makes the authored exterior framing thickness
   // 145mm (a 2x6 stud) whereas draft floor plan defaults to a 150mm strip.
   // Both modes must agree on the UPDATED canonical model, not stale values.
   assert.equal(await page.locator('.viewport').getAttribute('data-room-total-m2'),'48.88')
   assert.match(await page.getByTestId('frame-room-summary').textContent(),/48,88/)
+  await page.screenshot({path:dir+'/49-room-area-engineering-vector-iso.png'})
+  await page.getByRole('button',{name:'Вид сверху'}).click()
+  await page.screenshot({path:dir+'/50-room-area-engineering-vector-top.png'})
   await page.screenshot({path:dir+'/47-room-area-3d-three-rooms.png'})
   await page.getByTestId('frame-room-fill-toggle').uncheck()
   assert.equal(await page.locator('.viewport').getAttribute('data-room-fill-visible'),'false')

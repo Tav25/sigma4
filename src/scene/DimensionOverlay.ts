@@ -21,9 +21,13 @@ const point = (p: DimensionPoint) =>
 const VECTOR_DIGIT_SIZE = 0.18
 const font = new FontLoader().parse(fontData)
 
-function numericMesh(valueMm: number, color: number): THREE.Mesh {
-  const characters = formatDimensionNumber(valueMm)
-  const shapes = font.generateShapes(characters, VECTOR_DIGIT_SIZE)
+/** Reusable glyphs for dimension and room-area annotations.
+ * No textures, DOM labels or non-deterministic canvas font metrics.
+ */
+export function makePlanarVectorText(
+  characters: string, color: number, size = VECTOR_DIGIT_SIZE,
+): THREE.Mesh {
+  const shapes = font.generateShapes(characters, size)
   const geometry = new THREE.ShapeGeometry(shapes, 4)
   geometry.computeBoundingBox()
   const bounds = geometry.boundingBox
@@ -41,6 +45,9 @@ function numericMesh(valueMm: number, color: number): THREE.Mesh {
   }))
   mesh.renderOrder = 112
   return mesh
+}
+function numericMesh(valueMm: number, color: number): THREE.Mesh {
+  return makePlanarVectorText(formatDimensionNumber(valueMm), color)
 }
 
 /** Dimension strokes and extension lines: always on XZ, never through boards. */

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {ROOM_COLORS,formatRoomArea,type FloorRoom} from '../core/rooms'
+import {makePlanarVectorText} from './DimensionOverlay'
 
 /** Convert canonical millimetre plan rectangles into Three.js metre positions. */
 export function roomFloorPlanes(rooms:readonly FloorRoom[]) {
@@ -18,39 +19,36 @@ interface OverlayOptions {
   showFill:boolean
   selectedRoomId:string|null
 }
-function makeRoomLabel(room:FloorRoom,selected:boolean):THREE.Sprite|null {
-  const canvas=document.createElement('canvas')
-  canvas.width=512
-  canvas.height=176
-  const ctx=canvas.getContext('2d')
-  if(!ctx)return null
-  ctx.fillStyle=selected?'rgba(238,250,247,0.99)':'rgba(255,255,255,0.95)'
-  ctx.fillRect(6,6,500,164)
-  ctx.lineWidth=5
-  ctx.strokeStyle=selected?'#168f7b':'#b9cad5'
-  ctx.strokeRect(8,8,496,160)
-  ctx.textAlign='center'
-  ctx.textBaseline='middle'
-  ctx.fillStyle='#486373'
-  ctx.font='600 32px system-ui, sans-serif'
-  ctx.fillText(room.label,256,61)
-  ctx.fillStyle='#214457'
-  ctx.font='bold 56px system-ui, sans-serif'
-  ctx.fillText(formatRoomArea(room.areaM2)+' м²',256,122)
-  const texture=new THREE.CanvasTexture(canvas)
-  texture.colorSpace=THREE.SRGBColorSpace
-  const material=new THREE.SpriteMaterial({
-    map:texture,transparent:true,depthWrite:false,depthTest:false,
-  })
-  const label=new THREE.Sprite(material)
-  const side=Math.min(room.bounds.maxXmm-room.bounds.minXmm,
-    room.bounds.maxZmm-room.bounds.minZmm)/1000
-  const width=Math.max(0.60,Math.min(1.8,side*0.50))
-  label.scale.set(width,width*176/512,1)
-  label.position.set(room.center.xMm/1000,0.22,room.center.zMm/1000)
-  label.renderOrder=90
-  label.userData={roomId:room.id,areaM2:room.areaM2,kind:'room-label'}
-  return label
+/** Same font and XZ-plane layout as the dimensional numbers on wall lines.
+ * Planar VECTOR glyphs are occluded by timber, unlike Sprite billboards.
+ * The '2' is a raised geometric superscript, not a raster glyph.
+ */
+export function makeRoomLabel(room:FloorRoom,selected:boolean):THREE.Group {
+  const group=new THREE.Group()
+  const color=selected?0x1562a8:0x274559
+  const value=makePlanarVectorText(formatRoomArea(room.areaM2),color)
+  value.name='room-area-value-'+room.id
+  group.add(value)
+  value.geometry.computeBoundingBox()
+  const numberWidth=(value.geometry.boundingBox?.max.x??0)-
+    (value.geometry.boundingBox?.min.x??0)
+  // Keep the trailing unit considerably smaller than the main number;
+  // use ASCII vector 'm' because the existing Helvetiker CAD font does not
+  // include Cyrillic glyphs. Raised "2" gives the actual square-metre sign.
+  const metre=makePlanarVectorText('m',color,0.105)
+  const square=makePlanarVectorText('2',color,0.079)
+  const unitX=numberWidth/2+0.10
+  metre.position.set(unitX,0,0)
+  square.position.set(unitX+0.067,0.060,0)
+  group.add(metre,square)
+  // Exactly the same quaternion and camera-flip handling as wall dimensions.
+  group.name='dimension-number-room-'+room.id
+  group.userData.dimensionBaseYaw=0
+  group.userData.roomId=room.id
+  group.userData.areaM2=room.areaM2
+  group.userData.kind='room-area-vector'
+  group.position.set(room.center.xMm/1000,0.044,room.center.zMm/1000)
+  return group
 }
 /** The visual group never changes any ProjectDocument or participates in raycasts. */
 export function makeRoomOverlayGroup(rooms:readonly FloorRoom[],options:OverlayOptions) {
@@ -72,21 +70,16 @@ export function makeRoomOverlayGroup(rooms:readonly FloorRoom[],options:OverlayO
     mesh.userData={roomId:plane.roomId,kind:'room-floor'}
     group.add(mesh)
   }
-  if(options.showLabels)for(const room of rooms){
-    const label=makeRoomLabel(room,room.id===options.selectedRoomId)
-    if(label)group.add(label)
-  }
+  if(options.showLabels)for(const room of rooms)
+    group.add(makeRoomLabel(room,room.id===options.selectedRoomId))
   return group
 }
 export function disposeRoomOverlayGroup(group:THREE.Group):void {
   group.traverse(node=>{
     if(node instanceof THREE.Mesh)node.geometry.dispose()
-    if(node instanceof THREE.Mesh||node instanceof THREE.Sprite){
+    if(node instanceof THREE.Mesh){
       const materials=Array.isArray(node.material)?node.material:[node.material]
-      for(const material of materials){
-        if(material instanceof THREE.SpriteMaterial)material.map?.dispose()
-        material.dispose()
-      }
+      for(const material of materials)material.dispose()
     }
   })
 }
