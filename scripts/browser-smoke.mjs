@@ -22,6 +22,12 @@ try {
     '--no-sandbox', '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader',
   ] })
   const page = await browser.newPage({ viewport: { width: 1500, height: 950 } })
+  // Historical regression scenarios require a fresh starter project.
+  // Production reloads retain local autosave; only test resets clear it.
+  const reloadFresh = async () => {
+    await page.evaluate(() => window.localStorage.removeItem('sigma4.autosave.v1'))
+    await page.reload({ waitUntil: 'networkidle' })
+  }
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
@@ -228,7 +234,7 @@ try {
   await page.screenshot({ path: dir + '/05-garage-door.png' })
   assert.equal(errors.length, 0, 'Unexpected browser exception')
   // Focused real-3D visual check: one untouched facade, one garage wall.
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadFresh()
   await page.getByTestId('tab-frame').click()
   await page.getByRole('button', { name: '+ Добавить вторую стену' }).click()
   await page.getByTestId('add-garage-door').click()
@@ -293,7 +299,7 @@ try {
   assert.equal(errors.length, 0)
   // S06.5: import a clean 4 m wall, prove the left end stays at X=0,
   // inspect the dimension readout and capture a real-world-axis screenshot.
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadFresh()
   await page.getByTestId('tab-frame').click()
   const blankDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
@@ -530,7 +536,7 @@ try {
   assert.deepEqual(imported.building.floorPlan.graph,final.building.floorPlan.graph)
   assert.equal(imported.validation.valid,true)
   // New linked project: draw and edit the same geometry used by the real 3D scene.
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadFresh()
   await page.getByTestId('plan-add-exact').click()
   for (const length of ['10', '7', '10']) {
     await page.getByTestId('plan-length-input').fill(length)
@@ -584,7 +590,7 @@ try {
   assert.deepEqual(linked.building.walls.map(wall => wall.lengthMm), [11000, 6710, 11000, 6710])
   assert.equal(linked.validation.valid, true)
 
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadFresh()
   await page.locator('#import-file').setInputFiles([{
     name: 'linked-garage.sigma4.json', mimeType: 'application/json', buffer: Buffer.from(linkedJson),
   }])
@@ -674,7 +680,7 @@ try {
 
   // Direct 2D editing uses the selected host, a transient preview, and one
   // canonical command when a placement or drag is confirmed.
-  await page.reload({ waitUntil: 'networkidle' })
+  await reloadFresh()
   const drawDirectGarage = async targetPage => {
     await targetPage.getByTestId('plan-add-exact').click()
     for (const length of ['10', '7', '10']) {
@@ -847,7 +853,7 @@ try {
   // Screenshot regression: 9 x 6 metre house with a north-west 3 x 3.25 m
   // room, through internal Z wall, left-facing T branch and door on the
   // upper wall. Run it through the actual UI, not just the ProjectStore.
-  await page.reload({waitUntil:'networkidle'})
+  await reloadFresh()
   await page.getByTestId('plan-add-exact').click()
   for(const length of ['9','6','9']){
     await page.getByTestId('plan-length-input').fill(length)
@@ -1073,7 +1079,7 @@ try {
   // v0.1.27: browser integration of a genuine four-arm X in a new garage.
   // The drawn graph keeps four independently editable arms, while the
   // physical framing builds ONE X-through and TWO Z-butt wall modules.
-  await page.reload({waitUntil:'networkidle'})
+  await reloadFresh()
   await page.getByTestId('plan-add-exact').click()
   for(const length of ['10','7','10']){
     await page.getByTestId('plan-length-input').fill(length)
@@ -1136,7 +1142,7 @@ try {
 
   // S22.1: reproduce user screenshot (9 x 6, through 6m, T arm 3m).
   // Do NOT press "Enable partitions" before the single Build click.
-  await page.reload({waitUntil:'networkidle'})
+  await reloadFresh()
   await page.getByTestId('plan-add-exact').click()
   for(const length of ['9','6','9']){
     await page.getByTestId('plan-length-input').fill(length)
