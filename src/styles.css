@@ -126,9 +126,6 @@ body,
   margin-bottom: 8px;
   color: #1f2937;
 }
-/* An inspection view placed below the existing reset camera button. */
-.top-view { top: 48px; }
-
 /* SIGMA4 S06.1: visual tree, derived from the JSON model (no duplicate state) */
 .project-tree {
   margin-top: 10px;
@@ -295,7 +292,7 @@ body,
 .plan-frame-form label {margin-top:6px}
 .plan-frame-fields [aria-pressed="true"] {background:#e2f4f0;border-color:#6db1a5;color:#175e57}
 
-.frame-section-toggle {position:absolute;z-index:2;top:12px;left:12px;padding:7px 12px}
+.frame-section-toggle {top:48px;right:12px;left:auto;z-index:11;}
 .frame-horizontal-section {display:flex;flex-direction:column;height:100%;min-height:0;background:#f6f9fc}
 .frame-section-toolbar {display:flex;gap:16px;align-items:center;padding:56px 14px 8px;font-size:13px}
 .frame-section-toolbar input {width:85px;margin-left:8px}

@@ -8,7 +8,7 @@ import type { SceneOpening3D } from './project-to-scene'
 import type { FloorRoom } from '../core/rooms'
 import { makeRoomOverlayGroup,disposeRoomOverlayGroup } from './room-overlay'
 import { openingLocalToWorld, openingWorldToLocalU, openingYaw } from './opening-geometry'
-import { calculateWorldBounds, topViewDistance } from './view-bounds'
+import { calculateWorldBounds } from './view-bounds'
 import type { DimensionLayout } from './dimension-model'
 import { makeDimensionGroup, makeOriginGroup, disposeDimensionGroup, orientDimensionNumbers } from './DimensionOverlay'
 import type { OpeningMarker } from './project-to-scene'
@@ -67,7 +67,6 @@ export function SceneView({
   const dimensionsRef = useRef(dimensions)
   const showDimensionsRef = useRef(showDimensions)
   const resetRef = useRef<(() => void) | null>(null)
-  const topViewRef = useRef<(() => void) | null>(null)
   const elementsRef = useRef<TimberElement[]>(elements)
   const selectedRef = useRef<string | null>(selectedId)
   const showEdgesRef = useRef<boolean>(showEdges)
@@ -353,7 +352,7 @@ export function SceneView({
     resizeObserver.observe(container)
 
     // Frame actual 3D rotated geometry from the canonical JSON projection.
-    const frameView = (mode: 'iso' | 'top') => {
+    const frameView = () => {
       const els = elementsRef.current
       if (!els.length || !container.clientWidth || !container.clientHeight) return
       const bounds = calculateWorldBounds(els)
@@ -372,30 +371,20 @@ export function SceneView({
       const ctr = bounds.getCenter(new THREE.Vector3())
       const size = bounds.getSize(new THREE.Vector3())
       const radius = Math.max(size.x, size.y, size.z) * 1.5 + 2
-      // Near-orthographic technical view: 1° perspective makes the
-      // parallax from the 2.7m studs negligible even at the image edges.
-      camera.fov = mode === 'top' ? 1 : 60
-      if (mode === 'top') {
-        const distance = topViewDistance(bounds, camera.fov, camera.aspect)
-        camera.far = Math.max(1000, distance * 3)
-        camera.up.set(0, 0, -1)
-        camera.position.set(ctr.x, ctr.y + distance, ctr.z)
-      } else {
-        camera.far = 1000
-        camera.up.set(0, 1, 0)
-        const sign = wallCountRef.current > 1 ? -1 : 1
-        camera.position.copy(ctr.clone().add(new THREE.Vector3(
-          sign * radius * 0.6, radius * 0.5, sign * radius * 0.6,
-        )))
-      }
+      camera.fov = 60
+      camera.far = 1000
+      camera.up.set(0, 1, 0)
+      const sign = wallCountRef.current > 1 ? -1 : 1
+      camera.position.copy(ctr.clone().add(new THREE.Vector3(
+        sign * radius * 0.6, radius * 0.5, sign * radius * 0.6,
+      )))
       camera.updateProjectionMatrix()
       camera.lookAt(ctr)
       controls.target.copy(ctr)
       controls.update()
       hasCenteredRef.current = true
     }
-    resetRef.current = () => frameView('iso')
-    topViewRef.current = () => frameView('top')
+    resetRef.current = () => frameView()
 
     return () => {
       if (draggingRef.current) stopDrag(false)
@@ -454,7 +443,6 @@ export function SceneView({
       rendererRef.current = null
       controlsRef.current = null
       resetRef.current = null
-      topViewRef.current = null
     }
   }, [])
 
@@ -739,9 +727,6 @@ export function SceneView({
       data-selected-room={selectedRoomId??''}>
       <button type="button" className="reset-view" onClick={() => resetRef.current?.()}>
         Сбросить вид
-      </button>
-      <button type="button" className="reset-view top-view" onClick={() => topViewRef.current?.()}>
-        Вид сверху
       </button>
     </div>
   )

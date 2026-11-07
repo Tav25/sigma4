@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { calculateWorldBounds, topViewDistance } from './view-bounds'
+import { calculateWorldBounds } from './view-bounds'
 import { createProjectFromCurrentState } from '../core/project-store'
 import { createProjectStore } from '../core/ProjectStore'
 import { rightCornerOrigin } from '../core/corner'
@@ -22,7 +22,7 @@ const elementsWithCorner = () => {
   return projectToScene(store.getSnapshot()).elements
 }
 
-describe('S05.8 actual mesh bounds and top camera', () => {
+describe('S05.8 actual mesh bounds', () => {
   it('matches a union of real rotated Three.js mesh boxes', () => {
     const elements = elementsWithCorner()
     expect(elements).toHaveLength(46)
@@ -49,26 +49,4 @@ describe('S05.8 actual mesh bounds and top camera', () => {
     expect(actual.max.y).toBeCloseTo(2.7, 6)
   })
 
-  it('frames the full 6x3m L-corner from above at wide and narrow aspect ratios', () => {
-    const bounds = calculateWorldBounds(elementsWithCorner())
-    const size = bounds.getSize(new THREE.Vector3())
-    for (const aspect of [16 / 9, 9 / 16]) {
-      const nearOrthoFov = 1
-      const distance = topViewDistance(bounds, nearOrthoFov, aspect)
-      const nearestSurface = distance - size.y / 2
-      const tanSmall = Math.tan(THREE.MathUtils.degToRad(nearOrthoFov / 2))
-      expect(nearestSurface * tanSmall).toBeGreaterThan(size.z / 2)
-      expect(nearestSurface * tanSmall * aspect).toBeGreaterThan(size.x / 2)
-      // Maximum parallax scaling from the nearest to farthest horizontal
-      // section of the frame must stay under 2% at the extremities.
-      expect((distance + size.y / 2) / nearestSurface).toBeLessThan(1.02)
-    }
-  })
-
-  it('rejects invalid camera input', () => {
-    const bounds = calculateWorldBounds(elementsWithCorner())
-    expect(() => topViewDistance(bounds, 0, 1)).toThrow()
-    expect(() => topViewDistance(bounds, 60, 0)).toThrow()
-    expect(() => topViewDistance(new THREE.Box3(), 60, 1)).toThrow()
-  })
 })

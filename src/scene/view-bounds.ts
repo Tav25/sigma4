@@ -20,12 +20,3 @@ export function calculateWorldBounds(elements: TimberElement[]): THREE.Box3 {
   return bounds
 }
 
-/** Distance to frame +X horizontally and -Z vertically from world +Y. */
-export function topViewDistance(bounds: THREE.Box3, fovDeg: number, aspect: number): number {
-  if (bounds.isEmpty() || fovDeg <= 0 || fovDeg >= 180 || aspect <= 0) {
-    throw new Error('Invalid top camera parameters')
-  }
-  const sz = bounds.getSize(new THREE.Vector3())
-  const t = Math.tan(THREE.MathUtils.degToRad(fovDeg) / 2)
-  return sz.y / 2 + Math.max(sz.x / (2 * t * aspect), sz.z / (2 * t)) * 1.2 + 0.5
-}

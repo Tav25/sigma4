@@ -623,8 +623,8 @@ export default function App() {
         </aside>
         <main className="viewport-wrap">
           {elements.length > 0 &&
-            <button type="button" className="frame-section-toggle" data-testid="frame-section-toggle"
-              onClick={() => setShowSection(value => !value)}>{showSection ? 'Вернуться в 3D' : 'Горизонтальный разрез'}</button>}
+            <button type="button" className="reset-view frame-section-toggle" data-testid="frame-section-toggle"
+              onClick={() => setShowSection(value => !value)}>{showSection ? 'Вернуться в 3D' : 'Горизонтальный срез'}</button>}
           {elements.length > 0 && showSection
             ? <HorizontalSection elements={elements} />
             : <ErrorBoundary>
