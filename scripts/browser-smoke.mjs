@@ -1185,8 +1185,11 @@ try {
   await page.getByTestId('plan-frame-build').click()
   await page.getByText('Количество стен: 6',{exact:true}).waitFor()
   await page.locator('.viewport[data-room-count="3"]').waitFor()
-  assert.equal(await page.locator('.viewport').getAttribute('data-room-total-m2'),'48.74')
-  assert.match(await page.getByTestId('frame-room-summary').textContent(),/48,74/)
+  // The frame construction makes the authored exterior framing thickness
+  // 145mm (a 2x6 stud) whereas draft floor plan defaults to a 150mm strip.
+  // Both modes must agree on the UPDATED canonical model, not stale values.
+  assert.equal(await page.locator('.viewport').getAttribute('data-room-total-m2'),'48.88')
+  assert.match(await page.getByTestId('frame-room-summary').textContent(),/48,88/)
   await page.screenshot({path:dir+'/47-room-area-3d-three-rooms.png'})
   await page.getByTestId('frame-room-fill-toggle').uncheck()
   assert.equal(await page.locator('.viewport').getAttribute('data-room-fill-visible'),'false')
@@ -1196,10 +1199,13 @@ try {
   await page.getByTestId('frame-room-label-toggle').check()
   await page.screenshot({path:dir+'/45-user-9x6-T-built-3D.png'})
   await page.getByTestId('tab-plan').click()
+  assert.equal(await page.getByTestId('plan-room-total').getAttribute('data-area-m2'),'48,88')
+  await page.screenshot({path:dir+'/48-room-area-2d-after-build.png'})
   const tExport=page.waitForEvent('download')
   await page.getByTestId('plan-export').click()
   const tJson=JSON.parse(await readFile(await (await tExport).path(),'utf8'))
   assert.equal(tJson.building.floorPlan.frame.partitions,true)
+  assert.equal(tJson.building.floorPlan.exteriorThicknessMm,145)
   assert.equal(tJson.building.floorPlan.graph.edges.length,3)
   assert.equal(tJson.building.walls.length,6)
   assert.equal(tJson.validation.valid,true)
