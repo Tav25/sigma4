@@ -379,3 +379,214 @@
 @media (prefers-reduced-motion: reduce) {
   .plan-button, .ui-button, .ui-header-button { transition: none; }
 }
+
+/* UI-03–07: reusable inspector, semantic engineering status, accessible controls. */
+:root {
+  --ui-muted: #526677;
+  --ui-canvas-label: #536c80;
+  --ui-warning: #855318;
+  --ui-warning-surface: #fff4dd;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+}
+.ui-inspector-group {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius);
+  margin: var(--ui-space-3) 0;
+  overflow: visible;
+}
+.ui-inspector-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--ui-radius);
+  color: var(--ui-text);
+  background: var(--ui-panel-muted);
+  text-align: left;
+  font: 650 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  cursor: pointer;
+}
+.ui-inspector-toggle small {
+  display: block;
+  padding-top: 3px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.ui-inspector-toggle:hover { background: var(--ui-accent-light); }
+.ui-inspector-toggle:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+.ui-inspector-content { padding: 10px 11px 13px; }
+.ui-inspector-content .project-tree { margin: 0; }
+.ui-inspector-content > .plan-tool-section { border-top: 0; padding-top: 0; margin-top: 0; }
+.ui-inspector-content .panel-title:first-child { margin-top: 0; }
+.ui-inspector-content .props { margin-top: 8px; }
+.ui-inspector-content .plan-button { width: 100%; }
+.ui-inspector-group + .ui-inspector-group { margin-top: 10px; }
+
+.ui-model-status {
+  flex: 0 0 auto;
+  background: var(--ui-surface);
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  padding: 7px 14px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 20px;
+  row-gap: 4px;
+}
+.ui-model-status-compact { min-height: 37px; }
+.ui-status-item { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.ui-status-item > span:first-child {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #dcf3e8; color: var(--ui-success); font-weight: 800;
+}
+.ui-status-item[data-state="error"] { color: var(--ui-danger); }
+.ui-status-item[data-state="error"] > span:first-child {
+  background: var(--ui-danger-light); color: var(--ui-danger);
+}
+.ui-status-unverified { color: var(--ui-warning); }
+.ui-status-unverified > span:first-child { background: var(--ui-warning-surface); color: var(--ui-warning); }
+.ui-status-explanation { flex-basis: 100%; color: var(--ui-muted); font-size: 11px; }
+.ui-sidebar-notice strong { display: block; color: var(--ui-text); margin-bottom: 5px; }
+.ui-sidebar-notice p { margin-top: 5px; }
+.ui-sidebar-notice .plan-button { min-height: 44px; }
+
+.frame-section-filter-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+  padding: 3px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius);
+  background: var(--ui-panel-muted);
+}
+.frame-section-filter-row .ui-filter-button {
+  min-height: 34px; padding: 7px 9px;
+  border: 1px solid transparent; background: transparent;
+  border-radius: 6px; font: 650 12px/1.25 system-ui, sans-serif;
+  color: var(--ui-muted); cursor: pointer;
+}
+.frame-section-filter-row .ui-filter-button[aria-pressed="true"] {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-accent); background: var(--ui-surface);
+}
+.frame-section-filter-row .ui-filter-button:hover { background: var(--ui-accent-selected); }
+.frame-section-filter-row .ui-filter-button:focus-visible {
+  outline: 2px solid var(--ui-focus); outline-offset: 2px;
+}
+.frame-section-piece-picker {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0; font-size: 12px; font-weight: 650; color: var(--ui-text);
+}
+.frame-section-piece-picker select {
+  min-width: 0; max-width: 260px; width: 205px; min-height: 38px;
+  border: 1px solid var(--ui-border-strong); border-radius: var(--ui-radius);
+  background: var(--ui-surface); padding: 6px; color: var(--ui-text); font-size: 12px;
+}
+.frame-section-filter-count { color: var(--ui-muted); font-size: 12px; }
+.frame-section-toolbar { gap: 10px; padding-top: 57px; }
+.frame-section-zoom .ui-focus-piece { width: auto; margin: 0; }
+.frame-section-zoom { flex-wrap: wrap; justify-content: flex-end; }
+.frame-section-piece { outline: none; }
+.frame-section-piece:focus-visible {
+  stroke: var(--ui-focus); stroke-width: 4; outline: none;
+}
+.frame-section-footer { line-height: 1.5; }
+.frame-section-piece-picker select:focus-visible {
+  outline: 2px solid var(--ui-focus); outline-offset: 2px;
+}
+/* Increase critical plan annotation legibility without recolouring timber categories. */
+.plan-axis-label { fill: var(--ui-canvas-label); }
+.plan-start-subcaption { fill: var(--ui-canvas-label); }
+.plan-bottom, .plan-canvas-hint, .frame-section-summary, .frame-section-footer {
+  color: var(--ui-muted);
+}
+.plan-tool-section label, .param-label, .plan-inspector-form label {
+  font-size: 12px;
+  color: var(--ui-text);
+}
+.plan-measure-panel span, .plan-measure-panel strong { font-size: 12px; }
+.plan-toolbar button:focus-visible, .frame-section-toolbar button:focus-visible,
+.frame-section-zoom button:focus-visible {
+  outline: 2px solid var(--ui-focus); outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .plan-toolbar button, .plan-mode-buttons button,
+  .plan-opening-actions button, .frame-section-filter-row button,
+  .frame-section-main-controls button, .frame-section-zoom button,
+  .plan-button, .ui-header-button, .project-save-button {
+    min-height: 44px;
+  }
+  .frame-section-piece-picker select { min-height: 44px; }
+}
+@media (max-width: 700px) {
+  .ui-model-status { font-size: 11px; gap: 4px 10px; padding: 6px 10px; }
+  .ui-status-item { flex-wrap: nowrap; }
+  .plan-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 54px;
+    gap: 5px 8px;
+    padding: 6px 8px;
+  }
+  .plan-toolbar .plan-main-tools { flex: 0 1 auto; }
+  .plan-toolbar .plan-mode-mark { display: none; }
+  .plan-toolbar .plan-grid-select { flex: 0 1 auto; min-width: 0; margin-left: auto; }
+  .plan-toolbar .plan-grid-toggle { flex: 0 0 auto; }
+  .plan-toolbar .plan-zoom-tools {
+    flex: 1 1 auto; min-width: 0; justify-content: flex-end;
+  }
+  .plan-toolbar .plan-zoom-tools span {
+    display: inline-block; min-width: 38px; font-size: 12px;
+  }
+  .plan-toolbar .plan-zoom-tools button { padding: 7px 10px; }
+  .frame-section-toolbar { padding: 58px 10px 9px; gap: 8px; }
+  .frame-section-filter-row {
+    max-width: 100%; flex: 1 1 100%;
+    flex-wrap: nowrap; overflow-x: auto;
+  }
+  .frame-section-piece-picker { flex: 1 1 100%; }
+  .frame-section-piece-picker select { width: 100%; max-width: none; }
+  .frame-section-range { flex: 1 1 100%; min-width: 80px; }
+  .frame-section-zoom { left: 10px; right: 10px; gap: 4px; top: 10px; }
+  .frame-section-filter-count { flex: 1 1 100%; }
+  .project-tree-root, .tree-item { font-size: 12px; }
+}
+
+.ui-status-demo {
+  color: var(--ui-muted);
+  font-size: 11px;
+  padding-left: 6px;
+  border-left: 1px solid var(--ui-border);
+}
+.ui-status-item[data-state="unknown"] { color: var(--ui-muted); }
+.ui-status-item[data-state="unknown"] > span:first-child {
+  background: var(--ui-accent-light);
+  color: var(--ui-muted);
+}
+.plan-selection-panel .plan-opening-actions {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+}
+.plan-selection-panel .plan-opening-actions button {
+  flex: 1 1 85px;
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-accent-light);
+  min-height: 40px;
+}
+.plan-profile-editor > .ui-inspector-group { margin: 9px 0; }
+.plan-profile-editor > .ui-inspector-group .ui-inspector-content { padding: 10px; }
+.frame-section-toolbar .frame-section-summary { flex: 1 1 200px; }
+@media (max-width: 700px) {
+  .ui-status-demo { display: none; }
+  .plan-toolbar .plan-main-tools button { white-space: nowrap; }
+}

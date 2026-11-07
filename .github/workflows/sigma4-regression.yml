@@ -2,7 +2,7 @@ name: SIGMA4 regression checks
 
 on:
   push:
-    branches: [sigma4, 'ux-audit-*']
+    branches: [sigma4, 'ux-audit-*', 'ux-complete-*']
   pull_request:
     branches: [sigma4]
   workflow_dispatch:

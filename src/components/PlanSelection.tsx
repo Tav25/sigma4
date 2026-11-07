@@ -3,12 +3,13 @@ import { PLAN_OPENING_PRESETS, planSideLength, type PlanFrameSide } from '../cor
 import type { Opening } from '../core/project'
 import { openingMetres, parseOpeningDimension } from './PlanOpeningGraphics'
 import { DEFAULT_DOOR_SWING } from './usePlanOpenings'
+import { InspectorGroup } from './UIPrimitives'
 
-function OpeningActions({ side, onAdd }: { side: PlanFrameSide; onAdd: (type: Opening['type']) => void }) {
+function OpeningActions({ side, onAdd, testIdPrefix = 'plan-add-' }: { side: PlanFrameSide; onAdd: (type: Opening['type']) => void; testIdPrefix?: string }) {
   const presets = PLAN_OPENING_PRESETS.filter(item => !('thicknessMm' in side) || item.value === 'door')
   return <div className="plan-opening-actions" role="group" aria-label="Добавить проём в выбранную стену">
     {presets.map(preset => <button type="button" key={preset.value}
-      data-testid={'plan-add-' + preset.value}
+      data-testid={testIdPrefix + preset.value}
       aria-label={'Добавить ' + preset.label.toLowerCase()} onClick={() => onAdd(preset.value)}>
       <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none"
         stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
@@ -58,14 +59,15 @@ export function PlanWallActions({ side, anchor, svgRef, onAdd }: {
   </div>
 }
 
-export function PlanWallSelection({ side }: { side: PlanFrameSide }) {
+export function PlanWallSelection({ side, onAdd }: { side: PlanFrameSide; onAdd?: (type: Opening['type']) => void }) {
   return <section className="plan-selection-panel" aria-label="Выбранная стена">
     <span className="plan-inspector-kicker">Выбранная стена</span>
     <strong>{side.label}</strong>
     <span className="plan-selection-detail">{openingMetres(planSideLength(side))} м · {
       'thicknessMm' in side ? 'Перегородка' : 'Наружная'
     }</span>
-    <span className="plan-selection-detail">Действия доступны рядом со стеной на плане.</span>
+    <span className="plan-selection-detail">Выберите проём на плане или добавьте новый.</span>
+    {onAdd && <OpeningActions side={side} onAdd={onAdd} testIdPrefix="plan-sidebar-add-" />}
   </section>
 }
 
@@ -143,6 +145,7 @@ export function PlanOpeningInspector({ opening, side, onSave, onRemove }: {
       {opening.type === 'window' && <label>Подоконник от пола, мм<input inputMode="numeric" value={sill}
         onChange={event => setSill(event.target.value)} /></label>}
       {previewConfig && <div className="plan-profile-editor" data-testid="plan-opening-profile">
+        <InspectorGroup title="Конструкция перемычки" description="Дополнительные параметры без расчёта несущей способности">
         <strong className="plan-section-title">Предварительная перемычка</strong>
         <div className="plan-frame-fields">
           <label>Высота перемычки, мм
@@ -159,6 +162,7 @@ export function PlanOpeningInspector({ opening, side, onSave, onRemove }: {
           </label>
         </div>
         <p className="plan-guidance">Это геометрия каркаса, не проверка несущей способности. Сечение и крепёж требуют расчёта по применимым нормам.</p>
+        </InspectorGroup>
       </div>}
       {partition && opening.type === 'door' && <p className="plan-guidance">
         Ненесущая перегородка: плоская перемычка без jack-стоек.

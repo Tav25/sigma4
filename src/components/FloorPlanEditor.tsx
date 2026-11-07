@@ -18,6 +18,7 @@ import { usePlanOpenings } from './usePlanOpenings'
 import { OpeningCut, PlanOpeningDimensions, PlanOpeningSymbol, closestPointOnSide } from './PlanOpeningGraphics'
 import { PlanOpeningInspector, PlanWallActions, PlanWallSelection } from './PlanSelection'
 import { PlanFrameControls, type PlanFramePick } from './PlanFrameControls'
+import { InspectorGroup } from './UIPrimitives'
 
 const preciseMetres = (mm:number) => (mm/1000).toFixed(3).replace('.', ',')
 const EMPTY_PLAN = emptyFloorPlan()
@@ -49,9 +50,10 @@ export interface FloorPlanEditorProps {
   onFrameBuilt: () => void
   onUndo: () => void
   onRedo: () => void
+  focusOpening?: { id: string; nonce: number } | null
 }
 
-export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImport, onFrameBuilt, onUndo, onRedo }: FloorPlanEditorProps) {
+export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImport, onFrameBuilt, onUndo, onRedo, focusOpening }: FloorPlanEditorProps) {
   const [direction, setDirection] = useState<Direction>('+x')
   const [exactLength, setExactLength] = useState('6')
   const [snapMm, setSnapMm] = useState(250)
@@ -92,6 +94,17 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
   const [frameIssueIds, setFrameIssueIds] = useState<string[]>([])
   useEffect(() => setFrameIssueIds([]), [plan])
   const openingTools = usePlanOpenings(plan, onCommand)
+  useEffect(() => {
+    if (!focusOpening) return
+    const target = openingTools.openings.find(opening => opening.id === focusOpening.id)
+    if (target) {
+      setTool('select')
+      openingTools.selectOpening(target)
+      sidebarRef.current?.scrollTo({ top: 0, behavior: 'auto' })
+    }
+    // Each explicit 3D-to-2D navigation generates a new focus nonce.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusOpening?.nonce])
   const frameSides = openingTools.sides
   const drawingSides = useMemo(() => wallPreview ? planFrameOpeningSides(wallPreview, true) : frameSides,
     [wallPreview, frameSides])
@@ -850,7 +863,8 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
         {tool === 'select' && selectedOpening && selectedWall
           ? <PlanOpeningInspector opening={selectedOpening} side={selectedWall} onSave={openingTools.save}
               onRemove={() => openingTools.remove(selectedOpening)} />
-          : tool === 'select' && selectedWall && <PlanWallSelection side={selectedWall} />}
+          : tool === 'select' && selectedWall && <PlanWallSelection side={selectedWall}
+              onAdd={type => openingTools.startPlacement(type)} />}
         {!plan.closed && <div className="plan-step">
           <span className="plan-step-count">01</span>
           <div><strong>{plan.closed ? 'Контур готов' : points.length ? 'Продолжайте контур' : 'Начальная точка'}</strong>
@@ -895,11 +909,13 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
                 }
               }}>Разомкнуть для продолжения</button>
           </div>
+          <InspectorGroup title="Каркас и проёмы" description="Построение модели и точные параметры" testId="plan-frame-section">
           <PlanFrameControls plan={plan} pick={framePick} picking={tool === 'frame'}
             onPick={() => {
               activateTool(tool === 'frame' ? 'select' : 'frame')
             }}
             onCommand={onCommand} onIssues={setFrameIssueIds} onBuilt={onFrameBuilt} />
+          </InspectorGroup>
           <div className="plan-tool-section" data-testid="plan-outer-wall-width">
             <strong className="plan-section-title">Толщина наружных стен</strong>
             <label htmlFor="outer-wall-width">Толщина внутрь периметра, мм</label>
@@ -1089,8 +1105,8 @@ export function FloorPlanEditor({ plan = EMPTY_PLAN, onCommand, onExport, onImpo
           <div><strong>Внутренние стены</strong><small>Доступны после замыкания наружного периметра.</small></div>
         </div>}
         <button type="button" className="plan-button plan-export" onClick={onExport}
-          data-testid="plan-export">Экспортировать план в JSON</button>
-        <button type="button" className="plan-button plan-text" onClick={onImport}>Импортировать JSON</button>
+          data-testid="plan-export">Скачать проект JSON</button>
+        <button type="button" className="plan-button plan-text" onClick={onImport}>Открыть проект JSON</button>
       </aside>
       <main className="plan-drawing">
         <div className="plan-toolbar">

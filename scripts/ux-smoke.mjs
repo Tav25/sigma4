@@ -25,7 +25,7 @@ try {
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.33')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.34')
 
   // UI-02: one set of design tokens controls all sidebars and buttons.
   const styleOf = async selector => page.locator(selector).first().evaluate(el => {
@@ -69,6 +69,34 @@ try {
   await page.screenshot({ path: dir + '/ui02-desktop-section.png' })
   await page.getByTestId('frame-section-toggle').click()
   await page.getByTestId('tab-plan').click()
+
+  // UI-03: clearly separated model checks and unverified structural design.
+  assert.match(await page.getByTestId('ui-engineering-status').textContent(), /не рассчитана/)
+  assert.ok(await page.getByTestId('ui-geometry-status').isVisible())
+  assert.ok(await page.getByTestId('ui-demo-status').isVisible())
+  const treeGroup = page.getByTestId('frame-tree-section')
+  const toggle = treeGroup.locator('.ui-inspector-toggle')
+  await toggle.click()
+  assert.equal(await toggle.getAttribute('aria-expanded'), 'false')
+  await toggle.click()
+  assert.equal(await toggle.getAttribute('aria-expanded'), 'true')
+
+  // UI-05: filtered CAD section and keyboard-based element selection.
+  await page.getByTestId('frame-section-toggle').click()
+  const sectionUi = page.getByTestId('frame-section')
+  await sectionUi.getByTestId('frame-section-height').fill('10')
+  await sectionUi.getByTestId('frame-section-filter-partition').click()
+  assert.equal(await sectionUi.getByTestId('frame-section-piece').count(), 0)
+  await sectionUi.getByTestId('frame-section-filter-all').click()
+  const sectionPiece = sectionUi.getByTestId('frame-section-piece').first()
+  await sectionPiece.focus()
+  await sectionPiece.press('Enter')
+  assert.ok(await sectionUi.getByTestId('frame-section-selected').isVisible())
+  const beforeFocus = await sectionUi.getByTestId('frame-section-svg').getAttribute('viewBox')
+  await sectionUi.getByTestId('frame-section-focus').click()
+  assert.notEqual(await sectionUi.getByTestId('frame-section-svg').getAttribute('viewBox'), beforeFocus)
+  await page.screenshot({ path: dir + '/ui03-07-section.png' })
+  await page.getByTestId('frame-section-toggle').click()
 
   // Preserve the exact workspace view when switching between 2D and 3D.
   await page.locator('button[title="Увеличить масштаб"]').click()
@@ -140,6 +168,16 @@ try {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByTestId('tab-plan').click()
   assert.equal((await styleOf('.plan-controls')).width, 390)
+  const mobileToolbar = await page.locator('.plan-toolbar').evaluate(toolbar => {
+    const rect = toolbar.getBoundingClientRect()
+    const controls = [...toolbar.querySelectorAll('button, select')].filter(el => el.getBoundingClientRect().width > 0)
+    return { width: toolbar.clientWidth, content: toolbar.scrollWidth,
+      outOfBounds: controls.filter(el => {
+        const r = el.getBoundingClientRect()
+        return r.left < rect.left - 2 || r.right > rect.right + 2
+      }).map(el => el.getAttribute('data-testid') || el.textContent?.trim()) }
+  })
+  assert.deepEqual(mobileToolbar.outOfBounds, [], 'Mobile toolbar controls should remain within the viewport')
   await page.getByTestId('tab-frame').click()
   assert.equal((await styleOf('.left-panel')).width, 390)
   const frameLayout = await page.evaluate(() => {

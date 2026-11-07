@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { HorizontalSection } from './components/HorizontalSection'
+import { ActionButton, InspectorGroup, ModelStatus } from './components/UIPrimitives'
 import { SceneView } from './scene/SceneView'
 import { FloorPlanEditor } from './components/FloorPlanEditor'
 import { timberVolumeM3, type TimberElement as CoreTimberElement } from './core/timber'
@@ -74,6 +75,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [workspace, setWorkspace] = useState<'plan' | 'frame'>('plan')
   const [showSection, setShowSection] = useState(false)
+  const [planTarget, setPlanTarget] = useState<{ id: string; nonce: number } | null>(null)
   const [showEdges, setShowEdges] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
   const [commandError, setCommandError] = useState<string | null>(recoveryError)
@@ -132,6 +134,9 @@ export default function App() {
   const selected = elements.find((e) => e.id === selectedId) ?? null
   const validation = snapshot.validation
   const hasErrors = validation && !validation.valid
+  const validationErrors = validation?.issues.filter(issue => issue.severity === 'error') ?? []
+  const structuralErrorCount = validationErrors.filter(issue => issue.code.startsWith('STRUCTURAL_')).length
+  const demo3D = !linkedFrame && !snapshot.building.floorPlan?.closed
 
   const dispatch = (command: ProjectCommand) => {
     const result = store.dispatch(command)
@@ -376,7 +381,7 @@ export default function App() {
           <FloorPlanEditor plan={snapshot.building.floorPlan}
             onCommand={dispatch} onExport={exportJson} onUndo={undo} onRedo={redo}
             onImport={() => document.getElementById('import-file')?.click()}
-            onFrameBuilt={() => setWorkspace('frame')} />
+            onFrameBuilt={() => setWorkspace('frame')} focusOpening={planTarget} />
         </ErrorBoundary>
       </div>
       <div className="main" style={{ display: workspace === 'frame' ? 'flex' : 'none' }}
@@ -390,9 +395,95 @@ export default function App() {
               <button type="button" className="plan-button plan-secondary" onClick={() => setWorkspace('plan')}>
                 Редактировать план
               </button>
-            </> : 'Самостоятельный 3D-каркас. Связанный каркас можно построить из прямоугольника во вкладке «План 2D».'}
+            </> : 'Демонстрационный 3D-каркас. Он не связан с пустым планом 2D. Чтобы построить свой проект, начните с периметра в режиме «План 2D».'}
           </div>
-          <h2 className="panel-title">Дерево проекта</h2>
+          {showSection && <div className="ui-sidebar-notice" data-testid="frame-section-context">
+            <strong>Режим горизонтального разреза</strong>
+            <p>Высоту, фильтры и масштаб меняйте над чертежом. Выбранная деталь показана здесь и в дереве.</p>
+          </div>}
+          {selectedOpening && (
+            <div className="props">
+              <h3 className="props-title">
+                Свойства {selectedOpening.type === 'garage-door' ? 'гаражных ворот' : selectedOpening.type === 'door' ? 'дверного проёма' : 'оконного проёма'} ({selectedOpening.id})
+              </h3>
+              <div>ID: {selectedOpening.id}</div>
+              <div>Тип: {selectedOpening.type === 'garage-door' ? 'Гаражные секционные ворота' : selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
+              {linkedFrame ? <>
+                <div>Размер: {selectedOpening.widthMm} × {selectedOpening.heightMm} мм</div>
+                <div>От начала линии стены: {planOpening?.positionUmm} мм</div>
+                <ActionButton data-testid="frame-edit-opening-in-plan" variant="primary" onClick={() => {
+                  setPlanTarget(previous => ({ id: selectedOpening.id, nonce: (previous?.nonce ?? 0) + 1 }))
+                  setWorkspace('plan')
+                }}>Редактировать проём в 2D</ActionButton>
+              </> : <>
+              {selectedOpening.type === 'garage-door' && (
+                <div style={{ margin: '8px 0', fontSize: 12 }}>
+                  <label className="param-label" htmlFor="garage-preset">Североамериканский размер</label>
+                  <select id="garage-preset" className="param-input"
+                    value={GARAGE_DOOR_PRESETS.find(p => p.widthMm === selectedOpening.widthMm &&
+                      p.heightMm === selectedOpening.heightMm)?.label ?? ''}
+                    onChange={event => {
+                      const preset = GARAGE_DOOR_PRESETS.find(p => p.label === event.target.value)
+                      if (preset) {
+                        updateOpening(selectedOpening.id, { widthMm: preset.widthMm })
+                        if (selectedOpening.heightMm !== preset.heightMm)
+                          updateOpening(selectedOpening.id, { heightMm: preset.heightMm })
+                      }
+                    }}>
+                    <option value="">Индивидуальный размер</option>
+                    {GARAGE_DOOR_PRESETS.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
+                  </select>
+                  <div style={{ marginTop: 8 }}>
+                    Профиль: Clopay, стандартные торсионные направляющие (справочный)
+                  </div>
+                  <div>Требуется сбоку: ≥ {selectedOpening.garage?.minSideRoomMm} мм с каждой стороны</div>
+                  <div>Требуется сверху: ≥ {selectedOpening.garage?.minHeadRoomMm} мм</div>
+                  <div>Требуется в глубину: ≥ {selectedOpening.heightMm +
+                    (selectedOpening.garage?.minBackRoomExtraMm ?? 0)} мм</div>
+                  <div style={{ marginTop: 7, color: '#a25a00' }}>
+                    Перемычка {selectedOpening.garage?.lintelPreviewDepthMm} мм и
+                    {' '}{selectedOpening.garage?.jackStudsPerSide} опорные стойки на сторону — предварительная компоновка.
+                    Несущая способность, portal frame и реальные зазоры НЕ проверены.
+                  </div>
+                </div>
+              )}
+              <SafeNumberInput label="Положение вдоль стены U (мм)" value={selectedOpening.positionXmm} onChange={(v) => updateOpening(selectedOpening.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
+              <SafeNumberInput label="Ширина (мм)" value={selectedOpening.widthMm} onChange={(v) => updateOpening(selectedOpening.id, { widthMm: v })} validate={(r) => validateInt(r, 300, 5000, 'ширина')} />
+              <SafeNumberInput label="Высота (мм)" value={selectedOpening.heightMm} onChange={(v) => updateOpening(selectedOpening.id, { heightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота')} />
+              {selectedOpening.type === 'window' && (
+                <SafeNumberInput label="Высота подоконника (мм)" value={selectedOpening.sillHeightMm} onChange={(v) => updateOpening(selectedOpening.id, { sillHeightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота подоконника')} />
+              )}
+              {selectedMarker && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13 }}>
+                  <input type="checkbox" checked={selectedMarker.visible}
+                    onChange={e => dispatch({
+                      type: 'SET_MARKER_SETTINGS',
+                      payload: { openingId: selectedOpening.id, visible: e.target.checked },
+                    })} />
+                  Показывать маркер проёма
+                </label>
+              )}
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="plan-button plan-text ui-danger" onClick={() => deleteOpening(selectedOpening.id)}>Удалить {selectedOpening.type === 'garage-door' ? 'гаражные ворота' : selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
+              </div>
+              </>}
+            </div>
+          )}
+
+          {selected && (
+            <div className="props">
+              <h3 className="props-title">Свойства детали</h3>
+              <div>ID: {selected.id}</div>
+              <div>Роль: {selected.role}</div>
+              <div>Длина: {selected.length} мм</div>
+              <div>Сечение: {selected.width}x{selected.height} мм</div>
+              <div>Объём: {timberVolumeM3(selected).toFixed(6)} м³</div>
+              <div>Направление: {dirText(selected)}</div>
+              <div>Угол roll: {selected.orientation.roll}</div>
+              <div>Опорная точка: {selected.position.x}, {selected.position.y}, {selected.position.z} мм</div>
+            </div>
+          )}
+          <InspectorGroup title="Объекты проекта" description="Выбор стен, проёмов и деталей" testId="frame-tree-section">
           <ProjectTree
             document={snapshot}
             selectedWallId={wall.wallId}
@@ -414,6 +505,7 @@ export default function App() {
               setSelectedOpeningId(null)
             }}
           />
+          </InspectorGroup>
           {!linkedFrame && <>
           <h2 className="panel-title" style={{ marginTop: 16 }}>Стены</h2>
           <div className="param-group ui-button-stack">
@@ -505,72 +597,9 @@ export default function App() {
             <button type="button" className="plan-button plan-secondary" data-testid="add-garage-door"
               onClick={() => addOpening('garage-door')}>+ Гаражные ворота</button>
           </div>}
-          {selectedOpening && (
-            <div className="props">
-              <h3 className="props-title">
-                Свойства {selectedOpening.type === 'garage-door' ? 'гаражных ворот' : selectedOpening.type === 'door' ? 'дверного проёма' : 'оконного проёма'} ({selectedOpening.id})
-              </h3>
-              <div>ID: {selectedOpening.id}</div>
-              <div>Тип: {selectedOpening.type === 'garage-door' ? 'Гаражные секционные ворота' : selectedOpening.type === 'door' ? 'Дверь' : 'Окно'}</div>
-              {linkedFrame ? <>
-                <div>Размер: {selectedOpening.widthMm} × {selectedOpening.heightMm} мм</div>
-                <div>От начала линии стены: {planOpening?.positionUmm} мм</div>
-              </> : <>
-              {selectedOpening.type === 'garage-door' && (
-                <div style={{ margin: '8px 0', fontSize: 12 }}>
-                  <label className="param-label" htmlFor="garage-preset">Североамериканский размер</label>
-                  <select id="garage-preset" className="param-input"
-                    value={GARAGE_DOOR_PRESETS.find(p => p.widthMm === selectedOpening.widthMm &&
-                      p.heightMm === selectedOpening.heightMm)?.label ?? ''}
-                    onChange={event => {
-                      const preset = GARAGE_DOOR_PRESETS.find(p => p.label === event.target.value)
-                      if (preset) {
-                        updateOpening(selectedOpening.id, { widthMm: preset.widthMm })
-                        if (selectedOpening.heightMm !== preset.heightMm)
-                          updateOpening(selectedOpening.id, { heightMm: preset.heightMm })
-                      }
-                    }}>
-                    <option value="">Индивидуальный размер</option>
-                    {GARAGE_DOOR_PRESETS.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
-                  </select>
-                  <div style={{ marginTop: 8 }}>
-                    Профиль: Clopay, стандартные торсионные направляющие (справочный)
-                  </div>
-                  <div>Требуется сбоку: ≥ {selectedOpening.garage?.minSideRoomMm} мм с каждой стороны</div>
-                  <div>Требуется сверху: ≥ {selectedOpening.garage?.minHeadRoomMm} мм</div>
-                  <div>Требуется в глубину: ≥ {selectedOpening.heightMm +
-                    (selectedOpening.garage?.minBackRoomExtraMm ?? 0)} мм</div>
-                  <div style={{ marginTop: 7, color: '#a25a00' }}>
-                    Перемычка {selectedOpening.garage?.lintelPreviewDepthMm} мм и
-                    {' '}{selectedOpening.garage?.jackStudsPerSide} опорные стойки на сторону — предварительная компоновка.
-                    Несущая способность, portal frame и реальные зазоры НЕ проверены.
-                  </div>
-                </div>
-              )}
-              <SafeNumberInput label="Положение вдоль стены U (мм)" value={selectedOpening.positionXmm} onChange={(v) => updateOpening(selectedOpening.id, { positionXmm: v })} validate={(r) => validateInt(r, 135, 100000, 'положение')} />
-              <SafeNumberInput label="Ширина (мм)" value={selectedOpening.widthMm} onChange={(v) => updateOpening(selectedOpening.id, { widthMm: v })} validate={(r) => validateInt(r, 300, 5000, 'ширина')} />
-              <SafeNumberInput label="Высота (мм)" value={selectedOpening.heightMm} onChange={(v) => updateOpening(selectedOpening.id, { heightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота')} />
-              {selectedOpening.type === 'window' && (
-                <SafeNumberInput label="Высота подоконника (мм)" value={selectedOpening.sillHeightMm} onChange={(v) => updateOpening(selectedOpening.id, { sillHeightMm: v })} validate={(r) => validateInt(r, 300, 5000, 'высота подоконника')} />
-              )}
-              {selectedMarker && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13 }}>
-                  <input type="checkbox" checked={selectedMarker.visible}
-                    onChange={e => dispatch({
-                      type: 'SET_MARKER_SETTINGS',
-                      payload: { openingId: selectedOpening.id, visible: e.target.checked },
-                    })} />
-                  Показывать маркер проёма
-                </label>
-              )}
-              <div style={{ marginTop: 8 }}>
-                <button type="button" className="plan-button plan-text ui-danger" onClick={() => deleteOpening(selectedOpening.id)}>Удалить {selectedOpening.type === 'garage-door' ? 'гаражные ворота' : selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
-              </div>
-              </>}
-            </div>
-          )}
 
-          <h2 className="panel-title" style={{ marginTop: 16 }}>Проект</h2>
+          <InspectorGroup title="Данные проекта" description="Импорт, экспорт и технические проверки" testId="frame-project-section">
+          <h2 className="panel-title" style={{ marginTop: 10 }}>Проект</h2>
           <div className="param-group" style={{ fontSize: 12 }} data-testid="first-wall-exterior-corner">
             {linkedFrame ? 'Начало первой панели:' : 'Нижний левый наружный угол стены 1:'}
             X={firstExteriorCorner.x}, Y={firstExteriorCorner.y}, Z={firstExteriorCorner.z} мм
@@ -596,7 +625,7 @@ export default function App() {
             <div>Ruleset: {snapshot.project.rulesetVersion}</div>
             <div>Generator: {snapshot.project.generatorVersion}</div>
             <div style={{ color: hasErrors ? '#cc0000' : '#006600', marginTop: 4 }}>
-              Валидация: {validation?.valid ? 'OK' : 'ОШИБКИ'}
+              Геометрия модели: {validation?.valid ? 'проверка пройдена' : 'есть ошибки'}
             </div>
             {linkedFrame && <div data-testid="structural-validator-summary" style={{ marginTop: 4 }}>
               Геометрический контроль каркаса: {validation?.issues.filter(i =>
@@ -620,19 +649,8 @@ export default function App() {
             )}
           </div>
 
-          {selected && (
-            <div className="props">
-              <h3 className="props-title">Свойства детали</h3>
-              <div>ID: {selected.id}</div>
-              <div>Роль: {selected.role}</div>
-              <div>Длина: {selected.length} мм</div>
-              <div>Сечение: {selected.width}x{selected.height} мм</div>
-              <div>Объём: {timberVolumeM3(selected).toFixed(6)} м³</div>
-              <div>Направление: {dirText(selected)}</div>
-              <div>Угол roll: {selected.orientation.roll}</div>
-              <div>Опорная точка: {selected.position.x}, {selected.position.y}, {selected.position.z} мм</div>
-            </div>
-          )}
+
+          </InspectorGroup>
         </aside>
         <main className="viewport-wrap">
           {elements.length > 0 &&
@@ -668,6 +686,9 @@ export default function App() {
           </ErrorBoundary>
         </main>
       </div>
+      <ModelStatus compact valid={validation?.valid ?? null} errorCount={validationErrors.length}
+        structuralErrorCount={structuralErrorCount}
+        hasGarage={snapshot.building.openings.some(o => o.type === 'garage-door')} demo={demo3D} />
     </div>
   )
 }
