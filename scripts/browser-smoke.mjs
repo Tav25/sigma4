@@ -182,9 +182,8 @@ try {
   const third = tree.getByTestId('wall-node-wall-003')
   await tree.locator('[data-testid="wall-node-wall-003"] > summary').click()
   assert.notEqual(await third.getAttribute('open'), null)
-  const ninthSummary = tree.locator('[data-testid="wall-node-wall-009"] > summary')
-  if (await selectedNinth.getAttribute('open') !== null) await ninthSummary.click()
-  await ninthSummary.click()
+  // Selecting another wall expands it without collapsing the earlier branch.
+  await tree.locator('[data-testid="wall-node-wall-009"] > summary').click()
   assert.notEqual(await selectedNinth.getAttribute('open'), null)
   assert.notEqual(await third.getAttribute('open'), null)
   // All nine walls inherit the same ADD_OPENING mechanics.

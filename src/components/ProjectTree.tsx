@@ -38,7 +38,9 @@ export function ProjectTree({
                 event.preventDefault()
                 setExpandedWalls(previous => ({
                   ...previous,
-                  [wallId]: !(previous[wallId] ?? selectedWallId === wallId),
+                  [wallId]: selectedWallId === wallId
+                    ? !(previous[wallId] ?? true)
+                    : true,
                 }))
                 onSelectWall(wallId)
               }}>
