@@ -1,7 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react'
-import { buildHorizontalCut } from '../core/horizontal-cut'
-import type { TimberElement } from '../core/timber'
-import { PlanStructuralOverlay } from './PlanStructuralOverlay'
 import {
   emptyFloorPlan, meters, planAreaM2, planBounds, planDistanceMm,
   planPerimeterMm, validateFloorPlan, decimalMetersToMm,
@@ -48,7 +45,6 @@ type DraftTool = 'outline'|'interior'|'turn'|'point'|'split'|'erase'|'select'|'f
 
 export interface FloorPlanEditorProps {
   plan?: FloorPlan
-  timberElements: TimberElement[]
   rooms: FloorRoom[]
   showRoomLabels:boolean
   showRoomFill:boolean
@@ -65,7 +61,7 @@ export interface FloorPlanEditorProps {
 }
 
 export function FloorPlanEditor({
-  plan = EMPTY_PLAN, timberElements, rooms, showRoomLabels, showRoomFill, selectedRoomId,
+  plan = EMPTY_PLAN, rooms, showRoomLabels, showRoomFill, selectedRoomId,
   onSelectRoom, onShowRoomLabelsChange, onShowRoomFillChange,
   onCommand, onExport, onImport, onFrameBuilt, onUndo, onRedo,
 }: FloorPlanEditorProps) {
@@ -73,9 +69,6 @@ export function FloorPlanEditor({
   const [exactLength, setExactLength] = useState('6')
   const [snapMm, setSnapMm] = useState(250)
   const [gridVisible, setGridVisible] = useState(true)
-  const [planView,setPlanView]=useState<'layout'|'framing'>('layout')
-  const [cutHeightMm,setCutHeightMm]=useState(1200)
-  const [selectedTimberId,setSelectedTimberId]=useState<string|null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [hover, setHover] = useState<PlanPoint | null>(null)
@@ -116,8 +109,7 @@ export function FloorPlanEditor({
   const drawingSides = useMemo(() => wallPreview ? planFrameOpeningSides(wallPreview, true) : frameSides,
     [wallPreview, frameSides])
   const { selectedWall, selectedOpening, placement, placementWall, preview, wallPick } = openingTools
-  const openingInputActive = (tool === 'select' || tool === 'frame') &&
-    !(planView==='framing' && plan.frame?.built && timberElements.length>0)
+  const openingInputActive = tool === 'select' || tool === 'frame'
   const shownOpenings = (wallPreview?.frame?.openings ?? openingTools.openings).map(opening => opening.id === preview?.opening.id
     ? { ...opening, positionUmm: preview.error ? openingTools.lastValidPosition ?? opening.positionUmm : preview.opening.positionUmm }
     : opening)
@@ -128,27 +120,6 @@ export function FloorPlanEditor({
     !placement && !wallPreview && !dimensionEdit
   const placementLabel = placement && { window: 'Окно', door: 'Дверь', 'garage-door': 'Ворота' }[placement.type]
   const hasFrameWork = plan.frame?.built || !!plan.frame?.openings.length
-  const structuralReady = plan.frame?.built === true && timberElements.length>0
-  const structuralVisible = structuralReady && planView==='framing'
-  const structuralBounds = useMemo(()=>structuralReady
-    ? buildHorizontalCut(timberElements,0).bounds : null,[structuralReady,timberElements])
-  const cutLimitMin = structuralBounds ? Math.ceil(structuralBounds.minY) : 0
-  const cutLimitMax = structuralBounds ? Math.max(cutLimitMin,Math.ceil(structuralBounds.maxY)-1) : 2700
-  const validCutHeight = Math.max(cutLimitMin,Math.min(cutLimitMax,cutHeightMm))
-  const structuralCut = useMemo(() => structuralVisible
-    ? buildHorizontalCut(timberElements,validCutHeight) : null,
-    [structuralVisible,timberElements,validCutHeight])
-  const selectedTimber = structuralCut?.pieces.find(piece=>piece.elementId===selectedTimberId)
-  useEffect(()=>{
-    if(!structuralReady) {
-      setPlanView('layout')
-      setSelectedTimberId(null)
-    }
-  },[structuralReady])
-  useEffect(()=>{
-    if(selectedTimberId && !structuralCut?.pieces.some(p=>p.elementId===selectedTimberId))
-      setSelectedTimberId(null)
-  },[selectedTimberId,structuralCut])
   const points = plan.exterior
   const viewPlan=graphView(plan)
   const selectedInterior = viewPlan.interiorWalls.find(w => w.id === selectedInteriorId)
@@ -222,7 +193,6 @@ export function FloorPlanEditor({
     setDimensionEdit(null)
   }
   const clearSelection = () => {
-    setSelectedTimberId(null)
     openingTools.clearSelection()
     clearPlanSelection()
   }
@@ -246,7 +216,7 @@ export function FloorPlanEditor({
     revealInspector()
   }
   const beginOpeningDrag = (event: PointerEvent<SVGGElement>, opening: Opening) => {
-    if (tool !== 'select' || structuralVisible || placement || !event.isPrimary || event.button !== 0 || event.shiftKey) return
+    if (tool !== 'select' || placement || !event.isPrimary || event.button !== 0 || event.shiftKey) return
     const svg = svgRef.current, transform = svg?.getScreenCTM()
     if (!svg || !transform) return
     event.stopPropagation()
@@ -421,7 +391,7 @@ export function FloorPlanEditor({
     }
   }
   const beginWallDrag = (event: PointerEvent<SVGLineElement>, wall: PlanInteriorWall) => {
-    if (tool !== 'select' || structuralVisible || placement || event.button !== 0 || event.shiftKey) return
+    if (tool !== 'select' || placement || event.button !== 0 || event.shiftKey) return
     event.preventDefault()
     event.stopPropagation()
     const root=svgRef.current
@@ -580,7 +550,6 @@ export function FloorPlanEditor({
     if (ignoreClick.current) { ignoreClick.current = false; return }
     if (event.shiftKey) return
     if (plan.closed) {
-      if(structuralVisible)return // Framing section is inspection-only; layout stays editable.
       const loc = svgFromEvent(event)
       const raw = canvasWorldPoint(loc)
       if (placement && placementWall) {
@@ -897,18 +866,12 @@ export function FloorPlanEditor({
   }, [plan, interiorStart, interiorHover, interiorThickness])
 
   return (
-    <div className="plan-workspace" data-testid="plan-workspace" data-closed={plan.closed} data-inspector={plan.closed||selectedIndex!==null}
-      data-view={structuralVisible?'framing':'layout'}>
+    <div className="plan-workspace" data-testid="plan-workspace" data-closed={plan.closed}
+      data-inspector={plan.closed||selectedIndex!==null}>
       <aside className="plan-controls" aria-label="Инструменты и построение">
         <div className="plan-eyebrow">SIGMA4 / ЧЕРТЁЖ 01</div>
         <h1>План этажа</h1>
-        {structuralVisible && <div className="plan-selection-panel">
-          <strong>Каркас 2D</strong>
-          <span className="plan-selection-detail">Только просмотр физического сечения по высоте Y.</span>
-          <span className="plan-selection-detail">Показано: {structuralCut?.pieces.length??0} деталей</span>
-          <span className="plan-selection-detail">Для редактирования плана переключитесь в «Планировку».</span>
-        </div>}
-        {plan.closed && !structuralVisible && <nav className="plan-quick-tools" aria-label="Быстрые инструменты плана">
+        {plan.closed && <nav className="plan-quick-tools" aria-label="Быстрые инструменты плана">
           <button type="button" title="Выбрать (V)" aria-pressed={tool==='select'} onClick={()=>activateTool('select')}>↖ <span>Выбор</span></button>
           <button type="button" title="Добавить стену (W)" aria-pressed={tool==='interior'} onClick={()=>activateTool('interior')}>▰ <span>Стена</span></button>
           <button type="button" title="Добавить точку" aria-pressed={tool==='point'} onClick={()=>activateTool('point')}>● <span>Точка</span></button>
@@ -949,7 +912,7 @@ export function FloorPlanEditor({
             )}
           </div>
         )}
-        {plan.closed && !structuralVisible && <>
+        {plan.closed && <>
           <div className="plan-complete" data-testid="plan-closed-status">
             <strong>Контур замкнут</strong>
             <button className="plan-button plan-secondary" type="button" data-testid="plan-reopen" disabled={hasFrameWork}
@@ -1063,7 +1026,7 @@ export function FloorPlanEditor({
       </aside>
       <main className="plan-drawing">
         <div className="plan-toolbar">
-          {plan.closed && !structuralVisible && <div className="plan-main-tools" role="group" aria-label="Инструменты плана">
+          {plan.closed && <div className="plan-main-tools" role="group" aria-label="Инструменты плана">
             <button type="button" data-testid="plan-toolbar-select" aria-keyshortcuts="V" aria-pressed={tool === 'select' && !placement}
               onClick={() => activateTool('select')}>
               <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" fill="none"
@@ -1077,33 +1040,11 @@ export function FloorPlanEditor({
               Стена <kbd>W</kbd>
             </button>
           </div>}
-          {plan.closed && <div className="plan-view-switch" role="group" aria-label="2D-режим отображения">
-            <button type="button" data-testid="plan-view-layout"
-              aria-pressed={!structuralVisible} onClick={()=>{setPlanView('layout');setSelectedTimberId(null)}}>
-              Планировка
-            </button>
-            <button type="button" data-testid="plan-view-framing"
-              aria-pressed={structuralVisible} disabled={!structuralReady}
-              title={!structuralReady?'Сначала постройте каркас':'Фактический горизонтальный разрез каркаса'}
-              onClick={()=>{activateTool('select');setPlanView('framing');setSelectedTimberId(null)}}>
-              Каркас 2D
-            </button>
-          </div>}
           <div className="plan-mode-mark"><span className="plan-dot" /> ПЛАН / {plan.closed
               ?placementLabel ?? ({interior:'ЛОМАНАЯ СТЕНА',turn:'ПОВОРОТ 90°',point:'СВОБОДНАЯ ТОЧКА',
                 split:'РАЗДЕЛЕНИЕ',erase:'УДАЛЕНИЕ ОТРЕЗКА',select:'РЕДАКТИРОВАНИЕ',
                 outline:'НАРУЖНЫЙ КОНТУР',frame:'ПРОЁМЫ'}[tool])
               :'НАРУЖНЫЙ КОНТУР'}</div>
-          {structuralVisible && <div className="plan-cut-controls">
-            <label htmlFor="plan-cut-height">Сечение Y, мм</label>
-            <input id="plan-cut-height" type="number" step="1" min={cutLimitMin} max={cutLimitMax}
-              data-testid="plan-cut-height" value={validCutHeight}
-              onChange={event=>{
-                const v=event.target.valueAsNumber
-                if(Number.isInteger(v)&&v>=cutLimitMin&&v<=cutLimitMax)setCutHeightMm(v)
-              }}/>
-            <span data-testid="plan-cut-count">{structuralCut?.pieces.length??0} деталей</span>
-          </div>}
           <div className="plan-room-display-tools" role="group" aria-label="Отображение площадей">
             <button type="button" data-testid="plan-room-label-toggle"
               aria-pressed={showRoomLabels} title="Показать или скрыть площади помещений"
@@ -1192,7 +1133,7 @@ export function FloorPlanEditor({
                     stroke="none"
                     pointerEvents={tool==='select'&&!placement?'all':'none'}
                     onClick={event=>{
-                      if(tool!=='select'||placement||structuralVisible)return
+                      if(tool!=='select'||placement)return
                       event.stopPropagation()
                       clearSelection()
                       onSelectRoom(room.id)
@@ -1286,7 +1227,7 @@ export function FloorPlanEditor({
               const a = xy(w.start), b = xy(w.end)
               const active = (selectedInteriorId === w.id || selectedWall?.wallId === 'partition-' + w.id) && tool === 'select'
               const label = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-              return <g key={w.id} pointerEvents={structuralVisible?'none':undefined} data-testid={'plan-internal-wall-' + w.id}
+              return <g key={w.id} data-testid={'plan-internal-wall-' + w.id}
                 onClick={e=>{
                   if(ignoreClick.current){ignoreClick.current=false;e.stopPropagation();return}
                   if (tool === 'select' && !placement) {
@@ -1329,9 +1270,6 @@ export function FloorPlanEditor({
                 </text>}
               </g>
             })}
-            {structuralCut && <PlanStructuralOverlay cut={structuralCut} xy={xy}
-              selectedId={selectedTimberId}
-              onSelect={id=>{clearSelection();setSelectedTimberId(id)}} />}
             {showRoomLabels && visibleRooms.map(room=>{
               const pos=xy(room.center)
               const selected=room.id===selectedRoomId
@@ -1341,15 +1279,15 @@ export function FloorPlanEditor({
                 data-testid={'plan-room-label-'+room.id}
                 data-area-m2={formatRoomArea(room.areaM2)}
                 className={'plan-room-label'+(selected?' plan-room-selected':'')}
-                role={tool==='select'&&!placement&&!structuralVisible?'button':undefined}
-                tabIndex={tool==='select'&&!placement&&!structuralVisible?0:undefined}
-                pointerEvents={tool==='select'&&!placement&&!structuralVisible?'visiblePainted':'none'}
+                role={tool==='select'&&!placement?'button':undefined}
+                tabIndex={tool==='select'&&!placement?0:undefined}
+                pointerEvents={tool==='select'&&!placement?'visiblePainted':'none'}
                 onClick={event=>{
-                  if(tool!=='select'||placement||structuralVisible)return
+                  if(tool!=='select'||placement)return
                   event.stopPropagation();clearSelection();onSelectRoom(room.id)
                 }}
                 onKeyDown={event=>{
-                  if(tool!=='select'||structuralVisible||(event.key!=='Enter'&&event.key!==' '))return
+                  if(tool!=='select'||(event.key!=='Enter'&&event.key!==' '))return
                   event.preventDefault();event.stopPropagation()
                   clearSelection();onSelectRoom(room.id)
                 }}>
@@ -1479,7 +1417,7 @@ export function FloorPlanEditor({
             {activeNodes.map(node=>{
               const loc=xy(node)
               return <g key={'graph-'+node.id} data-testid={'plan-graph-node-'+node.id}
-                className="plan-graph-node" pointerEvents={structuralVisible?'none':undefined} data-idle={tool==='select' && selectedGraphNodeId!==node.id && !placement}
+                className="plan-graph-node" data-idle={tool==='select' && selectedGraphNodeId!==node.id && !placement}
                 onClick={e=>{
                   if(ignoreClick.current){ignoreClick.current=false;e.stopPropagation();return}
                   if (placement) return
@@ -1505,7 +1443,7 @@ export function FloorPlanEditor({
               const loc=xy(point)
               return <g key={i} data-testid={`plan-point-${i}`}
                 className={'plan-vertex'+(plan.closed && selectedIndex!==i ? ' plan-vertex-idle' : '')}
-                pointerEvents={structuralVisible?'none':undefined} onClick={event => {if (!placement) { event.stopPropagation(); selectPoint(i) }}}>
+                onClick={event => {if (!placement) { event.stopPropagation(); selectPoint(i) }}}>
                 <circle cx={loc.x} cy={loc.y} r={i===0?12:9}
                   fill={i===0?'#18a98b':selectedIndex===i?'#ffab40':'#ffffff'}
                   stroke={i===0?'#0f6f60':'#234765'} strokeWidth={3}/>
@@ -1546,9 +1484,7 @@ export function FloorPlanEditor({
               :tool==='frame'?'Нажмите на стену или существующий проём'
               :placement?'Клик по выбранной стене · Alt — точная привязка'
               :selectedOpening?'Тяните проём вдоль стены · кликните размер для точного ввода'
-              :structuralVisible
-                ? 'Реальный разрез деревянных деталей · выберите элемент · для редактирования переключитесь в «Планировку»'
-                :'Выберите стену, чтобы добавить проём · Shift + перетаскивание — панорама')
+              :'Выберите стену, чтобы добавить проём · Shift + перетаскивание — панорама')
             :'ЛКМ — следующая точка · Shift+drag — сдвиг · колесо — масштаб'}</div>
         </div>
         <div className="plan-bottom">
@@ -1569,16 +1505,7 @@ export function FloorPlanEditor({
       {(plan.closed||selectedIndex!==null) && <aside className="plan-inspector" data-testid="plan-inspector"
         ref={sidebarRef} aria-label="Свойства выбранного объекта">
         <div className="plan-inspector-title">Свойства объекта</div>
-        {structuralVisible && selectedTimber && <section className="plan-selection-panel"
-          data-testid="plan-structural-inspector">
-          <span className="plan-inspector-kicker">Реальная деталь каркаса</span>
-          <strong>{selectedTimber.elementId}</strong>
-          <span className="plan-selection-detail">Тип: {selectedTimber.role}</span>
-          <span className="plan-selection-detail">Стена: {selectedTimber.wallId}</span>
-          <span className="plan-selection-detail">Сечение: {validCutHeight} мм · площадь {Math.round(selectedTimber.areaMm2)} мм²</span>
-          <p className="plan-muted">Контур получен из геометрии 3D-элемента. Проверка несущей способности отдельно.</p>
-        </section>}
-        {!structuralVisible && <>
+
         {tool === 'select' && selectedOpening && selectedWall
           ? <PlanOpeningInspector opening={selectedOpening} side={selectedWall} onSave={openingTools.save}
               onRemove={() => openingTools.remove(selectedOpening)} />
@@ -1679,20 +1606,17 @@ export function FloorPlanEditor({
           </div>
         )}
 
-        </>}
-        {!structuralVisible && selectedRoomId && !selectedOpening && !selectedInterior &&
+        {selectedRoomId && !selectedOpening && !selectedInterior &&
           !selectedGraphNode && !selectedWall && <div className="plan-selection-panel">
             <span className="plan-inspector-kicker">Выбрано помещение</span>
             <strong>{visibleRooms.find(r=>r.id===selectedRoomId)?.label??selectedRoomId}</strong>
             <span className="plan-selection-detail">Чистая площадь: {formatRoomArea(visibleRooms.find(r=>r.id===selectedRoomId)?.areaM2??0)} м²</span>
           </div>}
-        {!selectedTimber && !selectedOpening && !selectedInterior && !selectedGraphNode &&
+        {!selectedOpening && !selectedInterior && !selectedGraphNode &&
           !selectedWall && selectedIndex===null && !selectedRoomId &&
           <div className="plan-inspector-placeholder" data-testid="plan-inspector-empty">
-            <strong>{structuralVisible?'Режим каркаса':'Ничего не выбрано'}</strong>
-            <p>{structuralVisible
-              ? 'Щёлкните по реальной детали или измените высоту сечения Y в верхней панели.'
-              : 'Выберите стену, точку, проём или помещение на чертеже. Точные параметры появятся здесь.'}</p>
+            <strong>Ничего не выбрано</strong>
+            <p>Выберите стену, точку, проём или помещение на чертеже. Точные параметры появятся здесь.</p>
           </div>}
       </aside>}
     </div>

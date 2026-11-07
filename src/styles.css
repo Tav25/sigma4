@@ -537,7 +537,7 @@ body,
 .plan-canvas {background:#fbfdfe}
 .plan-interior-hit:hover {stroke:rgba(15,123,149,.20)}
 
-/* SIGMA4 0.1.36 — compact CAD tools, dedicated contextual inspector and exact 2D cut. */
+/* SIGMA4 0.1.37 — compact CAD tools and contextual inspector. Structural cuts stay in 3D. */
 .plan-workspace[data-inspector="true"] {
   grid-template-columns: minmax(220px,252px) minmax(0,1fr) minmax(238px,280px);
 }
@@ -551,7 +551,7 @@ body,
   font-weight:750;font-size:18px;cursor:pointer}
 .plan-quick-tools button span {font-size:10px;font-weight:650}
 .plan-quick-tools button[aria-pressed="true"] {background:#dff2f1;border-color:#5cabb4;color:#146d7b}
-.plan-quick-tools button:focus-visible,.plan-view-switch button:focus-visible {outline:2px solid #137a9d;outline-offset:2px}
+.plan-quick-tools button:focus-visible {outline:2px solid #137a9d;outline-offset:2px}
 .plan-inspector {min-height:0;overflow-y:auto;background:#fff;border-left:1px solid #d5e2e9;padding:16px 15px 20px}
 .plan-inspector-title {font-size:14px;font-weight:800;color:#223f53;padding:2px 0 12px;
   border-bottom:1px solid #e2eaf0;margin-bottom:8px}
@@ -561,21 +561,6 @@ body,
 .plan-inspector-placeholder p {font-size:12px;line-height:1.6;color:#6c8394;margin-top:9px}
 .plan-inspector .plan-tool-section {margin:12px 0;padding:12px 0 0;border-color:#e2ebf1}
 .plan-toolbar {height:auto;min-height:58px;flex-wrap:wrap;justify-content:flex-start;gap:7px 11px;padding:8px 12px}
-.plan-view-switch {display:flex;gap:2px;padding:3px;border-radius:8px;background:#edf3f6;border:1px solid #d5e3ea}
-.plan-view-switch button {min-height:31px;padding:5px 10px;border:1px solid transparent;background:transparent;
-  border-radius:5px;cursor:pointer;font:700 12px system-ui;color:#476479;white-space:nowrap}
-.plan-view-switch button[aria-pressed="true"] {border-color:#afd1d5;background:#fff;color:#116a7e;box-shadow:0 1px 2px #23475b1b}
-.plan-view-switch button:disabled {opacity:.35;cursor:not-allowed}
-.plan-cut-controls {display:flex;gap:6px;align-items:center;font-size:11px;color:#385e72}
-.plan-cut-controls input {width:74px;min-height:31px;padding:4px 5px;border:1px solid #bccfdc;border-radius:6px;
-  font:700 12px system-ui;color:#25485d;background:#fff}
-.plan-cut-controls span {white-space:nowrap;color:#5f7a8b}
-.plan-workspace[data-view="framing"] .plan-room-display-tools {opacity:.8}
-.plan-structural-piece {stroke:#536979;stroke-width:1.15;vector-effect:non-scaling-stroke;
-  cursor:pointer;outline:none;transition:stroke .1s}
-.plan-structural-piece:hover,.plan-structural-piece:focus-visible {stroke:#087e99;stroke-width:2.5}
-.plan-structural-piece[data-selected="true"] {stroke:#e07a33;stroke-width:3}
-.plan-structural-layer {isolation:isolate}
 @media(max-width:1150px) {
   .plan-workspace[data-inspector="true"] {grid-template-columns: 222px minmax(0,1fr) 244px}
   .plan-inspector {padding:12px}
