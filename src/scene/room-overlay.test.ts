@@ -44,7 +44,8 @@ describe('SIGMA4 0.1.33: 3D floor overlays use the same derived 2D dimensions',(
     numeric.geometry.computeBoundingBox()
     const height=numeric.geometry.boundingBox!.max.y-numeric.geometry.boundingBox!.min.y
     expect(height).toBeGreaterThan(0.08)
-    expect(height).toBeLessThanOrEqual(0.185)
+    // Comma descenders extend below the nominal 0.18 m type size.
+    expect(height).toBeLessThanOrEqual(0.23)
     const square=text.children[2] as THREE.Mesh
     expect(square.position.y).toBeGreaterThan(0)
     for(const child of text.children){
