@@ -25,9 +25,15 @@ try {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.34')
+  const packageVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), packageVersion)
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
+  const initialCanvas=page.getByTestId('plan-canvas')
+  assert.equal(await initialCanvas.getAttribute('data-grid-step-mm'),'250')
+  await page.getByTestId('plan-grid-step').selectOption('100')
+  assert.equal(await initialCanvas.getAttribute('data-grid-step-mm'),'100')
+  await page.getByTestId('plan-grid-step').selectOption('250')
   await page.screenshot({ path: dir + '/18-plan-editor-blank.png' })
   await page.getByTestId('tab-frame').click()
   await page.locator('.viewport canvas').waitFor({ state: 'visible' })
@@ -362,6 +368,7 @@ try {
   await page.screenshot({ path: dir + '/19-plan-drawing-6x4-open.png' })
   await page.getByTestId('plan-point-0').click() // snap and close
   await page.getByTestId('plan-closed-status').waitFor()
+  await page.getByTestId('plan-outer-dimension-0').waitFor()
   assert.match(await page.getByTestId('plan-dimensions').textContent(), /6,00.*4,00/)
   assert.match(await page.getByTestId('plan-perimeter').textContent(), /20,00/)
   assert.match(await page.getByTestId('plan-area').textContent(), /24/)
