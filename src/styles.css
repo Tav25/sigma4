@@ -491,3 +491,18 @@ body,
 }
 .plan-nudge-actions {display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
 .plan-nudge-actions .plan-button {width:auto;flex:1 1 90px;margin:0;white-space:normal}
+
+/* SIGMA4 UX-01: persistent workspaces and project safety. */
+.plan-host{display:flex;flex:1;min-width:0;min-height:0}
+.section-host{position:absolute;inset:0;display:flex;min-width:0;min-height:0;background:#f6f9fc}
+.top-bar{gap:9px}
+.top-bar>div:last-child{align-items:center;min-width:0}
+.project-autosave{color:#cae8dc;font-size:11px;white-space:nowrap}
+.project-save-button{border:1px solid #557084;background:#30465c;color:#fff;border-radius:5px;font-size:12px;font-weight:650;padding:6px 9px;cursor:pointer;white-space:nowrap}
+.project-save-button:hover{background:#40617a}
+.project-save-button:focus-visible{outline:2px solid #5cc6ae;outline-offset:2px}
+.project-revision{font-size:11px;color:#b5bfcb;white-space:nowrap}
+.global-command-error{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:9px 16px;background:#fff1ec;border-bottom:1px solid #e1a79d;color:#8c241a;font-size:13px;flex-shrink:0}
+.global-command-error button{border:1px solid #cc9991;border-radius:5px;background:#fff;color:inherit;padding:2px 9px;font-size:18px;cursor:pointer}
+@media(max-width:1000px){.project-revision{display:none}.project-autosave{font-size:10px}}
+@media(max-width:700px){.top-bar{padding:0 8px;gap:4px}.workspace-tabs{margin-left:4px}.project-autosave{display:none}.project-save-button{font-size:10px;padding:5px}}

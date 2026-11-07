@@ -46,7 +46,25 @@ const initialDoc = createProjectFromCurrentState({
   projectName: 'SIGMA4 Project',
 })
 
-const store = createProjectStore(initialDoc)
+const AUTO_SAVE_KEY = 'sigma4.autosave.v1'
+let recoveredLocalProject = false
+let recoveryError: string | null = null
+const store = (() => {
+  const candidate = createProjectStore(initialDoc)
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = window.localStorage.getItem(AUTO_SAVE_KEY)
+      if (saved) {
+        const recovery = candidate.restoreJson(saved)
+        if (recovery.success) recoveredLocalProject = true
+        else recoveryError = 'Локальная копия не открыта: ' + (recovery.messageRu ?? 'ошибка JSON')
+      }
+    } catch {
+      recoveryError = 'Не удалось прочитать локальную копию проекта'
+    }
+  }
+  return candidate
+})()
 
 export default function App() {
   const [snapshot, setSnapshot] = useState(() => store.getSnapshot())
@@ -58,12 +76,24 @@ export default function App() {
   const [showSection, setShowSection] = useState(false)
   const [showEdges, setShowEdges] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
-  const [commandError, setCommandError] = useState<string | null>(null)
+  const [commandError, setCommandError] = useState<string | null>(recoveryError)
+  const [autosaveState, setAutosaveState] = useState<'saved' | 'failed'>('saved')
+  const [changedSinceExport, setChangedSinceExport] = useState(false)
 
   useEffect(() => {
+    const persist = (doc: typeof snapshot) => {
+      try {
+        window.localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(doc))
+        setAutosaveState('saved')
+      } catch {
+        setAutosaveState('failed')
+      }
+    }
     const unsub = store.subscribe((doc, rev) => {
       setSnapshot(doc)
       setRevision(rev)
+      setChangedSinceExport(true)
+      persist(doc)
       // Import / Undo may remove the previously selected wall or board.
       setSelectedWallId(previous =>
         doc.building.walls.some(w => w.wallId === previous)
@@ -73,6 +103,7 @@ export default function App() {
       setSelectedId(previous =>
         previous && doc.assembly.elements.some(e => e.elementId === previous) ? previous : null)
     })
+    persist(store.getSnapshot())
     return unsub
   }, [])
 
@@ -104,23 +135,20 @@ export default function App() {
 
   const dispatch = (command: ProjectCommand) => {
     const result = store.dispatch(command)
-    if (!result.success) {
-      setCommandError(result.messageRu || result.errorCode || 'Ошибка')
-      setTimeout(() => setCommandError(null), 3000)
-    }
+    setCommandError(result.success ? null : (result.messageRu || result.errorCode || 'Ошибка'))
     return result
   }
 
   const updateLength = (value: number) => {
-    dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: wall.wallId, lengthMm: value } })
+    return dispatch({ type: 'SET_WALL_LENGTH', payload: { wallId: wall.wallId, lengthMm: value } }).success
   }
 
   const updateHeight = (value: number) => {
-    dispatch({ type: 'SET_WALL_HEIGHT', payload: { wallId: wall.wallId, heightMm: value } })
+    return dispatch({ type: 'SET_WALL_HEIGHT', payload: { wallId: wall.wallId, heightMm: value } }).success
   }
 
   const updateSpacing = (value: number) => {
-    dispatch({ type: 'SET_STUD_SPACING', payload: { wallId: wall.wallId, studSpacingMm: value } })
+    return dispatch({ type: 'SET_STUD_SPACING', payload: { wallId: wall.wallId, studSpacingMm: value } }).success
   }
 
   const updateOpening = (id: string, patch: Partial<WindowOpening>) => {
@@ -153,7 +181,7 @@ export default function App() {
     const width = type === 'garage-door' ? GARAGE_DOOR_PRESETS[0].widthMm : type === 'door' ? 900 : 450
     const pos = findFreePosition(onThisWall, availableLength, width, type === 'garage-door' ? 180 : 135)
     if (pos === null) {
-      alert('Недостаточно места для нового проёма. Увеличьте длину стены или измените размеры существующих проёмов.')
+      setCommandError('Недостаточно места для нового проёма. Увеличьте длину стены или измените размеры существующих проёмов.')
       return
     }
     // The counter is derived from canonical JSON, not from a session ref:
@@ -255,9 +283,9 @@ export default function App() {
   }
 
   const moveWall = (axis: 'x' | 'z', value: number) => {
-    dispatch({ type: 'SET_WALL_ORIGIN', payload: {
+    return dispatch({ type: 'SET_WALL_ORIGIN', payload: {
       wallId: wall.wallId, origin: { ...wall.origin, [axis]: value },
-    } })
+    } }).success
   }
 
   const deleteOpening = (id: string) => {
@@ -274,6 +302,7 @@ export default function App() {
     a.download = 'project.sigma4.json'
     a.click()
     URL.revokeObjectURL(url)
+    setChangedSinceExport(false)
   }
 
   const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,10 +313,8 @@ export default function App() {
       const result = event.target?.result
       if (typeof result === 'string') {
         const importResult = store.importJson(result)
-        if (!importResult.success) {
-          setCommandError(importResult.messageRu || importResult.errorCode || 'Ошибка импорта')
-          setTimeout(() => setCommandError(null), 3000)
-        }
+        setCommandError(importResult.success ? null :
+          (importResult.messageRu || importResult.errorCode || 'Ошибка импорта'))
       }
     }
     reader.readAsText(file)
@@ -325,20 +352,34 @@ export default function App() {
         <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <button onClick={undo} disabled={!canUndo} title="Отменить">↶</button>
           <button onClick={redo} disabled={!canRedo} title="Повторить">↷</button>
-          <span style={{ fontSize: 12, color: '#666', paddingTop: 4 }}>Rev: {revision}</span>
+          <span className="project-autosave" role="status">
+            {autosaveState === 'failed' ? 'Автосохранение недоступно' :
+              recoveredLocalProject ? 'Локальная копия восстановлена' : 'Автосохранено в браузере'}
+          </span>
+          <button type="button" className="project-save-button" onClick={exportJson}
+            title="Скачать текущий JSON-файл проекта">
+            Сохранить JSON{changedSinceExport ? ' •' : ''}
+          </button>
+          <span className="project-revision">Rev: {revision}</span>
         </div>
       </header>
       <input type="file" accept=".sigma4.json,.json" onChange={handleImportJson}
         style={{ display: 'none' }} id="import-file" />
-      {workspace === 'plan' ? (
+      {commandError && <div className="global-command-error" role="alert">
+        <span>{commandError}</span>
+        <button type="button" aria-label="Закрыть сообщение" onClick={() => setCommandError(null)}>×</button>
+      </div>}
+      <div className="plan-host" style={{ display: workspace === 'plan' ? 'flex' : 'none' }}
+        aria-hidden={workspace !== 'plan'}>
         <ErrorBoundary>
           <FloorPlanEditor plan={snapshot.building.floorPlan}
             onCommand={dispatch} onExport={exportJson} onUndo={undo} onRedo={redo}
             onImport={() => document.getElementById('import-file')?.click()}
             onFrameBuilt={() => setWorkspace('frame')} />
         </ErrorBoundary>
-      ) : (
-      <div className="main">
+      </div>
+      <div className="main" style={{ display: workspace === 'frame' ? 'flex' : 'none' }}
+        aria-hidden={workspace !== 'frame'}>
         <aside className="left-panel">
           <div style={{ fontSize: 11, padding: '8px 9px', border: '1px solid #d8e2ee',
             borderRadius: 7, background: '#edf5fc', color: '#3c647f', marginBottom: 12 }}>
@@ -599,10 +640,15 @@ export default function App() {
           {elements.length > 0 &&
             <button type="button" className="frame-section-toggle" data-testid="frame-section-toggle"
               onClick={() => setShowSection(value => !value)}>{showSection ? 'Вернуться в 3D' : 'Горизонтальный разрез'}</button>}
-          {elements.length > 0 && showSection
-            ? <HorizontalSection elements={elements} />
-            : <ErrorBoundary>
+          {elements.length > 0 && <div className="section-host"
+            style={{ display: showSection ? 'flex' : 'none' }}>
+            <HorizontalSection elements={elements} selectedId={selectedId}
+              onSelect={id => { setSelectedId(id); if (id) setSelectedOpeningId(null) }} />
+          </div>}
+          <ErrorBoundary>
             <SceneView elements={elements} selectedId={selectedId} showEdges={showEdges}
+              active={workspace === 'frame' && !showSection}
+              canDragOpenings={!linkedFrame}
               openings={sceneOpenings} markers={markers} wallCount={snapshot.building.walls.length}
               dimensions={dimensions} showDimensions={showDimensions}
               selectedWindowId={selectedOpeningId}
@@ -611,17 +657,19 @@ export default function App() {
               onWindowDragEnd={finishOpeningDrag}
               onWindowSelect={id => {
                 setSelectedOpeningId(id)
-                setSelectedId(null)
+                if (id) setSelectedId(null)
                 if (id) {
                   const opening = store.getSnapshot().building.openings.find(item => item.id === id)
                   if (opening) setSelectedWallId(opening.wallId)
                 }
               }}
-              onSelect={setSelectedId} />
-          </ErrorBoundary>}
+              onSelect={id => {
+                setSelectedId(id)
+                if (id) setSelectedOpeningId(null)
+              }} />
+          </ErrorBoundary>
         </main>
       </div>
-      )}
     </div>
   )
 }

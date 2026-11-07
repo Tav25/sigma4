@@ -14,6 +14,8 @@ import type { OpeningMarker } from './project-to-scene'
 interface SceneViewProps {
   elements: TimberElement[]
   selectedId: string | null
+  active?: boolean
+  canDragOpenings?: boolean
   showEdges?: boolean
   openings: SceneOpening3D[]
   markers: OpeningMarker[]
@@ -42,11 +44,15 @@ interface WindowEntry {
 }
 
 export function SceneView({
-  elements, selectedId, showEdges = true,
+  elements, selectedId, showEdges = true, active = true, canDragOpenings = true,
   openings, markers, wallCount, dimensions, showDimensions, selectedWindowId, onWindowSelect,
   onWindowDragStart, onWindowDragPreview, onWindowDragEnd, onSelect,
 }: SceneViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const activeRef = useRef(active)
+  const canDragOpeningsRef = useRef(canDragOpenings)
+  activeRef.current = active
+  canDragOpeningsRef.current = canDragOpenings
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -268,7 +274,7 @@ export function SceneView({
       }
       if (newHovered !== hoveredWindowRef.current) {
         hoveredWindowRef.current = newHovered
-        setCursor(newHovered ? 'move' : 'default')
+        setCursor(newHovered ? (canDragOpeningsRef.current ? 'move' : 'pointer') : 'default')
         // update outline visibility
         windowEntriesRef.current.forEach((w, id) => {
           const sel = id === windowSelectedRef.current
@@ -318,11 +324,13 @@ export function SceneView({
     let frameId = 0
     const animate = () => {
       frameId = requestAnimationFrame(animate)
-      controls.update()
-      if (dimensionGroupRef.current) {
-        orientDimensionNumbers(dimensionGroupRef.current, camera)
+      if (activeRef.current) {
+        controls.update()
+        if (dimensionGroupRef.current) {
+          orientDimensionNumbers(dimensionGroupRef.current, camera)
+        }
+        renderer.render(scene, camera)
       }
-      renderer.render(scene, camera)
     }
     animate()
 
@@ -673,10 +681,21 @@ export function SceneView({
     })
   }, [selectedWindowId])
 
-  // Refitting after toggling dimensions ensures all extension lines are visible.
+  // Changes in dimension visibility must never override the user's camera angle.
+  // The explicit "Сбросить вид" button remains available to fit the labels.
+
+  // Re-activate the existing camera when a hidden workspace or section becomes visible.
   useEffect(() => {
-    resetRef.current?.()
-  }, [showDimensions])
+    if (!active) return
+    const container = containerRef.current
+    const camera = cameraRef.current
+    const renderer = rendererRef.current
+    if (!container || !camera || !renderer || !container.clientWidth || !container.clientHeight) return
+    camera.aspect = container.clientWidth / container.clientHeight
+    camera.updateProjectionMatrix()
+    renderer.setSize(container.clientWidth, container.clientHeight)
+    if (!hasCenteredRef.current) resetRef.current?.()
+  }, [active])
 
   // cursor style
   useEffect(() => {
@@ -685,7 +704,7 @@ export function SceneView({
   }, [cursor])
 
   return (
-    <div className="viewport" ref={containerRef}
+    <div className="viewport" ref={containerRef} style={{ display: active ? undefined : 'none' }}
       data-dimension-total-x={Math.round(dimensions.overallXmm)}
       data-dimension-total-z={Math.round(dimensions.overallZmm)}
       data-dimensions-visible={showDimensions ? 'true' : 'false'}

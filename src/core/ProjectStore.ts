@@ -930,6 +930,20 @@ export class ProjectStore {
     }
   }
 
+  /** Restore a trusted-by-validation local snapshot without offering the starter template as Undo. */
+  restoreJson(json: string): CommandResult {
+    const result = this.importJson(json)
+    if (result.success) {
+      this.revision = 0
+      this.history = [{
+        document: this.deepClone(this.document), revision: 0,
+        command: { type: 'REPLACE_PROJECT', payload: { document: this.deepClone(this.document) } },
+      }]
+      this.historyIndex = 0
+    }
+    return { ...result, revision: this.revision }
+  }
+
   exportJson(): string {
     return serializeProject(this.document)
   }

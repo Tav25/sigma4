@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ProjectDocument } from '../core/project'
 import { buildProjectTree } from '../core/project-tree'
 
@@ -16,6 +17,7 @@ export function ProjectTree({
   onSelectWall, onSelectOpening, onSelectElement,
 }: ProjectTreeProps) {
   const tree = buildProjectTree(document)
+  const [expandedWalls, setExpandedWalls] = useState<Record<string, boolean>>({})
   return (
     <nav className="project-tree" aria-label="Дерево проекта">
       <div className="project-tree-root" title={document.project.projectId}>⌂ {tree.name}</div>
@@ -23,10 +25,14 @@ export function ProjectTree({
         const wallId = node.wall.wallId
         return (
           <details key={wallId} data-testid={'wall-node-' + wallId}
-            className="project-tree-wall" open={selectedWallId === wallId}>
+            className="project-tree-wall" open={expandedWalls[wallId] ?? selectedWallId === wallId}>
             <summary className={selectedWallId === wallId ? 'tree-selected' : ''}
               onClick={(event) => {
                 event.preventDefault()
+                setExpandedWalls(previous => ({
+                  ...previous,
+                  [wallId]: !(previous[wallId] ?? selectedWallId === wallId),
+                }))
                 onSelectWall(wallId)
               }}>
               Стена {index + 1} · {node.wall.lengthMm} мм

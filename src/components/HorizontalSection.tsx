@@ -14,19 +14,19 @@ function pieceFill(piece:SectionPiece):string {
     ? '#b98b5d':'#907054'
 }
 const fmt=(n:number)=>n.toLocaleString('ru-RU',{maximumFractionDigits:1})
-export function HorizontalSection({ elements }: { elements: TimberElement[] }) {
+export function HorizontalSection({ elements, selectedId, onSelect }: {
+  elements: TimberElement[]
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+}) {
   const bounds=useMemo(()=>buildHorizontalCut(elements,0).bounds,[elements])
   const minHeight=Math.ceil(bounds.minY)
   const maxHeight=Math.max(minHeight,Math.ceil(bounds.maxY)-1)
   const [height,setHeight]=useState(1200)
   const [zoom,setZoom]=useState(1)
-  const [selectedId,setSelectedId]=useState<string|null>(null)
   useEffect(()=>{
     setHeight(h=>Math.min(maxHeight,Math.max(minHeight,h)))
   },[minHeight,maxHeight])
-  useEffect(()=>{
-    if(selectedId&&!elements.some(e=>e.id===selectedId))setSelectedId(null)
-  },[elements,selectedId])
   const cut=useMemo(()=>buildHorizontalCut(elements,height),[elements,height])
   const selected=cut.pieces.find(p=>p.elementId===selectedId)
   const margin=Math.max(300,Math.min(750,(bounds.maxX-bounds.minX)*0.07))
@@ -90,7 +90,7 @@ export function HorizontalSection({ elements }: { elements: TimberElement[] }) {
           className={selectedId===piece.elementId?'frame-section-piece selected':'frame-section-piece'}
           points={piece.polygon.map(p=>p.xMm+','+(-p.zMm)).join(' ')}
           fill={pieceFill(piece)}
-          onClick={()=>setSelectedId(piece.elementId)}>
+          onClick={()=>onSelect(piece.elementId)}>
           <title>{piece.elementId} · {piece.role} · {piece.wallId}</title>
         </polygon>)}
         <g className="frame-section-axes" pointerEvents="none">
