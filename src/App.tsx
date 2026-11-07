@@ -504,7 +504,7 @@ export default function App() {
             </div>
             <button type="button" className="plan-button plan-secondary" data-testid="add-garage-door"
               onClick={() => addOpening('garage-door')}>+ Гаражные ворота</button>
-          </div>
+          </div>}
           {selectedOpening && (
             <div className="props">
               <h3 className="props-title">
