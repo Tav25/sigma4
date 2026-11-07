@@ -962,7 +962,7 @@ try {
   // Stage 3: use real UI fields to add a 235-mm exterior header,
   // two jack studs per side and explicit line-load demands.
   const openPanel = page.locator('details.plan-manual-openings')
-  if (!(await openPanel.getAttribute('open'))) {
+  if ((await openPanel.getAttribute('open')) === null) {
     await page.getByTestId('plan-manual-openings').click()
   }
   await page.getByTestId('plan-frame-add-opening').click()
@@ -1034,7 +1034,7 @@ try {
   assert.ok(s19Lower,'The lower edited half must still be selectable in the authored graph')
   // Switching away from Plan collapses the manual-opening disclosure.
   // Open it explicitly before acting on its hidden controls.
-  if (!(await page.locator('details.plan-manual-openings').getAttribute('open'))) {
+  if ((await page.locator('details.plan-manual-openings').getAttribute('open')) === null) {
     await page.getByTestId('plan-manual-openings').click()
   }
   await page.getByTestId('plan-frame-add-opening').click()

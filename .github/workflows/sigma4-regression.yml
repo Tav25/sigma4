@@ -25,14 +25,14 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright@1.56.1
           npx playwright install --with-deps chromium
-      - name: Verify browser 3D and JSON roundtrip
-        env:
-          LIBGL_ALWAYS_SOFTWARE: "1"
-        run: node scripts/browser-smoke.mjs
       - name: Verify UX persistence and 2D/3D context
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: node scripts/ux-smoke.mjs
+      - name: Verify browser 3D and JSON roundtrip
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: node scripts/browser-smoke.mjs
       - name: Save visual snapshots
         if: always()
         uses: actions/upload-artifact@v4
