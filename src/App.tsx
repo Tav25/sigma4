@@ -350,8 +350,8 @@ export default function App() {
           </button>
         </nav>
         <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-          <button onClick={undo} disabled={!canUndo} title="Отменить">↶</button>
-          <button onClick={redo} disabled={!canRedo} title="Повторить">↷</button>
+          <button className="ui-header-button" onClick={undo} disabled={!canUndo} title="Отменить">↶</button>
+          <button className="ui-header-button" onClick={redo} disabled={!canRedo} title="Повторить">↷</button>
           <span className="project-autosave" role="status">
             {autosaveState === 'failed' ? 'Автосохранение недоступно' :
               recoveredLocalProject ? 'Локальная копия восстановлена' : 'Автосохранено в браузере'}
@@ -381,9 +381,10 @@ export default function App() {
       </div>
       <div className="main" style={{ display: workspace === 'frame' ? 'flex' : 'none' }}
         aria-hidden={workspace !== 'frame'}>
-        <aside className="left-panel">
-          <div style={{ fontSize: 11, padding: '8px 9px', border: '1px solid #d8e2ee',
-            borderRadius: 7, background: '#edf5fc', color: '#3c647f', marginBottom: 12 }}>
+        <aside className="left-panel" data-testid="frame-sidebar">
+          <div className="plan-eyebrow">SIGMA4 / КАРКАС 3D</div>
+          <h1 className="workspace-sidebar-heading">Каркас 3D</h1>
+          <div className="ui-sidebar-notice">
             {linkedFrame ? <>
               Каркас стен построен по плану. Размеры и проёмы редактируются в 2D.
               <button type="button" className="plan-button plan-secondary" onClick={() => setWorkspace('plan')}>
@@ -415,16 +416,15 @@ export default function App() {
           />
           {!linkedFrame && <>
           <h2 className="panel-title" style={{ marginTop: 16 }}>Стены</h2>
-          <div className="param-group">
-            <button type="button" className="param-input" style={{ cursor: 'pointer' }}
+          <div className="param-group ui-button-stack">
+            <button type="button" className="plan-button plan-primary"
               onClick={() => addWall(true)}>
               {hasSecondWall ? '+ Продолжить стену' : '+ Добавить вторую стену'}
             </button>
-            <button type="button" className="param-input"
-              style={{ cursor: 'pointer', marginTop: 5 }}
+            <button type="button" className="plan-button plan-secondary"
               onClick={() => addWall(false)}>+ Свободная стена</button>
             {hasSecondWall && (
-              <button type="button" className="param-input" style={{ cursor: 'pointer', marginTop: 5 }}
+              <button type="button" className="plan-button plan-text ui-danger"
                 onClick={removeLastWall}>
                 Удалить {snapshot.building.walls.length === 2 ? 'вторую стену' : 'последнюю стену'}
               </button>
@@ -497,14 +497,14 @@ export default function App() {
           </div>
 
           {(!linkedFrame || selectedOpening) && <h2 className="panel-title" style={{ marginTop: 16 }}>Проёмы</h2>}
-          {!linkedFrame && <div className="param-group">
-            <button type="button" className="param-input" onClick={() => addOpening('window')} style={{ cursor: 'pointer' }}>Добавить окно</button>
-            <button type="button" className="param-input" onClick={() => addOpening('door')} style={{ cursor: 'pointer', marginLeft: 8 }}>Добавить дверь</button>
-            <button type="button" className="param-input" data-testid="add-garage-door"
-              onClick={() => addOpening('garage-door')} style={{ cursor: 'pointer', marginTop: 6 }}>
-              + Гаражные ворота
-            </button>
-          </div>}
+          {!linkedFrame && <div className="param-group ui-button-stack">
+            <div className="ui-button-row">
+              <button type="button" className="plan-button plan-secondary" onClick={() => addOpening('window')}>Добавить окно</button>
+              <button type="button" className="plan-button plan-secondary" onClick={() => addOpening('door')}>Добавить дверь</button>
+            </div>
+            <button type="button" className="plan-button plan-secondary" data-testid="add-garage-door"
+              onClick={() => addOpening('garage-door')}>+ Гаражные ворота</button>
+          </div>
           {selectedOpening && (
             <div className="props">
               <h3 className="props-title">
@@ -564,7 +564,7 @@ export default function App() {
                 </label>
               )}
               <div style={{ marginTop: 8 }}>
-                <button type="button" className="param-input" onClick={() => deleteOpening(selectedOpening.id)} style={{ cursor: 'pointer' }}>Удалить {selectedOpening.type === 'garage-door' ? 'гаражные ворота' : selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
+                <button type="button" className="plan-button plan-text ui-danger" onClick={() => deleteOpening(selectedOpening.id)}>Удалить {selectedOpening.type === 'garage-door' ? 'гаражные ворота' : selectedOpening.type === 'door' ? 'дверь' : 'окно'}</button>
               </div>
               </>}
             </div>
@@ -578,22 +578,19 @@ export default function App() {
           {!linkedFrame && !exteriorZeroAligned && (
             <div className="param-group">
               <button type="button" data-testid="anchor-first-wall-to-zero"
-                className="param-input" style={{ cursor: 'pointer' }}
+                className="plan-button plan-secondary"
                 onClick={() => dispatch({ type: 'ANCHOR_FIRST_WALL_AT_ZERO', payload: {} })}>
                 Установить угол стены 1 в (0, 0, 0)
               </button>
             </div>
           )}
           <div className="param-group">
-            <button type="button" className="param-input" onClick={exportJson} style={{ cursor: 'pointer' }}>Экспорт JSON</button>
+            <button type="button" className="plan-button plan-secondary" onClick={exportJson}>Экспорт JSON</button>
           </div>
           <div className="param-group">
-            <button type="button" className="param-input" onClick={() => document.getElementById('import-file')?.click()} style={{ cursor: 'pointer' }}>Импорт JSON</button>
+            <button type="button" className="plan-button plan-secondary" onClick={() => document.getElementById('import-file')?.click()}>Импорт JSON</button>
           </div>
-          {commandError && (
-            <div style={{ color: '#cc0000', margin: '8px 0', fontSize: 12 }}>{commandError}</div>
-          )}
-          <div className="props" style={{ fontSize: 12 }}>
+           <div className="props" style={{ fontSize: 12 }}>
             <div>Project ID: {snapshot.project.projectId}</div>
             <div>Schema: {snapshot.project.schemaVersion}</div>
             <div>Ruleset: {snapshot.project.rulesetVersion}</div>
@@ -639,7 +636,7 @@ export default function App() {
         </aside>
         <main className="viewport-wrap">
           {elements.length > 0 &&
-            <button type="button" className="frame-section-toggle" data-testid="frame-section-toggle"
+            <button type="button" className="frame-section-toggle plan-button plan-secondary" data-testid="frame-section-toggle"
               onClick={() => setShowSection(value => !value)}>{showSection ? 'Вернуться в 3D' : 'Горизонтальный разрез'}</button>}
           {elements.length > 0 && <div className="section-host"
             style={{ display: showSection ? 'flex' : 'none' }}>
