@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ProjectDocument } from '../core/project'
 import { buildProjectTree } from '../core/project-tree'
 
@@ -18,6 +18,13 @@ export function ProjectTree({
 }: ProjectTreeProps) {
   const tree = buildProjectTree(document)
   const [expandedWalls, setExpandedWalls] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    // Every programmatic selection (new opening, tree action, 3D pick) reveals its wall.
+    // Previously expanded branches remain independently open.
+    setExpandedWalls(previous => previous[selectedWallId] ? previous : {
+      ...previous, [selectedWallId]: true,
+    })
+  }, [selectedWallId])
   return (
     <nav className="project-tree" aria-label="Дерево проекта">
       <div className="project-tree-root" title={document.project.projectId}>⌂ {tree.name}</div>
