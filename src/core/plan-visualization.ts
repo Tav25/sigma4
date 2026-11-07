@@ -19,7 +19,8 @@ export function exteriorDimensionNormal(exterior: readonly PlanPoint[], index: n
     signedTwiceArea += p.xMm * q.zMm - q.xMm * p.zMm
   }
   const outside = signedTwiceArea >= 0 ? -1 : 1
-  return { x: -dz / length * outside, y: dx / length * outside }
+  const x = -dz / length * outside, y = dx / length * outside
+  return { x: x === 0 ? 0 : x, y: y === 0 ? 0 : y }
 }
 
 export function planGridMetrics(pxPerMetre: number, snapMm: number) {
