@@ -175,16 +175,18 @@ try {
   assert.equal(nine.building.connections[0].type, 'california-right')
   assert.ok(nine.assembly.elements.length > 46)
   assert.equal(new Set(nine.assembly.elements.map(e => e.elementId)).size, nine.assembly.elements.length)
-  // Only one wall branch is expanded; verify selection and switching even
-  // after adding nine real walls to the 3D scene.
+  // Expansion is now independent from the selected wall: several branches
+  // can remain open at once, without forcing the previous branch to close.
   const selectedNinth = tree.getByTestId('wall-node-wall-009')
   assert.notEqual(await selectedNinth.getAttribute('open'), null)
-  assert.equal(await tree.getByTestId('wall-node-wall-001').getAttribute('open'), null)
+  const third = tree.getByTestId('wall-node-wall-003')
   await tree.locator('[data-testid="wall-node-wall-003"] > summary').click()
-  assert.notEqual(await tree.getByTestId('wall-node-wall-003').getAttribute('open'), null)
-  assert.equal(await selectedNinth.getAttribute('open'), null)
-  await tree.locator('[data-testid="wall-node-wall-009"] > summary').click()
+  assert.notEqual(await third.getAttribute('open'), null)
+  const ninthSummary = tree.locator('[data-testid="wall-node-wall-009"] > summary')
+  if (await selectedNinth.getAttribute('open') !== null) await ninthSummary.click()
+  await ninthSummary.click()
   assert.notEqual(await selectedNinth.getAttribute('open'), null)
+  assert.notEqual(await third.getAttribute('open'), null)
   // All nine walls inherit the same ADD_OPENING mechanics.
   await page.getByRole('button', { name: 'Добавить дверь' }).click()
   await tree.getByTestId('tree-opening-D02').waitFor()
