@@ -339,6 +339,7 @@ export default function App() {
       {workspace === 'plan' ? (
         <ErrorBoundary>
           <FloorPlanEditor plan={snapshot.building.floorPlan}
+            timberElements={linkedFrame?elements:[]}
             rooms={rooms} showRoomLabels={showRoomLabels} showRoomFill={showRoomFill}
             selectedRoomId={selectedRoomId} onSelectRoom={setSelectedRoomId}
             onShowRoomLabelsChange={setShowRoomLabels}

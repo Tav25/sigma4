@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react'
+import { buildHorizontalCut } from '../core/horizontal-cut'
+import type { TimberElement } from '../core/timber'
+import { PlanStructuralOverlay } from './PlanStructuralOverlay'
 import {
   emptyFloorPlan, meters, planAreaM2, planBounds, planDistanceMm,
   planPerimeterMm, validateFloorPlan, decimalMetersToMm,
@@ -45,6 +48,7 @@ type DraftTool = 'outline'|'interior'|'turn'|'point'|'split'|'erase'|'select'|'f
 
 export interface FloorPlanEditorProps {
   plan?: FloorPlan
+  timberElements: TimberElement[]
   rooms: FloorRoom[]
   showRoomLabels:boolean
   showRoomFill:boolean
@@ -61,7 +65,7 @@ export interface FloorPlanEditorProps {
 }
 
 export function FloorPlanEditor({
-  plan = EMPTY_PLAN, rooms, showRoomLabels, showRoomFill, selectedRoomId,
+  plan = EMPTY_PLAN, timberElements, rooms, showRoomLabels, showRoomFill, selectedRoomId,
   onSelectRoom, onShowRoomLabelsChange, onShowRoomFillChange,
   onCommand, onExport, onImport, onFrameBuilt, onUndo, onRedo,
 }: FloorPlanEditorProps) {
@@ -69,6 +73,9 @@ export function FloorPlanEditor({
   const [exactLength, setExactLength] = useState('6')
   const [snapMm, setSnapMm] = useState(250)
   const [gridVisible, setGridVisible] = useState(true)
+  const [planView,setPlanView]=useState<'layout'|'framing'>('layout')
+  const [cutHeightMm,setCutHeightMm]=useState(1200)
+  const [selectedTimberId,setSelectedTimberId]=useState<string|null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [hover, setHover] = useState<PlanPoint | null>(null)
@@ -120,6 +127,27 @@ export function FloorPlanEditor({
     !placement && !wallPreview && !dimensionEdit
   const placementLabel = placement && { window: 'Окно', door: 'Дверь', 'garage-door': 'Ворота' }[placement.type]
   const hasFrameWork = plan.frame?.built || !!plan.frame?.openings.length
+  const structuralReady = plan.frame?.built === true && timberElements.length>0
+  const structuralVisible = structuralReady && planView==='framing'
+  const structuralBounds = useMemo(()=>structuralReady
+    ? buildHorizontalCut(timberElements,0).bounds : null,[structuralReady,timberElements])
+  const cutLimitMin = structuralBounds ? Math.ceil(structuralBounds.minY) : 0
+  const cutLimitMax = structuralBounds ? Math.max(cutLimitMin,Math.ceil(structuralBounds.maxY)-1) : 2700
+  const validCutHeight = Math.max(cutLimitMin,Math.min(cutLimitMax,cutHeightMm))
+  const structuralCut = useMemo(() => structuralVisible
+    ? buildHorizontalCut(timberElements,validCutHeight) : null,
+    [structuralVisible,timberElements,validCutHeight])
+  const selectedTimber = structuralCut?.pieces.find(piece=>piece.elementId===selectedTimberId)
+  useEffect(()=>{
+    if(!structuralReady) {
+      setPlanView('layout')
+      setSelectedTimberId(null)
+    }
+  },[structuralReady])
+  useEffect(()=>{
+    if(selectedTimberId && !structuralCut?.pieces.some(p=>p.elementId===selectedTimberId))
+      setSelectedTimberId(null)
+  },[selectedTimberId,structuralCut])
   const points = plan.exterior
   const viewPlan=graphView(plan)
   const selectedInterior = viewPlan.interiorWalls.find(w => w.id === selectedInteriorId)
@@ -193,6 +221,7 @@ export function FloorPlanEditor({
     setDimensionEdit(null)
   }
   const clearSelection = () => {
+    setSelectedTimberId(null)
     openingTools.clearSelection()
     clearPlanSelection()
   }
@@ -550,6 +579,7 @@ export function FloorPlanEditor({
     if (ignoreClick.current) { ignoreClick.current = false; return }
     if (event.shiftKey) return
     if (plan.closed) {
+      if(structuralVisible)return // Framing section is inspection-only; layout stays editable.
       const loc = svgFromEvent(event)
       const raw = canvasWorldPoint(loc)
       if (placement && placementWall) {
@@ -866,15 +896,17 @@ export function FloorPlanEditor({
   }, [plan, interiorStart, interiorHover, interiorThickness])
 
   return (
-    <div className="plan-workspace" data-testid="plan-workspace">
-      <aside className="plan-controls" ref={sidebarRef}>
+    <div className="plan-workspace" data-testid="plan-workspace" data-closed={plan.closed} data-view={structuralVisible?'framing':'layout'}>
+      <aside className="plan-controls" aria-label="Инструменты и построение">
         <div className="plan-eyebrow">SIGMA4 / ЧЕРТЁЖ 01</div>
         <h1>План этажа</h1>
+        {plan.closed && <nav className="plan-quick-tools" aria-label="Быстрые инструменты плана">
+          <button type="button" title="Выбрать (V)" aria-pressed={tool==='select'} onClick={()=>activateTool('select')}>↖ <span>Выбор</span></button>
+          <button type="button" title="Добавить стену (W)" aria-pressed={tool==='interior'} onClick={()=>activateTool('interior')}>▰ <span>Стена</span></button>
+          <button type="button" title="Добавить точку" aria-pressed={tool==='point'} onClick={()=>activateTool('point')}>● <span>Точка</span></button>
+          <button type="button" title="Выбрать проём" aria-pressed={tool==='frame'} onClick={()=>activateTool('frame')}>▯ <span>Проём</span></button>
+        </nav>}
         {!plan.closed && <p className="plan-muted">Задайте наружный контур на сетке или по точным размерам.</p>}
-        {tool === 'select' && selectedOpening && selectedWall
-          ? <PlanOpeningInspector opening={selectedOpening} side={selectedWall} onSave={openingTools.save}
-              onRemove={() => openingTools.remove(selectedOpening)} />
-          : tool === 'select' && selectedWall && <PlanWallSelection side={selectedWall} />}
         {!plan.closed && <div className="plan-step">
           <span className="plan-step-count">01</span>
           <div><strong>{plan.closed ? 'Контур готов' : points.length ? 'Продолжайте контур' : 'Начальная точка'}</strong>
@@ -995,83 +1027,6 @@ export function FloorPlanEditor({
                 }
               }}>Очистить внутренний план</button>}
           </div>
-          {selectedGraphNode && tool==='select' && <div className="plan-tool-section"
-              data-testid="plan-selected-graph-node">
-              <strong className="plan-section-title">Точка {selectedGraphNode.id}</strong>
-              <p className="plan-muted">Связанные отрезки используют один узел. Перемещение разрешено, если остаётся корректная геометрия.</p>
-              <label>X, м
-                <input data-testid="plan-node-edit-x" value={nodeEdit.x} type="text"
-                  onChange={e=>setNodeEdit(p=>({...p,x:e.target.value}))}/>
-              </label>
-              <label>Z, м
-                <input data-testid="plan-node-edit-z" value={nodeEdit.z} type="text"
-                  onChange={e=>setNodeEdit(p=>({...p,z:e.target.value}))}/>
-              </label>
-              <button type="button" className="plan-button plan-primary"
-                data-testid="plan-save-graph-node" onClick={saveGraphNode}>
-                Применить координаты
-              </button>
-              <button type="button" className="plan-button plan-text"
-                data-testid="plan-delete-graph-node" onClick={()=>{
-                  if(apply({type:'PLAN_GRAPH_DELETE_POINT',payload:{id:selectedGraphNode.id}}))
-                    setSelectedGraphNodeId(null)
-                }}>Удалить свободную точку</button>
-            </div>}
-          {selectedInterior && tool === 'select' && (
-            <div className="plan-tool-section" data-testid="plan-selected-interior">
-              <strong className="plan-section-title">Стена {selectedInterior.id}</strong>
-              <p className="plan-muted">Перемещайте стену мышью, стрелками клавиатуры или вводите точные размеры. Сдвиг перемещает связанные узлы; некорректное соединение блокируется.</p>
-              <div className="plan-nudge-actions" role="group" aria-label="Сдвинуть выбранную стену">
-                <button type="button" className="plan-button plan-secondary"
-                  data-testid="plan-wall-nudge-negative" onClick={()=>nudgeSelectedWall(-25)}>
-                  {selectedInterior.start.xMm===selectedInterior.end.xMm?'← X':'↑ Z'} −25 мм
-                </button>
-                <button type="button" className="plan-button plan-secondary"
-                  data-testid="plan-wall-nudge-positive" onClick={()=>nudgeSelectedWall(25)}>
-                  {selectedInterior.start.xMm===selectedInterior.end.xMm?'→ X':'↓ Z'} +25 мм
-                </button>
-              </div>
-              <p className="plan-muted">Стрелки: 25 мм · Shift + стрелка: 100 мм · Alt + стрелка: 1 мм.</p>
-              {([
-                ['sx', 'Начало X, м'], ['sz', 'Начало Z, м'],
-                ['ex', 'Конец X, м'], ['ez', 'Конец Z, м'],
-                ['thickness', 'Толщина, мм'],
-              ] as const).map(([key,label]) =>
-                <label key={key}>{label}
-                  <input data-testid={'plan-edit-' + key} type="text" value={interiorEdit[key]}
-                    onChange={e => setInteriorEdit(prev => ({...prev, [key]: e.target.value}))} />
-                </label>
-              )}
-              <div className="plan-length-editor" data-testid="plan-length-editor">
-                <strong>Изменить длину стены</strong>
-                <label>Длина, м
-                  <input type="text" data-testid="plan-length-value" value={wallLengthDraft}
-                    onChange={event => setWallLengthDraft(event.target.value)} />
-                </label>
-                <label>Неподвижный конец
-                  <select data-testid="plan-length-anchor" value={lengthFixedEnd}
-                    onChange={event => setLengthFixedEnd(event.target.value as 'start'|'end')}>
-                    <option value="start">Начало</option>
-                    <option value="end">Конец</option>
-                  </select>
-                </label>
-                <button className="plan-button plan-secondary" type="button"
-                  data-testid="plan-save-length" onClick={saveWallLength}>Применить длину</button>
-                <p className="plan-muted">Общие узлы сохраняются. Разрывы соединений и конфликты с проёмами блокируются.</p>
-              </div>
-              <p className="plan-guidance">Текущая длина: {preciseMetres(planDistanceMm(selectedInterior.start, selectedInterior.end))} м</p>
-              <button className="plan-button plan-primary" data-testid="plan-save-interior"
-                type="button" onClick={updateInteriorWall}>Применить координаты</button>
-              <button className="plan-button plan-text" data-testid="plan-remove-interior"
-                type="button" onClick={() => {
-                  if(window.confirm('Удалить выбранный отрезок '+selectedInterior.id+'?')){
-                    if(plan.graph)eraseWall(selectedInterior.id)
-                    else if(apply({type:'PLAN_REMOVE_INTERIOR_WALL',payload:{id:selectedInterior.id}}))
-                      setSelectedInteriorId(null)
-                  }
-                }}>Удалить стену</button>
-            </div>
-          )}
         </>}
         <div className="plan-tool-section plan-actions">
           {!plan.closed && <button type="button" className="plan-button plan-secondary"
@@ -1088,24 +1043,6 @@ export function FloorPlanEditor({
               }
             }}>Очистить чертёж</button>
         </div>
-        {selectedIndex !== null && points[selectedIndex] && (
-          <div className="plan-tool-section" data-testid="plan-selected-point">
-            <strong>Точка {selectedIndex + 1}</strong>
-            {selectedIndex === 0 ? <p className="plan-muted">Начало координат зафиксировано: X=0, Z=0.</p> :
-              <>
-                <label htmlFor="plan-point-x">X, м</label>
-                <input id="plan-point-x" type="text" value={pointX}
-                  onChange={e => setPointX(e.target.value)} />
-                <label htmlFor="plan-point-z">Z, м</label>
-                <input id="plan-point-z" type="text" value={pointZ}
-                  onChange={e => setPointZ(e.target.value)} />
-                <button type="button" className="plan-button plan-secondary"
-                  data-testid="plan-save-point" onClick={moveSelectedPoint}>
-                  Применить координаты
-                </button>
-              </>}
-          </div>
-        )}
         {!plan.closed && localError && <div className="plan-error" role="alert" data-testid="plan-error">{localError}</div>}
         <div className="plan-divider" />
         {!plan.closed && <div className="plan-step plan-step-secondary">
@@ -1132,11 +1069,33 @@ export function FloorPlanEditor({
               Стена <kbd>W</kbd>
             </button>
           </div>}
+          {plan.closed && <div className="plan-view-switch" role="group" aria-label="2D-режим отображения">
+            <button type="button" data-testid="plan-view-layout"
+              aria-pressed={!structuralVisible} onClick={()=>{setPlanView('layout');setSelectedTimberId(null)}}>
+              Планировка
+            </button>
+            <button type="button" data-testid="plan-view-framing"
+              aria-pressed={structuralVisible} disabled={!structuralReady}
+              title={!structuralReady?'Сначала постройте каркас':'Фактический горизонтальный разрез каркаса'}
+              onClick={()=>{activateTool('select');setPlanView('framing');setSelectedTimberId(null)}}>
+              Каркас 2D
+            </button>
+          </div>}
           <div className="plan-mode-mark"><span className="plan-dot" /> ПЛАН / {plan.closed
               ?placementLabel ?? ({interior:'ЛОМАНАЯ СТЕНА',turn:'ПОВОРОТ 90°',point:'СВОБОДНАЯ ТОЧКА',
                 split:'РАЗДЕЛЕНИЕ',erase:'УДАЛЕНИЕ ОТРЕЗКА',select:'РЕДАКТИРОВАНИЕ',
                 outline:'НАРУЖНЫЙ КОНТУР',frame:'ПРОЁМЫ'}[tool])
               :'НАРУЖНЫЙ КОНТУР'}</div>
+          {structuralVisible && <div className="plan-cut-controls">
+            <label htmlFor="plan-cut-height">Сечение Y, мм</label>
+            <input id="plan-cut-height" type="number" step="1" min={cutLimitMin} max={cutLimitMax}
+              data-testid="plan-cut-height" value={validCutHeight}
+              onChange={event=>{
+                const v=event.target.valueAsNumber
+                if(Number.isInteger(v)&&v>=cutLimitMin&&v<=cutLimitMax)setCutHeightMm(v)
+              }}/>
+            <span data-testid="plan-cut-count">{structuralCut?.pieces.length??0} деталей</span>
+          </div>}
           <div className="plan-room-display-tools" role="group" aria-label="Отображение площадей">
             <button type="button" data-testid="plan-room-label-toggle"
               aria-pressed={showRoomLabels} title="Показать или скрыть площади помещений"
@@ -1362,6 +1321,9 @@ export function FloorPlanEditor({
                 </text>}
               </g>
             })}
+            {structuralCut && <PlanStructuralOverlay cut={structuralCut} xy={xy}
+              selectedId={selectedTimberId}
+              onSelect={id=>{clearSelection();setSelectedTimberId(id)}} />}
             {showRoomLabels && visibleRooms.map(room=>{
               const pos=xy(room.center)
               const selected=room.id===selectedRoomId
@@ -1575,7 +1537,9 @@ export function FloorPlanEditor({
               :tool==='frame'?'Нажмите на стену или существующий проём'
               :placement?'Клик по выбранной стене · Alt — точная привязка'
               :selectedOpening?'Тяните проём вдоль стены · кликните размер для точного ввода'
-              :'Выберите стену, чтобы добавить проём · Shift + перетаскивание — панорама')
+              :structuralVisible
+                ? 'Реальный разрез деревянных деталей · выберите элемент · для редактирования переключитесь в «Планировку»'
+                :'Выберите стену, чтобы добавить проём · Shift + перетаскивание — панорама')
             :'ЛКМ — следующая точка · Shift+drag — сдвиг · колесо — масштаб'}</div>
         </div>
         <div className="plan-bottom">
@@ -1593,6 +1557,135 @@ export function FloorPlanEditor({
           <span className="plan-bottom-right">Размеры в метрах · точность 1 мм</span>
         </div>
       </main>
+      {plan.closed && <aside className="plan-inspector" data-testid="plan-inspector"
+        ref={sidebarRef} aria-label="Свойства выбранного объекта">
+        <div className="plan-inspector-title">Свойства объекта</div>
+        {structuralVisible && selectedTimber && <section className="plan-selection-panel"
+          data-testid="plan-structural-inspector">
+          <span className="plan-inspector-kicker">Реальная деталь каркаса</span>
+          <strong>{selectedTimber.elementId}</strong>
+          <span className="plan-selection-detail">Тип: {selectedTimber.role}</span>
+          <span className="plan-selection-detail">Стена: {selectedTimber.wallId}</span>
+          <span className="plan-selection-detail">Сечение: {validCutHeight} мм · площадь {Math.round(selectedTimber.areaMm2)} мм²</span>
+          <p className="plan-muted">Контур получен из геометрии 3D-элемента. Проверка несущей способности отдельно.</p>
+        </section>}
+        {!structuralVisible && <>
+        {tool === 'select' && selectedOpening && selectedWall
+          ? <PlanOpeningInspector opening={selectedOpening} side={selectedWall} onSave={openingTools.save}
+              onRemove={() => openingTools.remove(selectedOpening)} />
+          : tool === 'select' && selectedWall && <PlanWallSelection side={selectedWall} />}
+          {selectedGraphNode && tool==='select' && <div className="plan-tool-section"
+              data-testid="plan-selected-graph-node">
+              <strong className="plan-section-title">Точка {selectedGraphNode.id}</strong>
+              <p className="plan-muted">Связанные отрезки используют один узел. Перемещение разрешено, если остаётся корректная геометрия.</p>
+              <label>X, м
+                <input data-testid="plan-node-edit-x" value={nodeEdit.x} type="text"
+                  onChange={e=>setNodeEdit(p=>({...p,x:e.target.value}))}/>
+              </label>
+              <label>Z, м
+                <input data-testid="plan-node-edit-z" value={nodeEdit.z} type="text"
+                  onChange={e=>setNodeEdit(p=>({...p,z:e.target.value}))}/>
+              </label>
+              <button type="button" className="plan-button plan-primary"
+                data-testid="plan-save-graph-node" onClick={saveGraphNode}>
+                Применить координаты
+              </button>
+              <button type="button" className="plan-button plan-text"
+                data-testid="plan-delete-graph-node" onClick={()=>{
+                  if(apply({type:'PLAN_GRAPH_DELETE_POINT',payload:{id:selectedGraphNode.id}}))
+                    setSelectedGraphNodeId(null)
+                }}>Удалить свободную точку</button>
+            </div>}
+          {selectedInterior && tool === 'select' && (
+            <div className="plan-tool-section" data-testid="plan-selected-interior">
+              <strong className="plan-section-title">Стена {selectedInterior.id}</strong>
+              <p className="plan-muted">Перемещайте стену мышью, стрелками клавиатуры или вводите точные размеры. Сдвиг перемещает связанные узлы; некорректное соединение блокируется.</p>
+              <div className="plan-nudge-actions" role="group" aria-label="Сдвинуть выбранную стену">
+                <button type="button" className="plan-button plan-secondary"
+                  data-testid="plan-wall-nudge-negative" onClick={()=>nudgeSelectedWall(-25)}>
+                  {selectedInterior.start.xMm===selectedInterior.end.xMm?'← X':'↑ Z'} −25 мм
+                </button>
+                <button type="button" className="plan-button plan-secondary"
+                  data-testid="plan-wall-nudge-positive" onClick={()=>nudgeSelectedWall(25)}>
+                  {selectedInterior.start.xMm===selectedInterior.end.xMm?'→ X':'↓ Z'} +25 мм
+                </button>
+              </div>
+              <p className="plan-muted">Стрелки: 25 мм · Shift + стрелка: 100 мм · Alt + стрелка: 1 мм.</p>
+              {([
+                ['sx', 'Начало X, м'], ['sz', 'Начало Z, м'],
+                ['ex', 'Конец X, м'], ['ez', 'Конец Z, м'],
+                ['thickness', 'Толщина, мм'],
+              ] as const).map(([key,label]) =>
+                <label key={key}>{label}
+                  <input data-testid={'plan-edit-' + key} type="text" value={interiorEdit[key]}
+                    onChange={e => setInteriorEdit(prev => ({...prev, [key]: e.target.value}))} />
+                </label>
+              )}
+              <div className="plan-length-editor" data-testid="plan-length-editor">
+                <strong>Изменить длину стены</strong>
+                <label>Длина, м
+                  <input type="text" data-testid="plan-length-value" value={wallLengthDraft}
+                    onChange={event => setWallLengthDraft(event.target.value)} />
+                </label>
+                <label>Неподвижный конец
+                  <select data-testid="plan-length-anchor" value={lengthFixedEnd}
+                    onChange={event => setLengthFixedEnd(event.target.value as 'start'|'end')}>
+                    <option value="start">Начало</option>
+                    <option value="end">Конец</option>
+                  </select>
+                </label>
+                <button className="plan-button plan-secondary" type="button"
+                  data-testid="plan-save-length" onClick={saveWallLength}>Применить длину</button>
+                <p className="plan-muted">Общие узлы сохраняются. Разрывы соединений и конфликты с проёмами блокируются.</p>
+              </div>
+              <p className="plan-guidance">Текущая длина: {preciseMetres(planDistanceMm(selectedInterior.start, selectedInterior.end))} м</p>
+              <button className="plan-button plan-primary" data-testid="plan-save-interior"
+                type="button" onClick={updateInteriorWall}>Применить координаты</button>
+              <button className="plan-button plan-text" data-testid="plan-remove-interior"
+                type="button" onClick={() => {
+                  if(window.confirm('Удалить выбранный отрезок '+selectedInterior.id+'?')){
+                    if(plan.graph)eraseWall(selectedInterior.id)
+                    else if(apply({type:'PLAN_REMOVE_INTERIOR_WALL',payload:{id:selectedInterior.id}}))
+                      setSelectedInteriorId(null)
+                  }
+                }}>Удалить стену</button>
+            </div>
+          )}
+        {selectedIndex !== null && points[selectedIndex] && (
+          <div className="plan-tool-section" data-testid="plan-selected-point">
+            <strong>Точка {selectedIndex + 1}</strong>
+            {selectedIndex === 0 ? <p className="plan-muted">Начало координат зафиксировано: X=0, Z=0.</p> :
+              <>
+                <label htmlFor="plan-point-x">X, м</label>
+                <input id="plan-point-x" type="text" value={pointX}
+                  onChange={e => setPointX(e.target.value)} />
+                <label htmlFor="plan-point-z">Z, м</label>
+                <input id="plan-point-z" type="text" value={pointZ}
+                  onChange={e => setPointZ(e.target.value)} />
+                <button type="button" className="plan-button plan-secondary"
+                  data-testid="plan-save-point" onClick={moveSelectedPoint}>
+                  Применить координаты
+                </button>
+              </>}
+          </div>
+        )}
+
+        </>}
+        {!structuralVisible && selectedRoomId && !selectedOpening && !selectedInterior &&
+          !selectedGraphNode && !selectedWall && <div className="plan-selection-panel">
+            <span className="plan-inspector-kicker">Выбрано помещение</span>
+            <strong>{visibleRooms.find(r=>r.id===selectedRoomId)?.label??selectedRoomId}</strong>
+            <span className="plan-selection-detail">Чистая площадь: {formatRoomArea(visibleRooms.find(r=>r.id===selectedRoomId)?.areaM2??0)} м²</span>
+          </div>}
+        {!selectedTimber && !selectedOpening && !selectedInterior && !selectedGraphNode &&
+          !selectedWall && selectedIndex===null && !selectedRoomId &&
+          <div className="plan-inspector-placeholder" data-testid="plan-inspector-empty">
+            <strong>{structuralVisible?'Режим каркаса':'Ничего не выбрано'}</strong>
+            <p>{structuralVisible
+              ? 'Щёлкните по реальной детали или измените высоту сечения Y в верхней панели.'
+              : 'Выберите стену, точку, проём или помещение на чертеже. Точные параметры появятся здесь.'}</p>
+          </div>}
+      </aside>}
     </div>
   )
 }
