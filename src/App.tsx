@@ -10,7 +10,7 @@ import { validateWallLength, validateInt } from './core/validation'
 import type { WindowOpening } from './core/window'
 import { projectToScene } from './scene/project-to-scene'
 import { buildDimensionLayout } from './scene/dimension-model'
-import { createProjectFromCurrentState } from './core/project-store'
+import { createDefaultProject } from './core/default-project'
 import { createProjectStore, type ProjectCommand } from './core/ProjectStore'
 import { rightCornerOrigin } from './core/corner'
 import { firstWallExteriorLowerLeft } from './core/world-origin'
@@ -35,24 +35,14 @@ function findFreePosition(openings: WindowOpening[], wallLength: number, newW: n
   return null
 }
 
-const initialDoc = createProjectFromCurrentState({
-  length: 6000,
-  height: 2700,
-  spacing: 600,
-  openings: [
-    { id: 'W01', positionXmm: 900, widthMm: 1200, heightMm: 1200, sillHeightMm: 900, type: 'window' },
-    { id: 'W02', positionXmm: 3300, widthMm: 1200, heightMm: 1200, sillHeightMm: 900, type: 'window' },
-  ],
-  projectId: 'proj-001',
-  projectName: 'SIGMA4 Project',
-})
+const initialDoc = createDefaultProject()
 
 const store = createProjectStore(initialDoc)
 
 export default function App() {
   const [snapshot, setSnapshot] = useState(() => store.getSnapshot())
   const [revision, setRevision] = useState(() => store.getRevision())
-  const [selectedWallId, setSelectedWallId] = useState('wall-001')
+  const [selectedWallId, setSelectedWallId] = useState(initialDoc.building.walls[0].wallId)
   const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [workspace, setWorkspace] = useState<'plan' | 'frame'>('plan')
@@ -60,7 +50,7 @@ export default function App() {
   const [showEdges, setShowEdges] = useState(true)
   const [showDimensions, setShowDimensions] = useState(true)
   const [showRoomLabels,setShowRoomLabels] = useState(true)
-  const [showRoomFill,setShowRoomFill] = useState(true)
+  const [showRoomFill,setShowRoomFill] = useState(false)
   const [selectedRoomId,setSelectedRoomId] = useState<string|null>(null)
   const [commandError, setCommandError] = useState<string | null>(null)
 

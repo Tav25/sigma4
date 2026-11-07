@@ -1,0 +1,4061 @@
+{
+  "project": {
+    "schemaVersion": "1.1.0",
+    "projectId": "proj-001",
+    "projectName": "SIGMA4 Project",
+    "units": "mm",
+    "rulesetId": "sigma4-ruleset",
+    "rulesetVersion": "1.0.0",
+    "generatorVersion": "1.0.0"
+  },
+  "building": {
+    "materials": [
+      {
+        "id": "wood-c24",
+        "name": "Сосна/Ель С24",
+        "densityKgM3": 420,
+        "strengthClass": "C24"
+      }
+    ],
+    "walls": [
+      {
+        "wallId": "plan-front",
+        "origin": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "lengthMm": 11000,
+        "heightMm": 2700,
+        "studSpacingMm": 600,
+        "thicknessMm": 145,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "orientation": "x",
+        "openings": []
+      },
+      {
+        "wallId": "plan-right",
+        "origin": {
+          "x": 11000,
+          "y": 0,
+          "z": -145
+        },
+        "lengthMm": 6710,
+        "heightMm": 2700,
+        "studSpacingMm": 600,
+        "thicknessMm": 145,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "orientation": "z",
+        "openings": [
+          "G01",
+          "D03"
+        ]
+      },
+      {
+        "wallId": "plan-back",
+        "origin": {
+          "x": 11000,
+          "y": 0,
+          "z": -7000
+        },
+        "lengthMm": 11000,
+        "heightMm": 2700,
+        "studSpacingMm": 600,
+        "thicknessMm": 145,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "orientation": "x",
+        "reversed": true,
+        "openings": [
+          "W01"
+        ]
+      },
+      {
+        "wallId": "plan-left",
+        "origin": {
+          "x": 0,
+          "y": 0,
+          "z": -6855
+        },
+        "lengthMm": 6710,
+        "heightMm": 2700,
+        "studSpacingMm": 600,
+        "thicknessMm": 145,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "orientation": "z",
+        "reversed": true,
+        "openings": []
+      },
+      {
+        "wallId": "partition-I001",
+        "origin": {
+          "x": 4450,
+          "y": 0,
+          "z": -6855
+        },
+        "lengthMm": 6710,
+        "heightMm": 2700,
+        "studSpacingMm": 400,
+        "thicknessMm": 100,
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "orientation": "z",
+        "reversed": true,
+        "openings": [
+          "D01",
+          "D02"
+        ]
+      },
+      {
+        "wallId": "partition-I003",
+        "origin": {
+          "x": 4450,
+          "y": 0,
+          "z": -4300
+        },
+        "lengthMm": 4305,
+        "heightMm": 2700,
+        "studSpacingMm": 400,
+        "thicknessMm": 100,
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "orientation": "x",
+        "reversed": true,
+        "openings": []
+      }
+    ],
+    "openings": [
+      {
+        "id": "W01",
+        "wallId": "plan-back",
+        "type": "window",
+        "positionUmm": 8600,
+        "widthMm": 1200,
+        "heightMm": 1200,
+        "sillHeightMm": 900
+      },
+      {
+        "id": "D01",
+        "wallId": "partition-I001",
+        "type": "door",
+        "positionUmm": 155,
+        "widthMm": 900,
+        "heightMm": 2100,
+        "sillHeightMm": 0,
+        "swing": {
+          "hinge": "start",
+          "side": "right"
+        }
+      },
+      {
+        "id": "D02",
+        "wallId": "partition-I001",
+        "type": "door",
+        "positionUmm": 2905,
+        "widthMm": 900,
+        "heightMm": 2100,
+        "sillHeightMm": 0,
+        "swing": {
+          "hinge": "start",
+          "side": "right"
+        }
+      },
+      {
+        "id": "G01",
+        "wallId": "plan-right",
+        "type": "garage-door",
+        "positionUmm": 3055,
+        "widthMm": 3000,
+        "heightMm": 2134,
+        "sillHeightMm": 0,
+        "garage": {
+          "installationProfile": "clopay-standard-torsion",
+          "minSideRoomMm": 96,
+          "minHeadRoomMm": 305,
+          "minBackRoomExtraMm": 457,
+          "lintelPreviewDepthMm": 286,
+          "jackStudsPerSide": 2
+        }
+      },
+      {
+        "id": "D03",
+        "wallId": "plan-right",
+        "type": "door",
+        "positionUmm": 1755,
+        "widthMm": 900,
+        "heightMm": 2100,
+        "sillHeightMm": 0,
+        "swing": {
+          "hinge": "start",
+          "side": "right"
+        }
+      }
+    ],
+    "markers": [
+      {
+        "openingId": "W01",
+        "anchor": "center",
+        "outsideOffsetMm": 50,
+        "elevationMm": 1500,
+        "visible": true,
+        "color": "#0066ff"
+      },
+      {
+        "openingId": "D01",
+        "anchor": "center",
+        "outsideOffsetMm": 50,
+        "elevationMm": 1050,
+        "visible": true,
+        "color": "#0066ff"
+      },
+      {
+        "openingId": "D02",
+        "anchor": "center",
+        "outsideOffsetMm": 50,
+        "elevationMm": 1050,
+        "visible": true,
+        "color": "#0066ff"
+      },
+      {
+        "openingId": "G01",
+        "anchor": "center",
+        "outsideOffsetMm": 50,
+        "elevationMm": 1067,
+        "visible": true,
+        "color": "#0066ff"
+      },
+      {
+        "openingId": "D03",
+        "anchor": "center",
+        "outsideOffsetMm": 50,
+        "elevationMm": 1050,
+        "visible": true,
+        "color": "#0066ff"
+      }
+    ],
+    "floorPlan": {
+      "exterior": [
+        {
+          "xMm": 0,
+          "zMm": 0
+        },
+        {
+          "xMm": 11000,
+          "zMm": 0
+        },
+        {
+          "xMm": 11000,
+          "zMm": -7000
+        },
+        {
+          "xMm": 0,
+          "zMm": -7000
+        }
+      ],
+      "closed": true,
+      "interiorWalls": [],
+      "graph": {
+        "nodes": [
+          {
+            "id": "N001",
+            "xMm": 4500,
+            "zMm": -7000
+          },
+          {
+            "id": "N002",
+            "xMm": 4500,
+            "zMm": 0
+          },
+          {
+            "id": "N003",
+            "xMm": 4500,
+            "zMm": -4250
+          },
+          {
+            "id": "N004",
+            "xMm": 0,
+            "zMm": -4250
+          }
+        ],
+        "edges": [
+          {
+            "id": "I001",
+            "a": "N001",
+            "b": "N003",
+            "thicknessMm": 100
+          },
+          {
+            "id": "I002",
+            "a": "N003",
+            "b": "N002",
+            "thicknessMm": 100
+          },
+          {
+            "id": "I003",
+            "a": "N003",
+            "b": "N004",
+            "thicknessMm": 100
+          }
+        ]
+      },
+      "exteriorThicknessMm": 145,
+      "frame": {
+        "built": true,
+        "openings": [
+          {
+            "id": "W01",
+            "wallId": "plan-back",
+            "type": "window",
+            "positionUmm": 8600,
+            "widthMm": 1200,
+            "heightMm": 1200,
+            "sillHeightMm": 900
+          },
+          {
+            "id": "D01",
+            "wallId": "partition-I001",
+            "type": "door",
+            "positionUmm": 300,
+            "widthMm": 900,
+            "heightMm": 2100,
+            "sillHeightMm": 0,
+            "swing": {
+              "hinge": "start",
+              "side": "right"
+            }
+          },
+          {
+            "id": "D02",
+            "wallId": "partition-I002",
+            "type": "door",
+            "positionUmm": 300,
+            "widthMm": 900,
+            "heightMm": 2100,
+            "sillHeightMm": 0,
+            "swing": {
+              "hinge": "start",
+              "side": "right"
+            }
+          },
+          {
+            "id": "G01",
+            "wallId": "plan-right",
+            "type": "garage-door",
+            "positionUmm": 3200,
+            "widthMm": 3000,
+            "heightMm": 2134,
+            "sillHeightMm": 0,
+            "garage": {
+              "installationProfile": "clopay-standard-torsion",
+              "minSideRoomMm": 96,
+              "minHeadRoomMm": 305,
+              "minBackRoomExtraMm": 457,
+              "lintelPreviewDepthMm": 286,
+              "jackStudsPerSide": 2
+            }
+          },
+          {
+            "id": "D03",
+            "wallId": "plan-right",
+            "type": "door",
+            "positionUmm": 1900,
+            "widthMm": 900,
+            "heightMm": 2100,
+            "sillHeightMm": 0,
+            "swing": {
+              "hinge": "start",
+              "side": "right"
+            }
+          }
+        ],
+        "partitions": true
+      }
+    },
+    "connections": []
+  },
+  "assembly": {
+    "elements": [
+      {
+        "elementId": "plan-front:plate-bottom-1",
+        "wallId": "plan-front",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 11000,
+        "position": {
+          "x": 0,
+          "y": 22.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-01",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 22.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-left:stud-02",
+          "plan-front:warm-corner-stud-start"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-02",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 10977.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:stud-01",
+          "plan-front:warm-corner-stud"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:plate-top-1",
+        "wallId": "plan-front",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 11000,
+        "position": {
+          "x": 0,
+          "y": 2632.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:plate-top-2",
+        "wallId": "plan-front",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 4305,
+        "position": {
+          "x": 145,
+          "y": 2677.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I001:plate-top-2-channel-4500_-4250",
+          "plan-left:plate-top-2-channel-0_-4250"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:stud-01",
+        "wallId": "plan-right",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 22.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-front:stud-02",
+          "plan-front:warm-corner-stud"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:stud-02",
+        "wallId": "plan-right",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6687.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:stud-01",
+          "plan-back:warm-corner-stud-start"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:plate-top-1",
+        "wallId": "plan-right",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 6710,
+        "position": {
+          "x": 0,
+          "y": 2632.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:plate-top-2",
+        "wallId": "plan-right",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 7000,
+        "position": {
+          "x": -145,
+          "y": 2677.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-front:plate-top-2-channel-4500_0",
+          "plan-back:plate-top-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:D03-king-left",
+        "wallId": "plan-right",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1687.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:D03-king-right",
+        "wallId": "plan-right",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2722.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:D03-jack-left",
+        "wallId": "plan-right",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2055,
+        "position": {
+          "x": 1732.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:D03-header-1",
+          "plan-right:D03-header-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:D03-jack-right",
+        "wallId": "plan-right",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2055,
+        "position": {
+          "x": 2677.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:D03-header-1",
+          "plan-right:D03-header-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:D03-header-1",
+        "wallId": "plan-right",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 990,
+        "position": {
+          "x": 1710,
+          "y": 2100,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:D03-jack-left",
+          "plan-right:D03-jack-right"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:D03-header-2",
+        "wallId": "plan-right",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 990,
+        "position": {
+          "x": 1710,
+          "y": 2100,
+          "z": 50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:D03-jack-left",
+          "plan-right:D03-jack-right"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-king-left",
+        "wallId": "plan-right",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2942.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-king-right",
+        "wallId": "plan-right",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6167.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-jack-left",
+        "wallId": "plan-right",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2089,
+        "position": {
+          "x": 3032.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:G01-header-1",
+          "plan-right:G01-header-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-jack-right",
+        "wallId": "plan-right",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2089,
+        "position": {
+          "x": 6077.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:G01-header-1",
+          "plan-right:G01-header-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-jack-left-2",
+        "wallId": "plan-right",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2089,
+        "position": {
+          "x": 2987.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:G01-header-1",
+          "plan-right:G01-header-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-jack-right-2",
+        "wallId": "plan-right",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2089,
+        "position": {
+          "x": 6122.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:G01-header-1",
+          "plan-right:G01-header-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-header-1",
+        "wallId": "plan-right",
+        "role": "garage-lintel-preview",
+        "sectionMm": {
+          "width": 45,
+          "height": 286
+        },
+        "lengthMm": 3180,
+        "position": {
+          "x": 2965,
+          "y": 2134,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:G01-jack-left",
+          "plan-right:G01-jack-right",
+          "plan-right:G01-jack-left-2",
+          "plan-right:G01-jack-right-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-header-2",
+        "wallId": "plan-right",
+        "role": "garage-lintel-preview",
+        "sectionMm": {
+          "width": 45,
+          "height": 286
+        },
+        "lengthMm": 3180,
+        "position": {
+          "x": 2965,
+          "y": 2134,
+          "z": 50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:G01-jack-left",
+          "plan-right:G01-jack-right",
+          "plan-right:G01-jack-left-2",
+          "plan-right:G01-jack-right-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:plate-bottom-left",
+        "wallId": "plan-right",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1755,
+        "position": {
+          "x": 0,
+          "y": 22.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:plate-bottom-mid-1",
+        "wallId": "plan-right",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 400,
+        "position": {
+          "x": 2655,
+          "y": 22.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:plate-bottom-right",
+        "wallId": "plan-right",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 655,
+        "position": {
+          "x": 6055,
+          "y": 22.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:plate-bottom-1",
+        "wallId": "plan-back",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 11000,
+        "position": {
+          "x": 0,
+          "y": 22.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-01",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 22.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-right:stud-02",
+          "plan-back:warm-corner-stud-start"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-02",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 10977.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-left:stud-01",
+          "plan-back:warm-corner-stud"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:plate-top-1",
+        "wallId": "plan-back",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 11000,
+        "position": {
+          "x": 0,
+          "y": 2632.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:plate-top-2",
+        "wallId": "plan-back",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 6305,
+        "position": {
+          "x": 145,
+          "y": 2677.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I001:plate-top-2",
+          "plan-right:plate-top-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-king-left",
+        "wallId": "plan-back",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 8532.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-king-right",
+        "wallId": "plan-back",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 9867.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-jack-left",
+        "wallId": "plan-back",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2055,
+        "position": {
+          "x": 8577.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:W01-header-1",
+          "plan-back:W01-header-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-jack-right",
+        "wallId": "plan-back",
+        "role": "jack-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2055,
+        "position": {
+          "x": 9822.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:W01-header-1",
+          "plan-back:W01-header-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-header-1",
+        "wallId": "plan-back",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1290,
+        "position": {
+          "x": 8555,
+          "y": 2100,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:W01-jack-left",
+          "plan-back:W01-jack-right"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-header-2",
+        "wallId": "plan-back",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1290,
+        "position": {
+          "x": 8555,
+          "y": 2100,
+          "z": 50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:W01-jack-left",
+          "plan-back:W01-jack-right"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-sill",
+        "wallId": "plan-back",
+        "role": "sill",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 1200,
+        "position": {
+          "x": 8600,
+          "y": 877.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-cripple-bottom-left",
+        "wallId": "plan-back",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "position": {
+          "x": 8622.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-cripple-bottom-right",
+        "wallId": "plan-back",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "position": {
+          "x": 9777.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:plate-bottom-1",
+        "wallId": "plan-left",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 6710,
+        "position": {
+          "x": 0,
+          "y": 22.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-01",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 22.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:stud-02",
+          "plan-back:warm-corner-stud"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-02",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6687.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-front:stud-01",
+          "plan-front:warm-corner-stud-start"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:plate-top-1",
+        "wallId": "plan-left",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 6710,
+        "position": {
+          "x": 0,
+          "y": 2632.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:plate-top-2",
+        "wallId": "plan-left",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2700,
+        "position": {
+          "x": -145,
+          "y": 2677.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I003:plate-top-2",
+          "plan-back:plate-top-2-channel-4500_-7000"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:plate-top-1",
+        "wallId": "partition-I001",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 6710,
+        "position": {
+          "x": 0,
+          "y": 2632.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:plate-top-2",
+        "wallId": "partition-I001",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2700,
+        "position": {
+          "x": -145,
+          "y": 2677.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I003:plate-top-2",
+          "plan-back:plate-top-2",
+          "plan-back:plate-top-2-channel-4500_-7000"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-01",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 22.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:partition-backing-partition-I001-start-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-02",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6687.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-front:partition-backing-partition-I001-end-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D01-bottom-before",
+        "wallId": "partition-I001",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 155,
+        "position": {
+          "x": 0,
+          "y": 22.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D01-header",
+        "wallId": "partition-I001",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 900,
+        "position": {
+          "x": 155,
+          "y": 2122.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D01-king-left",
+        "wallId": "partition-I001",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 132.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D01-king-right",
+        "wallId": "partition-I001",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1077.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D02-bottom-before",
+        "wallId": "partition-I001",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 1850,
+        "position": {
+          "x": 1055,
+          "y": 22.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D02-header",
+        "wallId": "partition-I001",
+        "role": "header",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 900,
+        "position": {
+          "x": 2905,
+          "y": 2122.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D02-king-left",
+        "wallId": "partition-I001",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2882.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D02-king-right",
+        "wallId": "partition-I001",
+        "role": "king-stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3827.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:plate-bottom-last",
+        "wallId": "partition-I001",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2905,
+        "position": {
+          "x": 3805,
+          "y": 22.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:plate-bottom-1",
+        "wallId": "partition-I003",
+        "role": "bottom-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 4305,
+        "position": {
+          "x": 0,
+          "y": 22.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-01",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 22.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "partition-I001:partition-backing-partition-I003-start-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-02",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 4282.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-left:partition-backing-partition-I003-end-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:plate-top-1",
+        "wallId": "partition-I003",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 4305,
+        "position": {
+          "x": 0,
+          "y": 2632.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:plate-top-2",
+        "wallId": "partition-I003",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 4550,
+        "position": {
+          "x": -100,
+          "y": 2677.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-left:plate-top-2",
+          "plan-left:plate-top-2-channel-0_-4250",
+          "partition-I001:plate-top-2",
+          "partition-I001:plate-top-2-channel-4500_-4250"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:warm-corner-stud",
+        "wallId": "plan-front",
+        "role": "corner-backing",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 10810,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-front:stud-02",
+          "plan-right:stud-01"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:warm-corner-stud-start",
+        "wallId": "plan-back",
+        "role": "corner-backing",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 45,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-back:stud-01",
+          "plan-right:stud-02"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:warm-corner-stud",
+        "wallId": "plan-back",
+        "role": "corner-backing",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 10810,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-back:stud-02",
+          "plan-left:stud-01"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:warm-corner-stud-start",
+        "wallId": "plan-front",
+        "role": "corner-backing",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 45,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-front:stud-01",
+          "plan-left:stud-02"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:partition-backing-partition-I001-start-left",
+        "wallId": "plan-back",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 6427.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:partition-backing-partition-I001-start-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:partition-backing-partition-I001-start-right",
+        "wallId": "plan-back",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 6572.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-back:partition-backing-partition-I001-start-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:partition-backing-partition-I001-start-flat",
+        "wallId": "plan-back",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "position": {
+          "x": 6450,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-back:partition-backing-partition-I001-start-left",
+          "plan-back:partition-backing-partition-I001-start-right",
+          "partition-I001:stud-01"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:partition-backing-partition-I001-end-left",
+        "wallId": "plan-front",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 4427.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-front:partition-backing-partition-I001-end-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:partition-backing-partition-I001-end-right",
+        "wallId": "plan-front",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 4572.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-front:partition-backing-partition-I001-end-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:partition-backing-partition-I001-end-flat",
+        "wallId": "plan-front",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "position": {
+          "x": 4450,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-front:partition-backing-partition-I001-end-left",
+          "plan-front:partition-backing-partition-I001-end-right",
+          "partition-I001:stud-02"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:partition-backing-partition-I003-start-left",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "position": {
+          "x": 2532.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "partition-I001:partition-backing-partition-I003-start-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:partition-backing-partition-I003-start-right",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "position": {
+          "x": 2677.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "partition-I001:partition-backing-partition-I003-start-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:partition-backing-partition-I003-start-flat",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "position": {
+          "x": 2555,
+          "y": 45,
+          "z": 27.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I001:partition-backing-partition-I003-start-left",
+          "partition-I001:partition-backing-partition-I003-start-right",
+          "partition-I003:stud-01"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:partition-backing-partition-I003-end-left",
+        "wallId": "plan-left",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 2532.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-left:partition-backing-partition-I003-end-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:partition-backing-partition-I003-end-right",
+        "wallId": "plan-left",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "position": {
+          "x": 2677.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [
+          "plan-left:partition-backing-partition-I003-end-flat"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:partition-backing-partition-I003-end-flat",
+        "wallId": "plan-left",
+        "role": "stud",
+        "lengthMm": 2565,
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "position": {
+          "x": 2555,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "plan-left:partition-backing-partition-I003-end-left",
+          "plan-left:partition-backing-partition-I003-end-right",
+          "partition-I003:stud-02"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:plate-top-2-channel-0_-4250",
+        "wallId": "plan-left",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 4200,
+        "position": {
+          "x": 2655,
+          "y": 2677.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I003:plate-top-2",
+          "plan-front:plate-top-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:plate-top-2-channel-4500_-4250",
+        "wallId": "partition-I001",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 4200,
+        "position": {
+          "x": 2655,
+          "y": 2677.5,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I003:plate-top-2",
+          "plan-front:plate-top-2",
+          "plan-front:plate-top-2-channel-4500_0"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:plate-top-2-channel-4500_-7000",
+        "wallId": "plan-back",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 4305,
+        "position": {
+          "x": 6550,
+          "y": 2677.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I001:plate-top-2",
+          "plan-left:plate-top-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:plate-top-2-channel-4500_0",
+        "wallId": "plan-front",
+        "role": "top-plate",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 6305,
+        "position": {
+          "x": 4550,
+          "y": 2677.5,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "x",
+          "angle": 0,
+          "roll": 90
+        },
+        "connectionIds": [
+          "partition-I001:plate-top-2-channel-4500_-4250",
+          "plan-right:plate-top-2"
+        ],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-767p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 767.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-1367p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1367.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-1967p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1967.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-2567p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2567.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-3167p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3167.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-3767p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3767.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-4367p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 4367.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-5172p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 5172.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-5772p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 5772.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-6372p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6372.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-6972p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6972.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-7572p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 7572.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-8172p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 8172.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-8772p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 8772.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-9372p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 9372.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-9972p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 9972.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-front:stud-layout-10572p500",
+        "wallId": "plan-front",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 10572.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:stud-layout-622p500",
+        "wallId": "plan-right",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 622.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:stud-layout-1222p500",
+        "wallId": "plan-right",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1222.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-cripple-top-layout-3677p500",
+        "wallId": "plan-right",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 190,
+        "position": {
+          "x": 3677.5,
+          "y": 2420,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-cripple-top-layout-4277p500",
+        "wallId": "plan-right",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 190,
+        "position": {
+          "x": 4277.5,
+          "y": 2420,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-cripple-top-layout-4877p500",
+        "wallId": "plan-right",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 190,
+        "position": {
+          "x": 4877.5,
+          "y": 2420,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:G01-cripple-top-layout-5477p500",
+        "wallId": "plan-right",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 190,
+        "position": {
+          "x": 5477.5,
+          "y": 2420,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-right:D03-cripple-top-layout-2377p500",
+        "wallId": "plan-right",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 365,
+        "position": {
+          "x": 2377.5,
+          "y": 2245,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-767p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 767.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-1367p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1367.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-1967p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1967.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-2567p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2567.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-3167p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3167.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-3767p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3767.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-4367p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 4367.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-4967p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 4967.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-5567p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 5567.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-6167p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6167.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-7172p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 7172.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-7772p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 7772.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-8372p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 8372.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:stud-layout-10467p500",
+        "wallId": "plan-back",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 10467.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-cripple-top-layout-9222p500",
+        "wallId": "plan-back",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 365,
+        "position": {
+          "x": 9222.5,
+          "y": 2245,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-back:W01-cripple-bottom-layout-9222p500",
+        "wallId": "plan-back",
+        "role": "cripple-bottom",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 810,
+        "position": {
+          "x": 9222.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-622p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 622.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-1222p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1222.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-1822p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1822.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-2422p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2422.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-3277p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3277.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-3877p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3877.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-4477p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 4477.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-5077p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 5077.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-5677p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 5677.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "plan-left:stud-layout-6277p500",
+        "wallId": "plan-left",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 145
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6277.5,
+          "y": 45,
+          "z": -72.5
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-1477p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1477.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-1877p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1877.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-2277p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2277.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-4227p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 4227.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-4627p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 4627.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-5027p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 5027.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-5427p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 5427.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-5827p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 5827.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-6227p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6227.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:stud-layout-6627p500",
+        "wallId": "partition-I001",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 6627.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D01-cripple-top-layout-577p500",
+        "wallId": "partition-I001",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 465,
+        "position": {
+          "x": 577.5,
+          "y": 2145,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D01-cripple-top-layout-977p500",
+        "wallId": "partition-I001",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 465,
+        "position": {
+          "x": 977.5,
+          "y": 2145,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D02-cripple-top-layout-3327p500",
+        "wallId": "partition-I001",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 465,
+        "position": {
+          "x": 3327.5,
+          "y": 2145,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I001:D02-cripple-top-layout-3727p500",
+        "wallId": "partition-I001",
+        "role": "cripple-top",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 465,
+        "position": {
+          "x": 3727.5,
+          "y": 2145,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-422p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 422.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-822p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 822.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-1222p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1222.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-1622p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 1622.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-2022p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2022.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-2422p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2422.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-2822p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 2822.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-3222p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3222.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-3622p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 3622.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      },
+      {
+        "elementId": "partition-I003:stud-layout-4022p500",
+        "wallId": "partition-I003",
+        "role": "stud",
+        "sectionMm": {
+          "width": 45,
+          "height": 100
+        },
+        "lengthMm": 2565,
+        "position": {
+          "x": 4022.5,
+          "y": 45,
+          "z": -50
+        },
+        "orientation": {
+          "mode": "y",
+          "angle": 0,
+          "roll": 0
+        },
+        "connectionIds": [],
+        "generated": true
+      }
+    ]
+  },
+  "validation": {
+    "valid": true,
+    "issues": [
+      {
+        "code": "GARAGE_LINTEL_REQUIRES_ENGINEERING",
+        "severity": "warning",
+        "path": "building.openings[id=G01].garage",
+        "messageRu": "Гаражные ворота: показанная перемычка — предварительная компоновка, её пролёт и сечение НЕ рассчитаны по нагрузкам.",
+        "affectedIds": [
+          "G01",
+          "plan-right"
+        ]
+      },
+      {
+        "code": "GARAGE_BRACING_AND_TRACK_CLEARANCES_UNVERIFIED",
+        "severity": "warning",
+        "path": "building.openings[id=G01].garage",
+        "messageRu": "Проверить ветровую/сейсмическую жёсткость (portal frame, крепления и фундамент) и реальные зазоры для выбранной модели ворот.",
+        "affectedIds": [
+          "G01",
+          "plan-right"
+        ]
+      },
+      {
+        "code": "HEADER_LOADS_UNSPECIFIED",
+        "severity": "warning",
+        "path": "building.openings[id=W01]",
+        "messageRu": "W01: нагрузки на перемычку не заданы; подбор сечения и опор НЕ проверен",
+        "affectedIds": [
+          "W01",
+          "plan-back"
+        ]
+      },
+      {
+        "code": "HEADER_LOADS_UNSPECIFIED",
+        "severity": "warning",
+        "path": "building.openings[id=G01]",
+        "messageRu": "G01: нагрузки на перемычку не заданы; подбор сечения и опор НЕ проверен",
+        "affectedIds": [
+          "G01",
+          "plan-right"
+        ]
+      },
+      {
+        "code": "HEADER_LOADS_UNSPECIFIED",
+        "severity": "warning",
+        "path": "building.openings[id=D03]",
+        "messageRu": "D03: нагрузки на перемычку не заданы; подбор сечения и опор НЕ проверен",
+        "affectedIds": [
+          "D03",
+          "plan-right"
+        ]
+      }
+    ],
+    "engineeringStatus": "not_evaluated"
+  }
+}

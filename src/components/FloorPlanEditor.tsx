@@ -19,6 +19,7 @@ import { usePlanOpenings } from './usePlanOpenings'
 import { OpeningCut, PlanOpeningDimensions, PlanOpeningSymbol, closestPointOnSide } from './PlanOpeningGraphics'
 import { exteriorDimensionNormal, planGridMetrics, roomLabelKind, zoomPlanAround } from '../core/plan-visualization'
 import { PlanOpeningInspector, PlanWallActions, PlanWallSelection } from './PlanSelection'
+import { PlanDraftingDimensions } from './PlanDraftingDimensions'
 import { PlanFrameControls, type PlanFramePick } from './PlanFrameControls'
 
 const preciseMetres = (mm:number) => (mm/1000).toFixed(3).replace('.', ',')
@@ -68,7 +69,7 @@ export function FloorPlanEditor({
   const [direction, setDirection] = useState<Direction>('+x')
   const [exactLength, setExactLength] = useState('6')
   const [snapMm, setSnapMm] = useState(250)
-  const [gridVisible, setGridVisible] = useState(true)
+  const [gridVisible, setGridVisible] = useState(false)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [hover, setHover] = useState<PlanPoint | null>(null)
@@ -534,8 +535,8 @@ export function FloorPlanEditor({
   const fitView = () => {
     if (!points.length) { setPan({ x: 0, y: 0 }); setZoom(1); return }
     const pixelPerMeter = Math.min(
-      (WIDTH - 240) / Math.max(widthM, 2),
-      (HEIGHT - 210) / Math.max(depthM, 2),
+      (WIDTH - 320) / Math.max(widthM, 2),
+      (HEIGHT - 300) / Math.max(depthM, 2),
       BASE_PX_PER_METRE * 2.5,
     )
     const nextZoom = Math.min(2.5, Math.max(0.3, pixelPerMeter / BASE_PX_PER_METRE))
@@ -546,6 +547,9 @@ export function FloorPlanEditor({
       y: HEIGHT / 2 - ((bounds.minZ + bounds.maxZ) / 2000) * fittedPx - OFFSET_Y,
     })
   }
+  // Fit the reference project (and any remounted imported plan) once, never during dragging.
+  useEffect(() => { fitView() }, [])
+
   const onCanvasClick = (event: MouseEvent<SVGSVGElement>) => {
     if (ignoreClick.current) { ignoreClick.current = false; return }
     if (event.shiftKey) return
@@ -1072,8 +1076,11 @@ export function FloorPlanEditor({
           </div>
         </div>
         <div className="plan-canvas-wrap">
+          <div className="plan-sheet-heading" aria-hidden="true">
+            <strong>ПЛАН РАЗБИВКИ СТЕН</strong><span>A-101 · WALL LAYOUT PLAN · мм</span>
+          </div>
           <svg ref={svgRef} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="plan-canvas"
-            data-testid="plan-canvas" data-grid-step-mm={snapMm} role="group" aria-label="Чертёж здания в метрах"
+            data-testid="plan-canvas" data-grid-step-mm={snapMm} role="group" aria-label="План разбивки стен: размеры в миллиметрах"
             data-mode={placement ? 'placement' : preview ? 'opening-drag' : tool}
             onClick={onCanvasClick} onPointerDown={pointerDown} onPointerMove={pointerMove}
             onPointerUp={pointerUp} onPointerCancel={pointerUp}
@@ -1087,6 +1094,10 @@ export function FloorPlanEditor({
               openingTools.hidePlacementPreview()
             }} onWheel={wheel}>
             <defs>
+              <pattern id="plan-wall-hatch" width="6" height="6" patternUnits="userSpaceOnUse">
+                <rect width="6" height="6" fill="#e6e9ec"/>
+                <path d="M -1 1 L 1 -1 M 0 6 L 6 0 M 5 7 L 7 5" stroke="#b1b8bf" strokeWidth=".6"/>
+              </pattern>
               <mask id="plan-opening-cuts" maskUnits="userSpaceOnUse" x={-4} y={-4} width={WIDTH + 8} height={HEIGHT + 8}>
                 <rect x={-4} y={-4} width={WIDTH + 8} height={HEIGHT + 8} fill="white" />
                 {openingCuts.map(opening => {
@@ -1112,13 +1123,15 @@ export function FloorPlanEditor({
               {gridMetrics.showMinor && <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-small-grid)" pointerEvents="none" data-testid="plan-grid-small"/>}
               <rect x={0} y={0} width={WIDTH} height={HEIGHT} fill="url(#plan-big-grid)" pointerEvents="none" data-testid="plan-grid-big"/>
             </>}
+            {gridVisible && <>
             <line x1={originX} y1={0} x2={originX} y2={HEIGHT}
               stroke="#b8cadd" strokeWidth="1.8" pointerEvents="none"/>
             <line x1={0} y1={originY} x2={WIDTH} y2={originY}
               stroke="#b8cadd" strokeWidth="1.8" pointerEvents="none"/>
             <text x={WIDTH-32} y={originY-14} className="plan-axis-label" textAnchor="end">+X →</text>
             <text x={originX+14} y={22} className="plan-axis-label">−Z ↑</text>
-            {plan.closed && <polygon points={fill} fill="#dce7ed" fillOpacity=".32" stroke="none" pointerEvents="none"/>}
+            </>}
+            {plan.closed && <polygon points={fill} fill="#fff" fillOpacity="1" stroke="none" pointerEvents="none"/>}
             {showRoomFill && visibleRooms.map((room,i)=>
               <g key={'room-floor-'+room.id} data-room-id={room.id}
                 data-testid={'plan-room-fill-'+room.id}
@@ -1144,7 +1157,7 @@ export function FloorPlanEditor({
             {exteriorWallStrips(plan).map((strip,i)=>
               <polygon key={'outer-strip-'+i} data-testid={'plan-exterior-strip-'+i}
                 points={strip.map(p=>{const q=xy(p);return q.x+','+q.y}).join(' ')}
-                fill="#526978" stroke="#304858" strokeWidth=".7" fillOpacity=".88" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
+                fill="url(#plan-wall-hatch)" stroke="#20262c" strokeWidth="1.8" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
             )}
             {edges.map(edge => {
               const a=xy(edge.from),b=xy(edge.to)
@@ -1157,7 +1170,7 @@ export function FloorPlanEditor({
                 ? exteriorDimensionNormal(points,edge.index)
                 : { x: norm.x, y: norm.y }
               const labelX=center.x+outside.x*49, labelY=center.y+outside.y*49
-              const dimensionVisible=!plan.closed || length>=90
+              const dimensionVisible=!plan.closed
               const rotation=Math.abs(dx)<Math.abs(dy)?-90:0
               const label=meters(planDistanceMm(edge.from,edge.to))+' м'
               const hasOpeningDimensions = annotatedSide && !('thicknessMm' in annotatedSide) &&
@@ -1184,6 +1197,8 @@ export function FloorPlanEditor({
                 </>}
               </g>
             })}
+            {plan.closed && <PlanDraftingDimensions plan={wallPreview ?? plan} sides={drawingSides}
+              openings={openingCuts} xy={xy} pxPerMm={px / 1000} activeOpeningWallId={annotatedOpening?.wallId} />}
             {openingInputActive && frameSides.filter(side => !('thicknessMm' in side)).map(side => {
               const start = xy(side.start), end = xy(side.end)
               return <line key={side.wallId} className="plan-host-target"
@@ -1248,8 +1263,11 @@ export function FloorPlanEditor({
                   }
                 }}>
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke={active ? '#087b95' : '#677e8f'}
-                  strokeWidth={w.thicknessMm * px / 1000}
+                  stroke={active ? '#087b95' : '#20262c'}
+                  strokeWidth={w.thicknessMm * px / 1000 + 2.5}
+                  strokeLinecap="butt" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  stroke="url(#plan-wall-hatch)" strokeWidth={Math.max(1,w.thicknessMm * px / 1000 - .5)}
                   strokeLinecap="butt" pointerEvents="none" mask="url(#plan-opening-cuts)"/>
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
                   stroke="transparent" strokeWidth={Math.max(18,w.thicknessMm * px / 1000)}
@@ -1262,11 +1280,11 @@ export function FloorPlanEditor({
                     event.preventDefault()
                     selectInteriorWall(w, { xMm: (w.start.xMm + w.end.xMm) / 2, zMm: (w.start.zMm + w.end.zMm) / 2 })
                   }} className="plan-interior-hit"/>
-                {annotatedSide?.wallId !== 'partition-' + w.id &&
+                {active && annotatedSide?.wallId !== 'partition-' + w.id &&
                   <text x={label.x + (a.x === b.x ? 18 : 0)}
                   y={label.y + (a.y === b.y ? -15 : 0)}
                   textAnchor="middle" className="plan-inner-label" pointerEvents="none">
-                  {meters(planDistanceMm(w.start,w.end))} м
+                  {Math.round(planDistanceMm(w.start,w.end))}
                 </text>}
               </g>
             })}
@@ -1372,7 +1390,7 @@ export function FloorPlanEditor({
                     fill="#fff" stroke="#72abb6" strokeWidth={1.5}/>
                   <text x={labelX} y={labelY+3} textAnchor="middle"
                     fill="#176f81" fontWeight={750} fontSize={13} pointerEvents="none">
-                    {dimensionLabel} м
+                    {Math.round(Number(dimensionLabel.replace(',','.'))*1000)}
                   </text>
                 </g>}
                 {currentlyEditing && dimensionEdit && <foreignObject x={labelX-60} y={labelY-18}
@@ -1461,6 +1479,11 @@ export function FloorPlanEditor({
                   Щёлкните, чтобы поставить первую точку
                 </text>
               </g>}
+            <g className="plan-graphic-scale" transform={`translate(24 ${HEIGHT-56})`} pointerEvents="none">
+              <path d={`M 0 -5 V 0 H ${px*2} V -5 M ${px} 0 V -5`}/>
+              <text x={0} y={15}>0</text><text x={px} y={15} textAnchor="middle">1</text>
+              <text x={px*2} y={15} textAnchor="middle">2 м</text>
+            </g>
           </svg>
           {showWallActions && <PlanWallActions side={selectedWall}
             anchor={xy(planSidePoint(selectedWall, wallPick.offsetMm))}
@@ -1499,7 +1522,7 @@ export function FloorPlanEditor({
               </strong>
             </div>
           </div>
-          <span className="plan-bottom-right">Размеры в метрах · точность 1 мм</span>
+          <span className="plan-bottom-right">Чертёж — мм · ввод — м · RO — черновой проём · CL — ось</span>
         </div>
       </main>
       {(plan.closed||selectedIndex!==null) && <aside className="plan-inspector" data-testid="plan-inspector"
@@ -1618,6 +1641,19 @@ export function FloorPlanEditor({
             <strong>Ничего не выбрано</strong>
             <p>Выберите стену, точку, проём или помещение на чертеже. Точные параметры появятся здесь.</p>
           </div>}
+        <div className="plan-drawing-notes" data-testid="plan-drawing-notes">
+          <strong>Базы размеров</strong>
+          <p>Габариты — по наружным граням каркаса. CL — оси перегородок. RO — грани чернового проёма; размер изделия задаёт изготовитель.</p>
+          <p>Площади — между гранями каркаса, без отделки. Сечения и шаг стоек сохранены из JSON.</p>
+        </div>
+        {!!shownOpenings.length && <div className="plan-opening-schedule" data-testid="plan-opening-schedule">
+          <strong>Ведомость проёмов · мм</strong>
+          <table><thead><tr><th>Марка</th><th>RO: Ш × В</th><th>Низ</th></tr></thead>
+            <tbody>{[...shownOpenings].sort((a,b)=>a.id.localeCompare(b.id)).map(o=><tr key={o.id}>
+              <td><button type="button" onClick={()=>{activateTool('select');selectOpening(o)}}>{o.id}</button></td>
+              <td>{o.widthMm} × {o.heightMm}</td><td>{o.sillHeightMm}</td>
+            </tr>)}</tbody></table>
+        </div>}
       </aside>}
     </div>
   )

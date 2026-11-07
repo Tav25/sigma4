@@ -22,11 +22,45 @@ try {
     '--no-sandbox', '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader',
   ] })
   const page = await browser.newPage({ viewport: { width: 1500, height: 950 } })
+  // Regression scenarios import their explicit legacy fixture instead of depending on startup data.
+  const loadLegacyProject = async targetPage => {
+    await targetPage.locator('#import-file').setInputFiles([{
+      name:'legacy.sigma4.json',mimeType:'application/json',
+      buffer:await readFile(new URL('../example.sigma4.json',import.meta.url)),
+    }])
+    await targetPage.locator('.top-bar').getByText('Rev: 1',{exact:true}).waitFor()
+    await targetPage.getByTestId('plan-grid-toggle').click()
+    await targetPage.getByTestId('plan-room-fill-toggle').click()
+  }
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(base, { waitUntil: 'networkidle' })
   const packageVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version
   assert.equal((await page.locator('.app-version').textContent())?.trim(), packageVersion)
+  // 0.1.38: supplied sample, correct jamb and axis references, monotone defaults.
+  assert.match(await page.getByTestId('plan-dimensions').textContent(),/11,00.*7,00/)
+  assert.equal(await page.locator('[data-testid^="plan-frame-opening-"]').count(),5)
+  assert.equal(await page.locator('[data-testid^="plan-room-label-R"]').count(),3)
+  assert.equal(await page.getByTestId('plan-grid-toggle').getAttribute('aria-pressed'),'false')
+  assert.equal(await page.getByTestId('plan-room-fill-toggle').getAttribute('aria-pressed'),'false')
+  const rightRO=page.locator('[data-edge="1"][data-chain="openings"] [data-dimension-mm]')
+  assert.deepEqual(await rightRO.evaluateAll(nodes=>nodes.map(n=>Number(n.getAttribute('data-dimension-mm')))),[1900,900,400,3000,800])
+  await page.getByTestId('plan-opening-schedule').getByRole('button',{name:'D02',exact:true}).click()
+  await page.getByTestId('plan-opening-dimensions').waitFor()
+  await page.screenshot({path:dir+'/49-us-reference-2d.png'})
+  await page.getByTestId('tab-frame').click()
+  await page.locator('.viewport canvas').waitFor({state:'visible'})
+  assert.equal(await page.locator('.viewport').getAttribute('data-dimension-total-x'),'11000')
+  assert.equal(await page.locator('.viewport').getAttribute('data-dimension-total-z'),'7000')
+  await page.screenshot({path:dir+'/50-us-reference-3d.png'})
+  await page.getByTestId('tab-plan').click()
+  const referenceDownload=page.waitForEvent('download')
+  await page.getByTestId('plan-export').click()
+  const reference=JSON.parse(await readFile(await (await referenceDownload).path(),'utf8'))
+  const supplied=JSON.parse(await readFile(new URL('../src/data/default-project.sigma4.json',import.meta.url),'utf8'))
+  assert.deepEqual(reference.building.floorPlan,supplied.building.floorPlan)
+  assert.equal(reference.validation.valid,true)
+  await loadLegacyProject(page)
   // New SIGMA4 0.1.0 starts on the separate 2D Plan workspace.
   await page.getByTestId('plan-workspace').waitFor()
   const initialCanvas=page.getByTestId('plan-canvas')
@@ -140,7 +174,7 @@ try {
     name: 'old.sigma4.json', mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(exported)),
   }])
-  await page.getByText('Rev: 2').waitFor()
+  await page.getByText('Rev: 3').waitFor()
   await page.getByText('Валидация: OK').waitFor()
   const secondDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
@@ -233,7 +267,7 @@ try {
   await page.screenshot({ path: dir + '/05-garage-door.png' })
   assert.equal(errors.length, 0, 'Unexpected browser exception')
   // Focused real-3D visual check: one untouched facade, one garage wall.
-  await page.reload({ waitUntil: 'networkidle' })
+  await page.reload({ waitUntil: 'networkidle' }); await loadLegacyProject(page)
   await page.getByTestId('tab-frame').click()
   await page.getByRole('button', { name: '+ Добавить вторую стену' }).click()
   await page.getByTestId('add-garage-door').click()
@@ -298,7 +332,7 @@ try {
   assert.equal(errors.length, 0)
   // S06.5: import a clean 4 m wall, prove the left end stays at X=0,
   // inspect the dimension readout and capture a real-world-axis screenshot.
-  await page.reload({ waitUntil: 'networkidle' })
+  await page.reload({ waitUntil: 'networkidle' }); await loadLegacyProject(page)
   await page.getByTestId('tab-frame').click()
   const blankDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Экспорт JSON' }).click()
@@ -374,7 +408,7 @@ try {
   await page.getByTestId('plan-inspector').waitFor()
   assert.equal(await page.getByTestId('plan-view-framing').count(),0)
   assert.equal(await page.getByTestId('plan-cut-height').count(),0)
-  await page.getByTestId('plan-outer-dimension-0').waitFor()
+  await page.locator('[data-edge="0"][data-chain="overall"]').waitFor()
   assert.match(await page.getByTestId('plan-dimensions').textContent(), /6,00.*4,00/)
   assert.match(await page.getByTestId('plan-perimeter').textContent(), /20,00/)
   assert.match(await page.getByTestId('plan-area').textContent(), /24/)
@@ -464,12 +498,12 @@ try {
   await page.getByTestId('plan-tool-select').click()
   await clickGarage(4700,-1000)
   await page.getByTestId('plan-clearance-negative').waitFor()
-  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/4,70/)
+  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/4700/)
   await page.getByTestId('plan-clearance-negative').locator('.plan-click-dimension').click()
   await page.getByTestId('plan-dimension-input').fill('5,20')
   await page.getByTestId('plan-dimension-input').press('Enter')
   await page.getByTestId('plan-dimension-input').waitFor({state:'detached'})
-  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/5,20/)
+  assert.match(await page.getByTestId('plan-clearance-negative').textContent(),/5200/)
   await page.getByTestId('plan-outer-thickness').fill('200')
   await page.getByTestId('plan-save-outer-thickness').click()
   const movedDownload=page.waitForEvent('download')
@@ -542,7 +576,7 @@ try {
   assert.deepEqual(imported.building.floorPlan.graph,final.building.floorPlan.graph)
   assert.equal(imported.validation.valid,true)
   // New linked project: draw and edit the same geometry used by the real 3D scene.
-  await page.reload({ waitUntil: 'networkidle' })
+  await page.reload({ waitUntil: 'networkidle' }); await loadLegacyProject(page)
   await page.getByTestId('plan-add-exact').click()
   for (const length of ['10', '7', '10']) {
     await page.getByTestId('plan-length-input').fill(length)
@@ -596,7 +630,7 @@ try {
   assert.deepEqual(linked.building.walls.map(wall => wall.lengthMm), [11000, 6710, 11000, 6710])
   assert.equal(linked.validation.valid, true)
 
-  await page.reload({ waitUntil: 'networkidle' })
+  await page.reload({ waitUntil: 'networkidle' }); await loadLegacyProject(page)
   await page.locator('#import-file').setInputFiles([{
     name: 'linked-garage.sigma4.json', mimeType: 'application/json', buffer: Buffer.from(linkedJson),
   }])
@@ -624,11 +658,11 @@ try {
   await page.getByTestId('plan-tool-select').click()
   await clickGarage(4000, -1500)
   const cleanSize = page.getByTestId('plan-clearance-negative')
-  assert.match(await cleanSize.textContent(), /3,805/)
+  assert.match(await cleanSize.textContent(), /3805/)
   await cleanSize.getByRole('button').click()
   await page.getByTestId('plan-dimension-input').fill('4,105')
   await page.getByTestId('plan-dimension-input').press('Enter')
-  assert.match(await cleanSize.textContent(), /4,105/)
+  assert.match(await cleanSize.textContent(), /4105/)
   await page.getByTestId('plan-frame-build').click()
   await page.getByText('Количество стен: 6', { exact: true }).waitFor()
   await page.locator('.viewport[data-dimension-total-x="10000"][data-dimension-total-z="7000"]').waitFor()
@@ -686,7 +720,7 @@ try {
 
   // Direct 2D editing uses the selected host, a transient preview, and one
   // canonical command when a placement or drag is confirmed.
-  await page.reload({ waitUntil: 'networkidle' })
+  await page.reload({ waitUntil: 'networkidle' }); await loadLegacyProject(page)
   const drawDirectGarage = async targetPage => {
     await targetPage.getByTestId('plan-add-exact').click()
     for (const length of ['10', '7', '10']) {
@@ -859,7 +893,7 @@ try {
   // Screenshot regression: 9 x 6 metre house with a north-west 3 x 3.25 m
   // room, through internal Z wall, left-facing T branch and door on the
   // upper wall. Run it through the actual UI, not just the ProjectStore.
-  await page.reload({waitUntil:'networkidle'})
+  await page.reload({waitUntil:'networkidle'}); await loadLegacyProject(page)
   await page.getByTestId('plan-add-exact').click()
   for(const length of ['9','6','9']){
     await page.getByTestId('plan-length-input').fill(length)
@@ -915,9 +949,9 @@ try {
   await clickNorthwest(3000,-5100)
   await page.getByTestId('plan-selected-interior').waitFor()
   const originalClearanceText=await page.getByTestId('plan-clearance-negative').textContent()
-  const originalClearanceMatch=originalClearanceText.match(/(\d+),(\d+)/)
+  const originalClearanceMatch=originalClearanceText.match(/\d+/)
   assert.ok(originalClearanceMatch,'A numeric negative clearance must exist')
-  const clearanceMm=Math.round(Number(originalClearanceMatch[0].replace(',','.'))*1000)
+  const clearanceMm=Number(originalClearanceMatch[0])
   for(const desiredMm of [clearanceMm+250,clearanceMm]){
     const desired=(desiredMm/1000).toFixed(3).replace('.',',')
     await page.getByTestId('plan-clearance-negative').locator('.plan-click-dimension').click()
@@ -925,7 +959,7 @@ try {
     await page.getByTestId('plan-dimension-input').press('Enter')
     await page.getByTestId('plan-dimension-input').waitFor({state:'detached'})
     assert.match(await page.getByTestId('plan-clearance-negative').textContent(),
-      new RegExp(desired.replace(',','[,]')))
+      new RegExp(String(desiredMm)))
   }
   await page.screenshot({path:dir+'/37-northwest-9x6-wall-resized-back.png'})
   const nwBuiltDownload=page.waitForEvent('download')
@@ -950,7 +984,7 @@ try {
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
   mobile.on('pageerror', error => errors.push(error.message))
-  await mobile.goto(base, { waitUntil: 'networkidle' })
+  await mobile.goto(base, { waitUntil: 'networkidle' }); await loadLegacyProject(mobile)
   await drawDirectGarage(mobile)
   const mobileWall = await garagePoint(4500, 0, mobile)
   await mobile.touchscreen.tap(mobileWall.x, mobileWall.y)
@@ -1085,7 +1119,7 @@ try {
   // v0.1.27: browser integration of a genuine four-arm X in a new garage.
   // The drawn graph keeps four independently editable arms, while the
   // physical framing builds ONE X-through and TWO Z-butt wall modules.
-  await page.reload({waitUntil:'networkidle'})
+  await page.reload({waitUntil:'networkidle'}); await loadLegacyProject(page)
   await page.getByTestId('plan-add-exact').click()
   for(const length of ['10','7','10']){
     await page.getByTestId('plan-length-input').fill(length)
@@ -1148,7 +1182,7 @@ try {
 
   // S22.1: reproduce user screenshot (9 x 6, through 6m, T arm 3m).
   // Do NOT press "Enable partitions" before the single Build click.
-  await page.reload({waitUntil:'networkidle'})
+  await page.reload({waitUntil:'networkidle'}); await loadLegacyProject(page)
   await page.getByTestId('plan-add-exact').click()
   for(const length of ['9','6','9']){
     await page.getByTestId('plan-length-input').fill(length)

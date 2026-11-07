@@ -68,6 +68,7 @@ export function PlanOpeningSymbol({
   const hinge = swing.hinge === 'start' ? 0 : width
   const latch = width - hinge
   const direction = swing.side === 'left' ? -1 : 1
+  const hingeFace = direction * depth / 2
   const sweep = (swing.hinge === 'start' ? direction : -direction) > 0 ? 1 : 0
   const label = at(offset + width / 2, -(depth / 2 + 10))
   const title = { window: 'Окно', door: 'Дверь', 'garage-door': 'Ворота' }[opening.type]
@@ -90,7 +91,7 @@ export function PlanOpeningSymbol({
       {onSelect && <>
         <line className="plan-opening-hit" x2={width} />
         {opening.type === 'door' && <line className="plan-opening-hit plan-opening-leaf-hit"
-          x1={hinge} x2={hinge} y2={width * direction} />}
+          x1={hinge} x2={hinge} y1={hingeFace} y2={hingeFace + width * direction} />}
       </>}
       <g className="plan-opening-lines" pointerEvents="none">
         <path d={`M 0 ${-depth / 2} V ${depth / 2} M ${width} ${-depth / 2} V ${depth / 2}`} />
@@ -100,9 +101,9 @@ export function PlanOpeningSymbol({
           <path className="plan-garage-track" d={`M 0 ${-depth / 2} H ${width}`} />
         </>}
         {opening.type === 'door' && <>
-          <path d={`M ${hinge} 0 V ${width * direction}`} />
-          <path className="plan-door-arc" d={`M ${latch} 0 A ${width} ${width} 0 0 ${sweep} ${hinge} ${width * direction}`} />
-          <circle cx={hinge} r={2.2} fill="currentColor" stroke="none" />
+          <path d={`M ${hinge} ${hingeFace} V ${hingeFace + width * direction}`} />
+          <path className="plan-door-arc" d={`M ${latch} ${hingeFace} A ${width} ${width} 0 0 ${sweep} ${hinge} ${hingeFace + width * direction}`} />
+          <circle cx={hinge} cy={hingeFace} r={1.6} fill="currentColor" stroke="none" />
         </>}
         {(preview || selected) && <rect className="plan-opening-selection" x={0} y={-depth / 2 - 3}
           width={width} height={depth + 6} rx={2} />}
@@ -127,7 +128,9 @@ export function PlanOpeningDimensions({
     { field: 'end', label: 'До конца стены', from: end, to: length },
   ] as const
   const normalDirection = 'thicknessMm' in side && opening.type === 'door' && opening.swing?.side === 'right' ? -1 : 1
-  const normal = (depth / 2 + 38) * normalDirection
+  const swingSpace = !('thicknessMm' in side) && opening.type === 'door' &&
+    opening.swing?.side !== 'left' ? opening.widthMm * pxPerMm + 28 : 38
+  const normal = (depth / 2 + swingSpace) * normalDirection
   const witness = [...new Set([0, start, end, length])]
   return <g className="plan-opening-dimensions" pointerEvents="none" data-testid="plan-opening-dimensions">
     {witness.map(u => {
@@ -171,7 +174,7 @@ export function PlanOpeningDimensions({
           </div>
         </foreignObject> : <g className={interactive ? 'plan-click-dimension' : undefined}
           role={interactive ? 'button' : undefined} tabIndex={interactive ? 0 : undefined}
-          aria-label={interactive ? label + ' ' + text + ' м, изменить' : undefined}
+          aria-label={interactive ? label + ' ' + Math.round(to-from) + ' мм, изменить' : undefined}
           pointerEvents={interactive ? 'auto' : 'none'}
           onClick={interactive ? event => { event.stopPropagation(); begin() } : undefined}
           onKeyDown={interactive ? event => {
@@ -182,7 +185,7 @@ export function PlanOpeningDimensions({
             }
           } : undefined}>
           <rect x={center.x - labelWidth / 2} y={center.y - 11} width={labelWidth} height={22} rx={5} />
-          <text x={center.x} y={center.y + 4} textAnchor="middle">{text} м</text>
+          <text x={center.x} y={center.y + 4} textAnchor="middle">{Math.round(to-from)}</text>
         </g>}
       </g>
     })}

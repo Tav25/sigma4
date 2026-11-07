@@ -580,3 +580,35 @@ body,
    Its actionable child buttons remain interactive and keyboard accessible. */
 .plan-wall-actions {pointer-events:none}
 .plan-wall-actions button {pointer-events:auto}
+
+/* 0.1.38 — US wall-layout drawing conventions, metric model retained.
+   Screen weights express hierarchy; they are not a claim of plotted mm widths. */
+.plan-canvas {background:#fff}
+.plan-wall-line {stroke:#20262c}
+.plan-drafting-dimensions {stroke:#434b53;stroke-width:.85;fill:none}
+.plan-drafting-dimensions .draft-witness {stroke:#8b9299;stroke-width:.65}
+.plan-drafting-dimensions .draft-tick {stroke:#20262c;stroke-width:1.7}
+.plan-drafting-dimensions .draft-value {fill:#20262c;stroke:#fff;stroke-width:4px;
+  paint-order:stroke;stroke-linejoin:round;font:500 16px Arial,sans-serif;font-variant-numeric:tabular-nums}
+.plan-drafting-dimensions .draft-cl {fill:#555;stroke:#fff;stroke-width:3;paint-order:stroke;font:10px Arial,sans-serif}
+.plan-opening-symbol[data-type="window"],.plan-opening-symbol[data-type="garage-door"],.plan-opening-symbol {color:#252b31}
+.plan-opening-lines {stroke-width:1.5;stroke-linecap:butt}
+.plan-opening-lines .plan-door-arc {stroke-width:.8;opacity:1}
+.plan-opening-label {font:600 14px Arial,sans-serif;stroke:#fff;stroke-width:4}
+.plan-room-label-background {fill:#fff;fill-opacity:.92;stroke:none}
+.plan-room-name {fill:#4b535b;font:500 13px Arial,sans-serif}
+.plan-room-area {fill:#20262c;font:600 16px Arial,sans-serif}
+.plan-sheet-heading {position:absolute;top:18px;left:24px;z-index:1;pointer-events:none;
+  color:#555e66;font:10px Arial,sans-serif;background:#ffffffeb;padding:5px 7px}
+.plan-sheet-heading strong {display:block;color:#20262c;font:bold 13px Arial,sans-serif;letter-spacing:.6px;margin-bottom:5px}
+.plan-sheet-heading span {display:block}
+.plan-graphic-scale {fill:#454d55;font:10px Arial,sans-serif}
+.plan-graphic-scale path {fill:none;stroke:#454d55;stroke-width:1.2}
+.plan-drawing-notes,.plan-opening-schedule {margin-top:18px;padding-top:14px;border-top:1px solid #dce3e8;font-size:12px;color:#455968}
+.plan-drawing-notes strong,.plan-opening-schedule strong {font-size:12px;color:#263b49}
+.plan-drawing-notes p {font-size:11px;line-height:1.6;margin:8px 0}
+.plan-opening-schedule table {width:100%;border-collapse:collapse;margin-top:10px;font-size:11px;font-variant-numeric:tabular-nums}
+.plan-opening-schedule th,.plan-opening-schedule td {padding:7px 3px;text-align:left;border-bottom:1px solid #e3e8ed;white-space:nowrap}
+.plan-opening-schedule th {font-weight:500;color:#6c7c87}
+.plan-opening-schedule button {border:1px solid #ccd9e1;background:#fff;border-radius:4px;color:#21647e;padding:4px 6px;cursor:pointer}
+.plan-opening-schedule button:hover,.plan-opening-schedule button:focus-visible {background:#e8f5f8;outline:2px solid #2186a1}
