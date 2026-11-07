@@ -1,0 +1,381 @@
+/* SIGMA4 UI-02 — one visual system for Plan 2D, Frame 3D and Section.
+ * All workspace controls inherit these tokens. 3D canvas materials are not
+ * recoloured by the UI theme.
+ */
+:root {
+  --ui-sidebar-width: 302px;
+  --ui-sidebar-compact-width: 260px;
+  --ui-bg: #eef3f7;
+  --ui-surface: #ffffff;
+  --ui-panel-muted: #f5f9fc;
+  --ui-border: #d7e2eb;
+  --ui-border-strong: #c5d7e3;
+  --ui-text: #243849;
+  --ui-muted: #63788c;
+  --ui-accent: #1b6a91;
+  --ui-accent-hover: #145576;
+  --ui-accent-light: #eff6fb;
+  --ui-accent-selected: #e1f0f8;
+  --ui-focus: #1297b4;
+  --ui-success: #187d62;
+  --ui-danger: #a8322b;
+  --ui-danger-light: #fff4f2;
+  --ui-header: #1f2937;
+  --ui-radius: 8px;
+  --ui-input-height: 38px;
+}
+
+/* One sidebar width and surface at every desktop breakpoint. */
+.plan-workspace {
+  grid-template-columns: var(--ui-sidebar-width) minmax(0, 1fr);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+.left-panel {
+  width: var(--ui-sidebar-width);
+  min-width: 0;
+  padding: 20px;
+  background: var(--ui-surface);
+  border-right: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+.plan-controls {
+  padding: 20px;
+  background: var(--ui-surface);
+  border-right: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+.viewport-wrap, .plan-drawing, .frame-horizontal-section {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+.plan-toolbar, .plan-bottom, .frame-section-toolbar, .frame-section-footer {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+}
+.plan-canvas-wrap { background: #fcfdff; }
+.plan-eyebrow {
+  color: var(--ui-accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+  margin: 2px 0 9px;
+}
+.plan-controls h1, .workspace-sidebar-heading {
+  margin: 0 0 14px;
+  color: var(--ui-text);
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+.panel-title, .plan-section-title {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+.plan-muted, .plan-guidance, .left-panel .param-group {
+  color: var(--ui-muted);
+  line-height: 1.6;
+}
+.plan-tool-section { border-color: var(--ui-border); }
+.plan-step-count { background: var(--ui-accent); }
+.plan-step strong { color: var(--ui-text); }
+.plan-step small { color: var(--ui-muted); }
+.ui-sidebar-notice {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--ui-panel-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  color: var(--ui-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.ui-sidebar-notice .plan-button { margin-top: 10px; }
+.plan-selection-panel, .props {
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-panel-muted);
+  color: var(--ui-text);
+}
+.props { margin-top: 16px; }
+.props-title, .plan-selection-panel strong { color: var(--ui-text); }
+.plan-inspector-kicker, .plan-mode-mark { color: var(--ui-accent); }
+.plan-selection-detail, .plan-wall-actions-label { color: var(--ui-muted); }
+.plan-object-tag { background: var(--ui-accent-selected); color: var(--ui-accent); }
+.project-tree {
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+.project-tree-wall, .project-tree-connections { border-color: var(--ui-border); }
+.project-tree-wall > summary:hover, .tree-group > summary:hover,
+.tree-item:hover { background: var(--ui-accent-light); }
+.tree-selected {
+  background: var(--ui-accent-selected) !important;
+  color: var(--ui-accent);
+}
+
+/* The same input geometry, border, typography, focus state and disabled state.
+ * Exclude checkboxes/ranges so they keep their native accessible semantics.
+ */
+:is(.plan-controls, .left-panel) input:not([type="checkbox"]):not([type="range"]),
+:is(.plan-controls, .left-panel) select,
+.frame-section-main-controls input[type="number"],
+.plan-grid-select select {
+  min-height: var(--ui-input-height);
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 500 13px/1.25 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  outline: none;
+}
+:is(.plan-controls, .left-panel) input:not([type="checkbox"]):not([type="range"]):focus,
+:is(.plan-controls, .left-panel) select:focus,
+.frame-section-main-controls input[type="number"]:focus,
+.plan-grid-select select:focus {
+  border-color: var(--ui-focus);
+  box-shadow: 0 0 0 3px #1297b422;
+}
+:is(.plan-controls, .left-panel) input:disabled,
+:is(.plan-controls, .left-panel) select:disabled {
+  opacity: .58;
+  cursor: not-allowed;
+  background: var(--ui-panel-muted);
+}
+:is(.plan-controls, .left-panel) input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  accent-color: var(--ui-accent);
+}
+.plan-controls .plan-large-input {
+  height: 50px;
+  font-size: 21px !important;
+  font-weight: 750 !important;
+}
+.frame-section-main-controls input[type="number"] { width: 92px; }
+.plan-grid-select select { width: auto; min-height: 34px; padding: 5px 8px; }
+.plan-grid-toggle { min-height: 36px; }
+
+/* Common button anatomy — 2D, 3D, toolbar, section, overlay, camera. */
+.plan-button,
+.plan-mode-buttons button,
+.plan-main-tools button,
+.plan-opening-actions button,
+.plan-swing-actions button,
+.plan-zoom-tools button,
+.plan-grid-toggle,
+.frame-section-main-controls button,
+.frame-section-zoom button,
+.reset-view,
+.frame-section-toggle,
+.ui-button {
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-accent-light);
+  color: var(--ui-accent);
+  font: 650 12px/1.3 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color .12s, border-color .12s, color .12s, box-shadow .12s;
+}
+:is(
+  .plan-button,
+  .plan-mode-buttons button,
+  .plan-main-tools button,
+  .plan-opening-actions button,
+  .plan-swing-actions button,
+  .plan-zoom-tools button,
+  .plan-grid-toggle,
+  .frame-section-main-controls button,
+  .frame-section-zoom button,
+  .reset-view,
+  .frame-section-toggle,
+  .ui-button
+):hover:not(:disabled) {
+  background: var(--ui-accent-selected);
+  border-color: #afd0df;
+}
+:is(
+  .plan-button,
+  .plan-mode-buttons button,
+  .plan-main-tools button,
+  .plan-opening-actions button,
+  .plan-swing-actions button,
+  .plan-zoom-tools button,
+  .plan-grid-toggle,
+  .frame-section-main-controls button,
+  .frame-section-zoom button,
+  .reset-view,
+  .frame-section-toggle,
+  .ui-button
+):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+:is(.plan-button, .plan-mode-buttons button, .plan-main-tools button,
+    .plan-opening-actions button, .frame-section-main-controls button,
+    .frame-section-zoom button, .ui-button):disabled {
+  opacity: .43;
+  cursor: not-allowed;
+}
+.plan-button.plan-primary {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: #fff;
+}
+.plan-button.plan-primary:hover:not(:disabled) {
+  background: var(--ui-accent-hover);
+  border-color: var(--ui-accent-hover);
+}
+.plan-button.plan-secondary {
+  background: var(--ui-accent-light);
+  border-color: var(--ui-border-strong);
+  color: var(--ui-accent);
+}
+.plan-button.plan-text {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+  color: var(--ui-muted);
+}
+.plan-button.ui-danger { color: var(--ui-danger); }
+.plan-button.ui-danger:hover:not(:disabled) {
+  color: var(--ui-danger);
+  background: var(--ui-danger-light);
+  border-color: #e1b4ae;
+}
+.plan-mode-buttons button.plan-mode-active {
+  background: var(--ui-accent);
+  color: #fff;
+  border-color: var(--ui-accent);
+}
+.plan-main-tools {
+  background: var(--ui-accent-light);
+  border-color: var(--ui-border);
+}
+.plan-main-tools button { background: transparent; border-color: transparent; }
+.plan-main-tools button[aria-pressed="true"] {
+  background: var(--ui-surface);
+  border-color: var(--ui-border-strong);
+  color: var(--ui-accent);
+}
+.plan-frame-fields [aria-pressed="true"],
+.plan-grid-toggle[aria-pressed="true"] {
+  background: var(--ui-accent-selected);
+  color: var(--ui-accent);
+  border-color: var(--ui-focus);
+}
+.plan-swing-actions button,
+.plan-opening-actions button { white-space: normal; }
+.plan-grid-toggle[aria-pressed="false"] { color: var(--ui-muted); }
+.plan-zoom-tools button, .frame-section-zoom button,
+.frame-section-main-controls button { min-height: 36px; padding: 7px 10px; }
+.frame-section-toggle.plan-button {
+  width: auto;
+  margin: 0;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+}
+.reset-view { padding: 7px 12px; }
+.left-panel .plan-button { margin-top: 0; width: 100%; }
+.ui-button-stack { display: flex; flex-direction: column; gap: 7px; }
+.ui-button-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.ui-button-row .plan-button { min-width: 0; padding-inline: 7px; }
+.ui-button-stack .plan-button { margin: 0; }
+.plan-manual-openings summary { color: var(--ui-accent); }
+.plan-wall-actions {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+}
+.plan-canvas-feedback {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-accent-light);
+  color: var(--ui-accent);
+}
+.plan-canvas-feedback[data-error="true"], .plan-error {
+  color: var(--ui-danger);
+  background: var(--ui-danger-light);
+}
+.frame-section-toolbar, .frame-section-footer { color: var(--ui-muted); }
+.frame-section-summary strong { color: var(--ui-accent); }
+.frame-section-range { accent-color: var(--ui-accent); }
+
+/* Header controls use the same radius/weight and a contrast-aware dark variant. */
+.top-bar { background: var(--ui-header); }
+.ui-header-button {
+  min-width: 36px;
+  min-height: 34px;
+  padding: 5px 9px;
+  border: 1px solid #506376;
+  border-radius: var(--ui-radius);
+  background: #30465c;
+  color: #fff;
+  font: 650 15px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.ui-header-button:hover:not(:disabled) { background: #40617a; }
+.ui-header-button:disabled { opacity: .4; cursor: not-allowed; }
+.ui-header-button:focus-visible, .project-save-button:focus-visible,
+.workspace-tabs button:focus-visible { outline: 2px solid #5cc6ae; outline-offset: 2px; }
+.project-save-button {
+  min-height: 34px;
+  border-radius: var(--ui-radius);
+  font: 650 12px/1.2 system-ui, sans-serif;
+}
+ .ui-save-label-short { display: none; }
+.workspace-tabs { border-radius: var(--ui-radius); }
+.workspace-tabs button { min-height: 32px; border-radius: 6px; font: 650 12px/1.2 system-ui, sans-serif; }
+.project-autosave { color: #c9e7dd; }
+
+/* Consistent responsive behaviour in both modes.
+ * At <=700px the canvas stays on top and the sidebar becomes a bottom panel.
+ */
+@media (max-width: 1000px) {
+  .plan-workspace { grid-template-columns: var(--ui-sidebar-compact-width) minmax(0, 1fr); }
+  .left-panel { width: var(--ui-sidebar-compact-width); padding: 16px; }
+  .plan-controls { padding: 16px; }
+}
+@media (max-width: 700px) {
+  .plan-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .main { flex-direction: column-reverse; }
+  .left-panel, .plan-controls {
+    width: 100%;
+    min-width: 0;
+    max-height: 32vh;
+    overflow: auto;
+    padding: 14px 16px;
+    border-right: 0;
+    border-bottom: 0;
+    border-top: 1px solid var(--ui-border);
+  }
+  .left-panel { flex: 0 0 auto; }
+  .main .viewport-wrap { flex: 1 1 auto; min-height: 0; }
+  .ui-button-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-title { font-size: 14px; }
+  .app-version { display: none; }
+  .top-bar { gap: 4px; padding-inline: 8px; }
+  .top-bar > div:last-child { gap: 4px !important; }
+  .workspace-tabs { margin-left: 2px; padding: 2px; gap: 1px; }
+  .workspace-tabs button { font-size: 10px; padding: 6px; min-height: 30px; }
+  .ui-header-button { min-width: 30px; min-height: 32px; padding: 4px 6px; }
+  .ui-save-label-full { display: none; }
+  .ui-save-label-short { display: inline; }
+  .project-save-button { min-height: 32px; font-size: 11px; padding: 4px 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-button, .ui-button, .ui-header-button { transition: none; }
+}

@@ -358,7 +358,8 @@ export default function App() {
           </span>
           <button type="button" className="project-save-button" onClick={exportJson}
             title="Скачать текущий JSON-файл проекта">
-            Сохранить JSON{changedSinceExport ? ' •' : ''}
+            <span className="ui-save-label-full">Сохранить JSON</span>
+            <span className="ui-save-label-short">JSON</span>{changedSinceExport ? ' •' : ''}
           </button>
           <span className="project-revision">Rev: {revision}</span>
         </div>

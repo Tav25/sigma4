@@ -25,7 +25,50 @@ try {
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
   await page.goto(base, { waitUntil: 'networkidle' })
-  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.32')
+  assert.equal((await page.locator('.app-version').textContent())?.trim(), '0.1.33')
+
+  // UI-02: one set of design tokens controls all sidebars and buttons.
+  const styleOf = async selector => page.locator(selector).first().evaluate(el => {
+    const style = getComputedStyle(el)
+    return {
+      width: Math.round(el.getBoundingClientRect().width),
+      background: style.backgroundColor,
+      border: style.borderRightColor,
+      padding: style.paddingLeft,
+      radius: style.borderRadius,
+      height: Math.round(el.getBoundingClientRect().height),
+      color: style.color,
+      font: style.fontFamily,
+    }
+  })
+  const planPanel = await styleOf('.plan-controls')
+  assert.equal(planPanel.width, 302)
+  const planPrimary = await styleOf('[data-testid="plan-add-exact"]')
+  const planSecondary = await styleOf('[data-testid="plan-close"]')
+
+  await page.getByTestId('tab-frame').click()
+  await page.screenshot({ path: dir + '/ui02-desktop-frame.png' })
+  const framePanel = await styleOf('.left-panel')
+  const framePrimary = await styleOf('.left-panel .plan-primary')
+  const frameSecondary = await styleOf('.left-panel .plan-secondary')
+  for (const key of ['width', 'background', 'border', 'padding']) {
+    assert.equal(framePanel[key], planPanel[key], 'Mismatched sidebar ' + key)
+  }
+  for (const key of ['background', 'radius', 'height', 'font']) {
+    assert.equal(framePrimary[key], planPrimary[key], 'Mismatched primary button ' + key)
+    assert.equal(frameSecondary[key], planSecondary[key], 'Mismatched secondary button ' + key)
+  }
+  await page.getByTestId('frame-section-toggle').click()
+  const sectionSecondary = await styleOf('[data-testid="frame-section-toggle"]')
+  assert.equal(sectionSecondary.background, planSecondary.background)
+  assert.equal(sectionSecondary.radius, planSecondary.radius)
+  const sectionAction = await styleOf('.frame-section-main-controls button')
+  for (const key of ['background', 'radius', 'font']) {
+    assert.equal(sectionAction[key], planSecondary[key], 'Mismatched section control ' + key)
+  }
+  await page.screenshot({ path: dir + '/ui02-desktop-section.png' })
+  await page.getByTestId('frame-section-toggle').click()
+  await page.getByTestId('tab-plan').click()
 
   // Preserve the exact workspace view when switching between 2D and 3D.
   await page.locator('button[title="Увеличить масштаб"]').click()
@@ -86,8 +129,29 @@ try {
   await page.getByTestId('tab-frame').click()
   await page.locator('.viewport canvas').waitFor({ state: 'visible' })
   assert.equal(await page.getByRole('textbox', { name: 'Высота (мм)' }).inputValue(), '2800')
+  // Both workspaces collapse to the same 260px sidebar at medium sizes.
+  await page.setViewportSize({ width: 900, height: 850 })
+  await page.getByTestId('tab-plan').click()
+  assert.equal((await styleOf('.plan-controls')).width, 260)
+  await page.getByTestId('tab-frame').click()
+  assert.equal((await styleOf('.left-panel')).width, 260)
+
+  // Both workspaces use a full-width bottom inspector on mobile.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByTestId('tab-plan').click()
+  assert.equal((await styleOf('.plan-controls')).width, 390)
+  await page.getByTestId('tab-frame').click()
+  assert.equal((await styleOf('.left-panel')).width, 390)
+  const frameLayout = await page.evaluate(() => {
+    const panel = document.querySelector('.left-panel').getBoundingClientRect()
+    const canvas = document.querySelector('.main .viewport-wrap').getBoundingClientRect()
+    return { panelY: panel.y, canvasBottom: canvas.bottom }
+  })
+  assert.ok(frameLayout.panelY >= frameLayout.canvasBottom - 2, '3D inspector should be below mobile canvas')
+  await page.screenshot({ path: dir + '/ui02-mobile-frame.png' })
+
   assert.deepEqual(errors, [], 'Uncaught browser exceptions')
-  console.log('SIGMA4 UX-01 regression: PASS')
+  console.log('SIGMA4 UX-01 + UI-02 regressions: PASS')
 } finally {
   if (browser) await browser.close()
   vite.kill('SIGTERM')
